@@ -228,10 +228,14 @@ rm = rep(rm, '''    <section class="panel" id="rCmp"></section>''', '''    <sect
 rm = rep(rm, '''  renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
   const allYm''', '''  renderRMDaily({ P, txIn, ym, isCur, day });
   renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
-  renderRMAppx({ P, txIn, ym, isCur, day });
+  renderRMAppx({ P, txIn, ym, isCur, day, inScope, yr });
   const allYm''')
 # perbandingan: hanya tahun lalu vs tahun ini (bulan berjalan vs 3 bulan lalu sudah ada di laporan harian; per cabang/RM jadi lampiran)
 rm = rep(rm, 'const mode = RS.cmp === "yoy" ? "yoy" : "mtd", grp', 'const mode = "yoy", grp')
+# tabel YtD per cabang / RM dipindah ke Lampiran 2
+i0 = rm.index('    <div class="panel-h" style="margin-top:6px"><h3 style="font-size:14px">${yo ?'); i1 = rm.index('<div id="tCmpG"></div>', i0) + len('<div id="tCmpG"></div>')
+rm = rm[:i0].rstrip() + rm[i1:]
+rm = rep(rm, 'table($("#tCmpG"), [{ key: "k"', 'if ($("#tCmpG")) table($("#tCmpG"), [{ key: "k"', 2)
 rm = rep(rm, '''<h2>Perbandingan disbursement</h2><div class="seg" role="tablist" aria-label="Jenis perbandingan">
       <button type="button" role="tab" aria-selected="${!yo}" data-cmp="mtd">Bulan berjalan vs 3 bulan lalu</button><button type="button" role="tab" aria-selected="${yo}" data-cmp="yoy">${y1} vs ${yr}</button></div></div>''', '''<h2>Perbandingan disbursement ${y1} vs ${yr}</h2></div>''')
 rm = rep(rm, '''<span class="sub">per bulan</span></div><div id="rHq"></div></section>`;''', '''<span class="sub">per bulan</span></div><div id="rHq"></div></section>

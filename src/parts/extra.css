@@ -168,3 +168,10 @@ details.rm-more[open] > summary{margin-bottom:10px}
 .xp-shot .table-wrap > table:not(.kt) tbody tr:hover td{background:var(--surface)}
 .xp-shot .table-wrap > table:not(.kt) tbody tr:nth-child(even):hover td{background:color-mix(in srgb,#2f7be0 7%,var(--surface))}
 .xp-shot tbody tr:hover{background:transparent}
+details.apx{border-top:1px solid var(--line);padding:10px 0 4px}
+details.apx > summary{cursor:pointer;color:var(--brand);padding:4px 0;list-style:none}
+details.apx > summary::-webkit-details-marker{display:none}
+details.apx > summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+details.apx[open] > summary::before{transform:rotate(90deg)}
+details.apx[open] > summary{margin-bottom:6px}
+#apxSel{max-width:420px}

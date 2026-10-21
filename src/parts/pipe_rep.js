@@ -45,16 +45,22 @@ function pipeKcRekap(el, aktif) {
     ${kcs.length ? `<tfoot><tr class="knv"><td>GRAND TOTAL</td>${cells(aktif)}</tr>${areas.length > 1 ? areas.map(ar => `<tr class="knv"><td>${esc(ar.replace(/\s*\/\s*/, "/"))}</td>${cells(aktif.filter(x => x.area === ar))}</tr>`).join("") : ""}</tfoot>` : ""}</table></div>`;
 }
 
-// pilihan jadwal akad (bisa lebih dari satu tanggal)
-function akadPicker(el, dates, onChange) {
-  const lbl = () => !PS.akad.length ? "Semua jadwal akad" : PS.akad.length <= 2 ? PS.akad.map(d => tglS(d).replace(/ \d{4}$/, "")).join(", ") : PS.akad.length + " tanggal akad";
-  el.innerHTML = `<details class="ms"><summary class="ctl">${lbl()}</summary><div class="ms-pop">
-    ${dates.length ? dates.map(([d, n]) => `<label class="check"><input type="checkbox" value="${d}" ${PS.akad.includes(d) ? "checked" : ""}> ${tglS(d)} <small class="note">${n} deb</small></label>`).join("") : '<span class="note">Belum ada jadwal akad.</span>'}
+// pilihan ceklis (bisa lebih dari satu): PS[key] = nilai terpilih; kosong = semua. opts = [[nilai, label, jumlah deb]]
+function msPicker(el, key, opts, allLbl, short, onChange) {
+  const lbl = () => { const v = PS[key]; return !v.length ? allLbl : v.length <= 2 ? v.map(x => short(x)).join(", ") : v.length + " dipilih"; };
+  el.innerHTML = `<details class="ms"><summary class="ctl">${esc(lbl())}</summary><div class="ms-pop">
+    ${opts.length ? opts.map(([v, l, n]) => `<label class="check"><input type="checkbox" value="${esc(v)}" ${PS[key].includes(v) ? "checked" : ""}> ${l}${n != null ? ` <small class="note">${nf0.format(n)} deb</small>` : ""}</label>`).join("") : '<span class="note">Belum ada pilihan.</span>'}
     <div class="toolbar"><button class="btn" type="button" data-ms="all">Pilih semua</button><button class="btn" type="button" data-ms="clr">Hapus pilihan</button></div></div></details>`;
-  const set = v => { PS.akad = v; el.querySelector("summary").textContent = lbl(); onChange(); };
-  el.querySelectorAll("input").forEach(i => i.onchange = () => set([...el.querySelectorAll("input:checked")].map(x => x.value).sort()));
-  el.querySelectorAll("[data-ms]").forEach(b => b.onclick = () => { const on = b.dataset.ms === "all"; el.querySelectorAll("input").forEach(i => i.checked = on); set(on ? dates.map(x => x[0]) : []); });
+  const set = v => { PS[key] = v; el.querySelector("summary").textContent = lbl(); onChange(); };
+  const order = opts.map(o => o[0]);
+  el.querySelectorAll("input").forEach(i => i.onchange = () => set([...el.querySelectorAll("input:checked")].map(x => x.value).sort((a, b) => order.indexOf(a) - order.indexOf(b))));
+  el.querySelectorAll("[data-ms]").forEach(b => b.onclick = () => { const on = b.dataset.ms === "all"; el.querySelectorAll("input").forEach(i => i.checked = on); set(on ? [...order] : []); });
 }
+// saringan Proses (HOT/WARM/COLD/BATAL) dan Jenis di daftar pipeline. Tanpa pilihan: semua berkas aktif (batal tidak ikut);
+// BATAL dicentang: berkas batal ikut tampil (hanya batal bila tidak ada HOT/WARM/COLD yang dicentang)
+const prosesIn = x => { const v = PS.prosesM, hwc = v.filter(p => p !== "BATAL");
+  return !v.length ? !x.batal : x.batal ? v.includes("BATAL") : hwc.includes(x.proses); };
+const jenisIn = x => !PS.jenisM.length || PS.jenisM.includes(x.jenis);
 document.addEventListener("click", e => document.querySelectorAll("details.ms[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }));
 
 // ringkasan debitur pada jadwal akad terpilih

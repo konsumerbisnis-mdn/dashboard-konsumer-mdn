@@ -223,3 +223,12 @@ body{font-variant-numeric:tabular-nums}
   .nav a svg{transition:transform .22s cubic-bezier(.2,.8,.2,1)}
 }
 @media (prefers-reduced-motion:reduce){.nav a:hover,.nav a:hover svg{transform:none}.v-zin,.v-zout,.v-up,.v-down{animation:none}}
+/* hasil sync data */
+.sync-res{margin-top:10px;padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.4}
+.sync-res.ok{background:color-mix(in srgb,#1baf7a 14%,var(--surface));color:#0a6b47;border:1px solid color-mix(in srgb,#1baf7a 40%,transparent)}
+.sync-res.run{background:color-mix(in srgb,#2b7ff6 10%,var(--surface));color:#0a50c8;border:1px solid color-mix(in srgb,#2b7ff6 35%,transparent);display:flex;gap:8px;align-items:center}
+.sync-res.skip{background:var(--surface-2);color:var(--ink-2);border:1px solid var(--line)}
+.sync-res.err{background:color-mix(in srgb,#d64545 12%,var(--surface));color:#9c1c1c;border:1px solid color-mix(in srgb,#d64545 40%,transparent)}
+.sync-res .spin{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sySpin .8s linear infinite;flex:none}
+@keyframes sySpin{to{transform:rotate(360deg)}}
+:root[data-theme="dark"] .sync-res.ok{color:#7ee2b8}:root[data-theme="dark"] .sync-res.run{color:#9cc2f7}:root[data-theme="dark"] .sync-res.err{color:#ff9d9d}

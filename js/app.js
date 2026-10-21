@@ -2700,6 +2700,55 @@ const Exp = (() => {
     head();
     return { doc, W, H, m, top: 70, bot: H - 30, head, finish };
   }
+  // tata letak untuk pembagian halaman (dalam piksel kanvas, relatif ke atas elemen akar):
+  // keep = unit yang harus utuh dalam satu halaman (tabel, grafik, deret kotak, judul + isi berikutnya), dengan rentang kepala tabel (h0–h1);
+  // cuts = titik potong yang diperbolehkan (bawah baris tabel, panel, unit)
+  const KEEP = ".table-wrap, .chart, .grid.tiles, .rd-box, .rmc, .funnel, .kpis, .lb-row, .ds, .banner";
+  function layoutOf(root, pr) {
+    const t = root.getBoundingClientRect().top, Y = v => Math.round((v - t) * pr), keep = [], cuts = new Set();
+    const vis = e => e.getClientRects().length && !SKIP(e);
+    root.querySelectorAll(KEEP).forEach(e => { if (!vis(e)) return; const r = e.getBoundingClientRect(), th = e.querySelector("thead"), hr = th && th.getBoundingClientRect();
+      // pre = awal panel tempat tabel berada (judul, saringan) agar tidak tertinggal sendirian di halaman sebelumnya
+      const sec = e.closest("section.panel"), pre = sec && root.contains(sec) ? Y(sec.getBoundingClientRect().top) : null;
+      keep.push({ a: Y(r.top), b: Y(r.bottom), h0: hr ? Y(hr.top) : null, h1: hr ? Y(hr.bottom) : null, pre: pre != null && pre < Y(r.top) ? pre : null }); });
+    // judul (panel-h / h3) tidak boleh tertinggal sendirian di bawah halaman: satukan dengan unit sesudahnya
+    root.querySelectorAll(".panel-h, h3, .note").forEach(e => { const n = e.nextElementSibling; if (!vis(e) || !n || !vis(n)) return;
+      keep.push({ a: Y(e.getBoundingClientRect().top), b: Y(n.getBoundingClientRect().bottom), glue: 1 }); });
+    root.querySelectorAll("tr, section, .panel-h, .grid > *, .rd-grid > *, " + KEEP).forEach(e => { if (vis(e)) { const r = e.getBoundingClientRect(); cuts.add(Y(r.bottom)); cuts.add(Y(r.top)); } });
+    return { keep, cuts: [...cuts].sort((a, b) => a - b) };
+  }
+  // susun satu kanvas ke halaman PDF tanpa memotong unit: unit yang tidak muat di sisa halaman pindah ke halaman baru;
+  // unit sedikit lebih tinggi dari satu halaman diperkecil agar muat; hanya tabel yang jauh lebih panjang dari satu halaman
+  // dipotong di batas baris, dengan kepala tabel diulang di halaman lanjutan
+  const FIT = .7;
+  function place(P, cv, L, k) {
+    const { doc, m, top, bot } = P, gap = 10;
+    const draw = (sy, h, kk) => { const c = document.createElement("canvas"); c.width = cv.width; c.height = Math.max(1, Math.round(h));
+      c.getContext("2d").drawImage(cv, 0, sy, cv.width, h, 0, 0, cv.width, h);
+      doc.addImage(c.toDataURL("image/jpeg", .92), "JPEG", m, P.y, cv.width * kk, h * kk); P.y += h * kk; };
+    const pageH = (bot - top) / k, keep = L.keep.filter(r => r.b - r.a <= pageH / FIT);
+    // tabel yang jauh lebih panjang dari satu halaman: boleh dipotong di batas baris, tetapi kepala tabel + 3 baris pertama tidak dipisah
+    const bigT = L.keep.filter(r => r.h1 != null && r.b - r.a > pageH / FIT);
+    const inside = c => keep.some(r => r.a + 2 < c && c < r.b - 2) || bigT.some(r => (r.pre != null && r.a - r.pre < pageH * .3 ? r.pre : r.a) + 2 < c && c < r.h1 + 3 * (r.h1 - r.h0));
+    const cont = c => bigT.find(r => c > r.h1 && c < r.b - 2) || null;
+    let sy = 0, hdr = null;
+    while (sy < cv.height - 2) {
+      let avail = (bot - P.y) / k;
+      // kepala tabel diulang di halaman lanjutan
+      if (hdr && sy > hdr.h1 && sy < hdr.b && P.y === top) { draw(hdr.h0, hdr.h1 - hdr.h0, k); avail = (bot - P.y) / k; }
+      const rest = cv.height - sy;
+      if (rest * .85 <= avail) { draw(sy, rest, Math.min(k, avail * k / rest)); P.y += gap; return; }
+      const safe = L.cuts.filter(c => c > sy + 4 && c <= sy + avail && !inside(c)).pop();
+      if (safe) { draw(sy, safe - sy, k); sy = safe; hdr = cont(sy); P.next(); continue; }
+      if (P.y > top) { P.next(); continue; }
+      // di awal halaman dan tidak ada titik potong aman: unit pertama lebih tinggi dari satu halaman
+      const u = keep.filter(r => r.a <= sy + 4 && r.b > sy + avail).sort((x, y) => y.b - x.b)[0];
+      if (u) { const h = u.b - sy, kk = Math.min(k, (bot - P.y) / h); draw(sy, h, kk); sy = u.b; P.next(); continue; }
+      // tidak ada batas baris yang pas (baris sangat tinggi): potong pada batas halaman
+      const c = L.cuts.filter(x => x > sy + avail * .3 && x <= sy + avail).pop() || Math.floor(sy + avail);
+      draw(sy, c - sy, k); sy = c; hdr = cont(sy); P.next();
+    }
+  }
   async function run(sec, kind) {
     const title = titleOf(sec), name = fname(ctxOf() + "-" + title) + "-" + iso(new Date());
     if (kind === "csv" || kind === "xlsx") {
@@ -2711,62 +2760,40 @@ const Exp = (() => {
     }
     toast("Menyiapkan " + (kind === "pdf" ? "PDF" : "gambar") + "…");
     try {
-      // unduh satu bagian: judul bagian sudah ada di kop, jadi tidak digambar ulang; potongan halaman di batas baris/panel
-      let cuts = []; sec.classList.add("xp-one");
-      const cv = await snap(sec, true, pr => { const t = sec.getBoundingClientRect().top;
-        cuts = [...sec.querySelectorAll("tr, section, .panel-h, .grid > *, .rd-grid > *, .chart, .table-wrap")].map(e => Math.round((e.getBoundingClientRect().bottom - t) * pr)).sort((a, c) => a - c); })
-        .finally(() => sec.classList.remove("xp-one"));
+      // unduh satu bagian: judul bagian sudah ada di kop, jadi tidak digambar ulang
+      let L = null; sec.classList.add("xp-one");
+      const cv = await snap(sec, true, pr => { L = layoutOf(sec, pr); }).finally(() => sec.classList.remove("xp-one"));
       if (kind === "png") { const b = await new Promise(r => cv.toBlob(r, "image/png")); saveFile(name + ".png", b); return; }
-      const { doc, W, m, top, bot, head, finish } = await pdfNew(cv.width > cv.height * 1.1 ? "landscape" : "portrait", ctxOf() + " · " + title);
-      const iw = W - m * 2, scale = iw / cv.width, pageH = Math.floor((bot - top) / scale);
-      for (let y = 0, p = 0; y < cv.height; p++) {
-        if (p) { doc.addPage(); head(); }
-        const cut = y + pageH < cv.height ? cuts.filter(c => c > y + pageH * .5 && c <= y + pageH).pop() : null;
-        const h = cut ? cut - y : Math.min(pageH, cv.height - y), part = document.createElement("canvas"); part.width = cv.width; part.height = Math.ceil(h);
-        part.getContext("2d").drawImage(cv, 0, y, cv.width, h, 0, 0, cv.width, h);
-        doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, top, iw, h * scale);
-        y += h;
-      }
-      saveFile(name + ".pdf", finish());
+      const P = await pdfNew(cv.width > cv.height * 1.1 ? "landscape" : "portrait", ctxOf() + " · " + title);
+      P.y = P.top; P.next = () => { P.doc.addPage(); P.head(); P.y = P.top; };
+      place(P, cv, L, (P.W - P.m * 2) / cv.width);
+      saveFile(name + ".pdf", P.finish());
     } catch (er) { toast(er.message || "Gagal membuat file."); }
   }
-  // cetak satu menu utuh ke PDF (A4 mendatar): tiap blok di layar digambar terpisah lalu disusun per halaman,
-  // blok hanya dipotong bila lebih tinggi dari satu halaman. Tabel dicetak sebanyak baris yang sedang tampil.
+  // cetak satu menu utuh ke PDF (A4 mendatar): tiap blok di layar digambar terpisah lalu disusun per halaman tanpa memotong
+  // tabel/grafik (lihat place). Tabel dicetak sebanyak baris yang sedang tampil.
   async function page() {
     const v = $("#view"), title = ctxOf();
     const vis = e => !SKIP(e) && e.getClientRects().length && e.offsetHeight > 0;
     const top0 = [...v.children].filter(vis); if (!top0.length) { toast("Tidak ada isi untuk dicetak."); return; }
     toast("Menyiapkan PDF " + title + "…");
     try {
-      const { doc, W, m, top, bot, head, finish } = await pdfNew("landscape", title), iw = W - m * 2, gap = 10;
-      const bw = Math.max(...top0.map(e => e.offsetWidth)), pagePx = (bot - top) * bw / iw;
+      const P = await pdfNew("landscape", title), iw = P.W - P.m * 2;
+      P.y = P.top; P.next = () => { P.doc.addPage(); P.head(); P.y = P.top; };
+      const bw = Math.max(...top0.map(e => e.offsetWidth)), pagePx = (P.bot - P.top) * bw / iw;
       // blok pembungkus (grid) yang terlalu tinggi dipecah menjadi isinya agar potongan halaman jatuh di antara panel
       const blocks = [], walk = el => [...el.children].filter(vis).forEach(c => {
         const kids = [...c.children].filter(vis);
         if (c.offsetHeight > pagePx && kids.length > 1 && !c.matches("section, table, canvas, .panel")) walk(c); else blocks.push(c);
       });
       walk(v);
-      let y = top;
-      const next = () => { doc.addPage(); head(); y = top; };
       for (const b of blocks) {
-        // batas potong yang rapi (bawah baris tabel / panel), dalam piksel kanvas
-        let cuts = [];
-        const cv = await snap(b, false, pr => { const t = b.getBoundingClientRect().top;
-          cuts = [...b.querySelectorAll("tr, section, .panel-h, .grid > *")].map(e => Math.round((e.getBoundingClientRect().bottom - t) * pr)).sort((a, c) => a - c); });
-        const pr = cv._pr || 1, k = Math.min(iw / bw, iw * pr / cv.width) / pr; // pt per piksel kanvas
-        // sisa yang hanya sedikit melebihi ruang diperkecil (maks. 15%) agar tidak pindah halaman / menyisakan potongan kecil
-        const draw = (sy, h, kk) => { const part = document.createElement("canvas"); part.width = cv.width; part.height = h;
-          part.getContext("2d").drawImage(cv, 0, sy, cv.width, h, 0, 0, cv.width, h);
-          doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, y, cv.width * kk, h * kk); y += h * kk + gap; };
-        if (y > top && cv.height * k * .85 > bot - y) next();
-        for (let sy = 0; sy < cv.height;) {
-          const rest = cv.height - sy; if (rest * k * .85 <= bot - y) { draw(sy, rest, Math.min(k, (bot - y) / rest)); break; }
-          const room = Math.floor((bot - y) / k), cut = sy + room < cv.height ? cuts.filter(c => c > sy + room * .5 && c <= sy + room).pop() : null;
-          const h = cut ? cut - sy : room;
-          draw(sy, h, k); sy += h; next();
-        }
+        let L = null;
+        const cv = await snap(b, false, pr => { L = layoutOf(b, pr); L.keep.push({ a: 0, b: Math.round(b.scrollHeight * pr) }); });
+        const pr = cv._pr || 1;
+        place(P, cv, L, Math.min(iw / bw, iw * pr / cv.width) / pr);
       }
-      saveFile(fname(title) + "-" + iso(new Date()) + ".pdf", finish());
+      saveFile(fname(title) + "-" + iso(new Date()) + ".pdf", P.finish());
     } catch (er) { toast(er.message || "Gagal membuat PDF."); }
   }
   let pop = null;

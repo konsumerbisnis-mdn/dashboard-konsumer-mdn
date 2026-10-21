@@ -1,9 +1,9 @@
-# 17 · Dashboard Konsumer RO Medan (gabungan Briguna + KPR) — aplikasi web
+# 17 · Dashboard Konsumer Region I - Medan (gabungan Briguna + KPR) — aplikasi web
 
 *Sub-ketentuan baru (21 Okt'26) · file `17_dashboard_konsumer_web.md` · indeks: [00_INDEX.md](00_INDEX.md)*
 
 ## Tujuan
-Mencatat ketentuan yang disepakati untuk **Dashboard Konsumer RO Medan**, yaitu Dashboard Briguna (ketentuan 16) yang digabung dengan Dashboard KPR (`Dashboard_KPR_Medan.html`) menjadi satu website: menu, aturan hitung, database Google Sheets tambahan, upload, unduhan, peran, tampilan/SFX, dan keamanan.
+Mencatat ketentuan yang disepakati untuk **Dashboard Konsumer Region I - Medan**, yaitu Dashboard Briguna (ketentuan 16) yang digabung dengan Dashboard KPR (`Dashboard_KPR_Medan.html`) menjadi satu website: menu, aturan hitung, database Google Sheets tambahan, upload, unduhan, peran, tampilan/SFX, dan keamanan.
 
 ## Kapan dirujuk
 - Membangun / merevisi Dashboard Konsumer (frontend GitHub Pages atau `google_apps_script.gs`).
@@ -87,7 +87,7 @@ Seluruh menu **mengikuti pola menu dashboard KPR** (filter, kartu, panel buka/tu
 
 - Tampilan **mengikuti dashboard KPR plek ketiplek**: tema PS5, logo Danantara/BRI, animasi pembuka + audio, mode gelap/terang, zoom.
 - SFX mengikuti `sfx-dashboard-kpr.zip` dan `PANDUAN-SOUND.md` ("Cara A" = file audio, cadangan synth): navigasi = enter, beranda = back, hover = hover (jeda min. 70 ms), on/close/klik sesuai panduan. Tombol suara di banner bisa mematikan.
-- Judul aplikasi: **"Dashboard Konsumer RO Medan"**.
+- Judul aplikasi: **"Dashboard Konsumer Region I - Medan"**.
 
 # ARSITEKTUR & KEAMANAN
 

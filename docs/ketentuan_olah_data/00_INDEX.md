@@ -21,7 +21,7 @@ Folder ini memecah `ketentuan_olah_data_LW321_v4.md` menjadi sub-ketentuan per t
 | [13_master_kanca_area_unit_dedicated.md](13_master_kanca_area_unit_dedicated.md) | Area Head, Lampiran A (kanca–area), Lampiran B (unit dedicated) | 8, Lampiran A, Lampiran B |
 | [15_update_materi_briguna.md](15_update_materi_briguna.md) | Update materi PPT Briguna: peta slide → sumber → rumus, mode tanggal, SML berjalan, angka yang wajib ditanyakan | baru (15 Okt'26) |
 | [16_database_dashboard_briguna_gsheet.md](16_database_dashboard_briguna_gsheet.md) | Database utama Dashboard Briguna (Google Sheets): struktur 5 sheet, temuan kualitas data (lokal angka), cara pengisian, keamanan | baru (20 Okt'26) |
-| [17_dashboard_konsumer_web.md](17_dashboard_konsumer_web.md) | Dashboard Konsumer RO Medan (gabungan Briguna + KPR): 6 menu, aturan hitung Konsumer/KPR Subsidi/DG-UG, sheet produktivitas KPR & `RM & KC card`, upload, peran, unduhan, istilah RPC, tampilan/SFX, upgrade | baru (21 Okt'26) |
+| [17_dashboard_konsumer_web.md](17_dashboard_konsumer_web.md) | Dashboard Konsumer Region I - Medan (gabungan Briguna + KPR): 6 menu, aturan hitung Konsumer/KPR Subsidi/DG-UG, sheet produktivitas KPR & `RM & KC card`, upload, peran, unduhan, istilah RPC, tampilan/SFX, upgrade | baru (21 Okt'26) |
 | [18_brispot_warm_hot_leads.md](18_brispot_warm_hot_leads.md) | Brispot Briguna per jam: klasifikasi Warm/Hot (3 tahap)/Cair (sheet Rule), plafon vs net OS, unik per NIK, Rencana Real & Guidance, output persis layout sheet RM BGRITEL / KC BGRITEL / Mantri BGMIKRO / Unit BGMIKRO | baru (21 Okt'26) |
 
 ## Panduan per task — file mana yang dibuka

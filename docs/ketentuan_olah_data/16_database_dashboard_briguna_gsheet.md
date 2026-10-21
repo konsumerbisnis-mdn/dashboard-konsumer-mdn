@@ -2,7 +2,7 @@
 
 *Sub-ketentuan baru (20 Okt'26) · file `16_database_dashboard_briguna_gsheet.md` · indeks: [00_INDEX.md](00_INDEX.md)*
 
-> *(update 21 Okt'26)* Dashboard Briguna kini digabung dengan Dashboard KPR menjadi **Dashboard Konsumer RO Medan**. Database di file ini tetap dipakai; sheet tambahan (produktivitas KPR, `RM & KC card`, `LW321 KPR`) dan ketentuan aplikasinya ada di [17_dashboard_konsumer_web.md](17_dashboard_konsumer_web.md).
+> *(update 21 Okt'26)* Dashboard Briguna kini digabung dengan Dashboard KPR menjadi **Dashboard Konsumer Region I - Medan**. Database di file ini tetap dipakai; sheet tambahan (produktivitas KPR, `RM & KC card`, `LW321 KPR`) dan ketentuan aplikasinya ada di [17_dashboard_konsumer_web.md](17_dashboard_konsumer_web.md).
 
 ## Tujuan
 Mencatat struktur sheet & kolom file `database_dashboard_briguna_mdn` (Google Sheets, diunduh sebagai .xlsx) yang akan menjadi **database utama** Dashboard Briguna, beserta temuan kualitas data yang harus dibereskan sebelum dipakai.

@@ -161,3 +161,10 @@ details.rm-more[open] > summary{margin-bottom:10px}
 .table-wrap > table:not(.kt) tfoot td .note,.table-wrap > table:not(.kt) tfoot td small{color:rgba(255,255,255,.8)}
 .table-wrap > table:not(.kt) tfoot td .delta{color:#fff}
 .table-wrap > table:not(.kt) td.empty{background:transparent!important}
+/* unduhan PDF/gambar: tanpa panah buka-tutup; unduh satu bagian tanpa judul (sudah di kop) & tombol pilihan */
+.xp-shot.sec > .panel-h::after,.xp-shot .sec > .panel-h::after{display:none}
+.xp-one > .panel-h > h2,.xp-one > .panel-h .seg{display:none}
+.kt tr.knv td .neg,.kt tr.ktot td .neg{color:#ffc2c7}
+.xp-shot .table-wrap > table:not(.kt) tbody tr:hover td{background:var(--surface)}
+.xp-shot .table-wrap > table:not(.kt) tbody tr:nth-child(even):hover td{background:color-mix(in srgb,#2f7be0 7%,var(--surface))}
+.xp-shot tbody tr:hover{background:transparent}

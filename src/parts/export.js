@@ -70,7 +70,7 @@ const Exp = (() => {
   async function pdfNew(orientation, title) {
     await lib("pdf"); const { jsPDF } = window.jspdf, [dan, bri] = await Promise.all([logo("dan"), logo("bri")]);
     const doc = new jsPDF({ orientation, unit: "pt", format: "a4" }), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), m = 28;
-    const pos = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }), full = title + " - Posisi " + pos;
+    const pos = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }), full = /\bs\.d\.|posisi/i.test(title) ? title : title + " - Posisi " + pos;
     const head = () => {
       const cy = 30; let x = m, xr = W - m;
       if (dan) { const h = 22, w = h * dan.r; doc.addImage(dan.src, "PNG", x, cy - h / 2, w, h); x += w + 12; doc.setDrawColor(205); doc.setLineWidth(.8); doc.line(x, cy - 12, x, cy + 12); x += 12; }
@@ -101,15 +101,21 @@ const Exp = (() => {
     }
     toast("Menyiapkan " + (kind === "pdf" ? "PDF" : "gambar") + "…");
     try {
-      const cv = await snap(sec);
+      // unduh satu bagian: judul bagian sudah ada di kop, jadi tidak digambar ulang; potongan halaman di batas baris/panel
+      let cuts = []; sec.classList.add("xp-one");
+      const cv = await snap(sec, true, pr => { const t = sec.getBoundingClientRect().top;
+        cuts = [...sec.querySelectorAll("tr, section, .panel-h, .grid > *, .rd-grid > *, .chart, .table-wrap")].map(e => Math.round((e.getBoundingClientRect().bottom - t) * pr)).sort((a, c) => a - c); })
+        .finally(() => sec.classList.remove("xp-one"));
       if (kind === "png") { const b = await new Promise(r => cv.toBlob(r, "image/png")); saveFile(name + ".png", b); return; }
       const { doc, W, m, top, bot, head, finish } = await pdfNew(cv.width > cv.height * 1.1 ? "landscape" : "portrait", ctxOf() + " · " + title);
-      const iw = W - m * 2, scale = iw / cv.width, pageH = (bot - top) / scale;
-      for (let y = 0, p = 0; y < cv.height; y += pageH, p++) {
+      const iw = W - m * 2, scale = iw / cv.width, pageH = Math.floor((bot - top) / scale);
+      for (let y = 0, p = 0; y < cv.height; p++) {
         if (p) { doc.addPage(); head(); }
-        const h = Math.min(pageH, cv.height - y), part = document.createElement("canvas"); part.width = cv.width; part.height = Math.ceil(h);
+        const cut = y + pageH < cv.height ? cuts.filter(c => c > y + pageH * .5 && c <= y + pageH).pop() : null;
+        const h = cut ? cut - y : Math.min(pageH, cv.height - y), part = document.createElement("canvas"); part.width = cv.width; part.height = Math.ceil(h);
         part.getContext("2d").drawImage(cv, 0, y, cv.width, h, 0, 0, cv.width, h);
         doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, top, iw, h * scale);
+        y += h;
       }
       saveFile(name + ".pdf", finish());
     } catch (er) { toast(er.message || "Gagal membuat file."); }

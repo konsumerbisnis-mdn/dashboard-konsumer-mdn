@@ -957,7 +957,7 @@ function viewRM(v) {
       scales: { x: { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x / 1000) + " M" } }, y: { ...baseOpts().scales.x, ticks: { ...baseOpts().scales.x.ticks, color: ink2, font: { size: 12 } } } } }) });
   renderRMDaily({ P, txIn, ym, isCur, day });
   renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
-  renderRMAppx({ P, txIn, ym, isCur, day });
+  renderRMAppx({ P, txIn, ym, isCur, day, inScope, yr });
   const allYm = uniq(P.months.map(x => x.ym)).sort().filter(m => m <= (P.asof || "9").slice(0, 7)).slice(-18);
   const mAgg = allYm.map(m => { const a = P.months.filter(x => x.ym === m && inScope(x)); return { s: sum(a, "sOs"), k: sum(a, "kOs"), t: sum(a.filter(x => x.tDisb > 0), "tDisb") }; });
   mkChart("cRmMon", { type: "bar", data: { labels: allYm.map(ymS), datasets: [
@@ -983,10 +983,7 @@ function renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }) {
   el.innerHTML = `<div class="panel-h"><h2>Perbandingan disbursement ${y1} vs ${yr}</h2></div>
     <p class="note" style="margin:0">${yo ? `Disbursement per bulan ${y1} dibanding ${yr} dan kumulatif (YtD). ${isCur ? `${BULAN[+ym.slice(5, 7) - 1]} ${yr} baru s.d. ${tglS(P.asof)}, sedangkan ${BULAN[+ym.slice(5, 7) - 1]} ${y1} sebulan penuh (data harian ${y1} tidak tersedia), jadi selisih bulan ini belum sebanding.` : ""}` : `Disbursement s.d. tanggal ${D} di ${ymS(ym)} dibanding tanggal yang sama di 3 bulan sebelumnya. Rp juta.`}</p>
     <div class="chart tall"><canvas id="cCmp"></canvas></div>
-    <div id="tCmp"></div>
-    <div class="panel-h" style="margin-top:6px"><h3 style="font-size:14px">${yo ? `YtD Jan s.d. ${BULAN[(isCur && +ym.slice(5, 7) > 1 ? +ym.slice(5, 7) - 1 : +ym.slice(5, 7)) - 1]}${isCur ? " (bulan penuh)" : ""}: ${y1} vs ${yr}` : `Per ${grp === "rm" ? "RM" : "cabang"} · s.d. tanggal ${D}`}</h3>
-      <div class="seg" role="tablist" aria-label="Kelompokkan"><button type="button" role="tab" aria-selected="${grp === "kc"}" data-g="kc">Per cabang</button><button type="button" role="tab" aria-selected="${grp === "rm"}" data-g="rm">Per RM</button></div></div>
-    <div id="tCmpG"></div>`;
+    <div id="tCmp"></div>`;
   el.querySelectorAll("[data-cmp]").forEach(b => b.onclick = () => { RS.cmp = b.dataset.cmp; saveRS(); renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }); });
   el.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { RS.cmpG = b.dataset.g; saveRS(); renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }); });
   if (!yo) {
@@ -1012,7 +1009,7 @@ function renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }) {
       { state: { key: "m", dir: -1 }, foot: { m: "Rata-rata 3 bulan", os: nf1.format(avg3), vs: `${dJ(cur - avg3)}<br><small>${dl(pc(cur, avg3))}</small>` } });
     const keys = uniq(cut.flat().map(gOf)).filter(Boolean);
     const gr = keys.map(k => { const o = { k }; ms.forEach((m, i) => o["m" + i] = sum(cut[i].filter(t => gOf(t) === k), "pl")); o.avg = (o.m0 + o.m1 + o.m2) / 3; o.d = o.m3 - o.avg; o.dp = pc(o.m3, o.avg); return o; });
-    table($("#tCmpG"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" }, ...ms.map((m, i) => ({ key: "m" + i, label: ymS(m), r: 1, fmt: x => i === 3 ? `<b>${nf1.format(x)}</b>` : (x ? nf1.format(x) : `<span class="note">–</span>`) })),
+    if ($("#tCmpG")) table($("#tCmpG"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" }, ...ms.map((m, i) => ({ key: "m" + i, label: ymS(m), r: 1, fmt: x => i === 3 ? `<b>${nf1.format(x)}</b>` : (x ? nf1.format(x) : `<span class="note">–</span>`) })),
       { key: "avg", label: "Rata 3 bln", r: 1, fmt: x => nf1.format(x) }, { key: "d", label: "Δ vs rata", r: 1, fmt: (x, r) => `${dJ(x)}<br><small>${dl(r.dp)}</small>` }], gr,
       { sortKey: "m3", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", ...Object.fromEntries(ms.map((m, i) => ["m" + i, nf1.format(sum(gr, "m" + i))])), avg: nf1.format(sum(gr, "avg")), d: dJ(sum(gr, "m3") - sum(gr, "avg")) } });
   } else {
@@ -1036,7 +1033,7 @@ function renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }) {
     const yRows = P.months.filter(x => inScope(x) && (x.ym.startsWith(y1 + "-") || x.ym.startsWith(yr + "-")) && upto.includes(x.ym.slice(5)));
     const gr = uniq(yRows.map(gKey)).filter(Boolean).map(k => { const a = yRows.filter(x => gKey(x) === k);
       const o = { k, a: sum(a.filter(x => x.ym.startsWith(y1)), "os"), b: sum(a.filter(x => x.ym.startsWith(yr)), "os"), ad: sum(a.filter(x => x.ym.startsWith(y1)), "deb"), bd: sum(a.filter(x => x.ym.startsWith(yr)), "deb") }; o.d = o.b - o.a; o.dp = pc(o.b, o.a); return o; });
-    table($("#tCmpG"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" },
+    if ($("#tCmpG")) table($("#tCmpG"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" },
       { key: "a", label: `YtD ${y1}`, r: 1, fmt: (x, r) => `${nf1.format(x)}<br><small class="note">${r.ad} deb</small>` },
       { key: "b", label: `YtD ${yr}`, r: 1, fmt: (x, r) => `<b>${nf1.format(x)}</b><br><small class="note">${r.bd} deb</small>` },
       { key: "d", label: "Selisih", r: 1, fmt: x => dJ(x) }, { key: "dp", label: "Growth", r: 1, sortVal: r => r.dp ?? -9, fmt: x => dl(x) }], gr,
@@ -1256,26 +1253,49 @@ function renderRMDaily({ P, txIn, ym, isCur, day }) {
         y: { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x) } } } }) });
 }
 
-// lampiran: disbursement per cabang / per RM s.d. tanggal yang sama, 3 bulan lalu + bulan berjalan
-function renderRMAppx({ P, txIn, ym, isCur, day }) {
-  const el = $("#rApx"); if (!el) return;
+// lampiran (paling bawah, tertutup secara bawaan; dibuka lewat menu "Buka lampiran" atau klik judulnya):
+// 1 = disbursement per cabang / RM s.d. tanggal yang sama, 3 bulan lalu + bulan berjalan; 2 = YtD tahun lalu vs tahun ini per cabang / RM
+const APX_OPEN = new Set();
+function renderRMAppx(A) {
+  const { P, txIn, ym, isCur, day, inScope, yr } = A, el = $("#rApx"); if (!el) return;
   const addM = (m, k) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); };
   const nDays = m => new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
-  const ms = [addM(ym, -3), addM(ym, -2), addM(ym, -1), ym], D = isCur ? day : nDays(ym), grp = RS.apxG === "rm" ? "rm" : "kc";
-  el.innerHTML = `<div class="panel-h"><h2>Lampiran · per ${grp === "rm" ? "RM" : "cabang"} s.d. tanggal ${D}</h2>
-    <div class="seg" role="tablist" aria-label="Kelompokkan"><button type="button" role="tab" aria-selected="${grp === "kc"}" data-ag="kc">Per cabang</button><button type="button" role="tab" aria-selected="${grp === "rm"}" data-ag="rm">Per RM</button></div></div>
-    <p class="note" style="margin:0">Disbursement s.d. tanggal ${D} di ${ymS(ym)} dibanding tanggal yang sama di 3 bulan sebelumnya · Rp juta.</p><div id="tApx"></div>`;
-  el.querySelectorAll("[data-ag]").forEach(b => b.onclick = () => { RS.apxG = b.dataset.ag; saveRS(); renderRMAppx({ P, txIn, ym, isCur, day }); });
-  if (!ms.some(m => P.tx.some(t => t.d.startsWith(m)))) { $("#tApx").innerHTML = '<div class="empty">Belum ada data pencairan harian untuk bulan-bulan ini.</div>'; return; }
-  const kcMap = new Map(P.months.map(x => [x.ym + "|" + nmKey(x.rm), x.kc]));
-  const gOf = t => grp === "rm" ? t.rm : (kcMap.get(t.d.slice(0, 7) + "|" + nmKey(t.rm)) || t.kc);
-  const cut = ms.map(m => txIn(m).filter(t => +t.d.slice(8) <= D));
+  const ms = [addM(ym, -3), addM(ym, -2), addM(ym, -1), ym], D = isCur ? day : nDays(ym), grp = RS.apxG === "rm" ? "rm" : "kc", gL = grp === "rm" ? RL.who : "cabang";
+  const y1 = String(+yr - 1), curM = +ym.slice(5, 7), fullM = isCur && curM > 1 ? curM - 1 : curM;
+  const L = [["1", `Disbursement per ${gL} s.d. tanggal ${D} · ${ymS(ms[0])}–${ymS(ym)}`, `Disbursement s.d. tanggal ${D} di ${ymS(ym)} dibanding tanggal yang sama di 3 bulan sebelumnya · Rp juta.`],
+    ["2", `YtD Jan s.d. ${BULAN[fullM - 1]}${isCur ? " (bulan penuh)" : ""} per ${gL} · ${y1} vs ${yr}`, `Disbursement Jan s.d. ${BULAN[fullM - 1]} ${y1} dibanding periode yang sama ${yr}${isCur ? " (bulan berjalan belum dihitung)" : ""} · Rp juta.`]];
+  el.innerHTML = `<div class="panel-h"><h2>Lampiran</h2><div class="toolbar">
+      <select class="ctl" id="apxSel" aria-label="Buka lampiran"><option value="">Buka lampiran…</option>${L.map(l => `<option value="${l[0]}">Lampiran ${l[0]} · ${esc(l[1])}</option>`).join("")}<option value="all">Buka semua lampiran</option><option value="none">Tutup semua lampiran</option></select>
+      <div class="seg" role="tablist" aria-label="Kelompokkan"><button type="button" role="tab" aria-selected="${grp === "kc"}" data-ag="kc">Per cabang</button><button type="button" role="tab" aria-selected="${grp === "rm"}" data-ag="rm">Per ${RL.who}</button></div></div></div>
+    ${L.map(l => `<details class="apx" data-apx="${l[0]}" ${APX_OPEN.has(l[0]) ? "open" : ""}><summary><b>Lampiran ${l[0]}</b> · ${esc(l[1])}</summary><p class="note" style="margin:0 0 8px">${esc(l[2])}</p><div id="tApx${l[0]}"></div></details>`).join("")}`;
+  el.querySelectorAll("[data-ag]").forEach(b => b.onclick = () => { RS.apxG = b.dataset.ag; saveRS(); renderRMAppx(A); });
+  el.querySelectorAll("details.apx").forEach(d => d.ontoggle = () => { d.open ? APX_OPEN.add(d.dataset.apx) : APX_OPEN.delete(d.dataset.apx); });
+  $("#apxSel").onchange = e => { const v = e.target.value; e.target.value = "";
+    el.querySelectorAll("details.apx").forEach(d => d.open = v === "all" || d.dataset.apx === v);
+    const t = v === "all" || v === "none" ? el : el.querySelector(`details[data-apx="${v}"]`); if (t && v !== "none") t.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const pc = (a, b) => b ? (a / b - 1) : null, dl = v => v == null ? "–" : `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + pct(Math.abs(v), 1)}</span>`;
-  const dJ = v => `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + nf1.format(Math.abs(v))}</span>`;
-  const gr = uniq(cut.flat().map(gOf)).filter(Boolean).map(k => { const o = { k }; ms.forEach((m, i) => o["m" + i] = sum(cut[i].filter(t => gOf(t) === k), "pl")); o.avg = (o.m0 + o.m1 + o.m2) / 3; o.d = o.m3 - o.avg; o.dp = pc(o.m3, o.avg); return o; });
-  table($("#tApx"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" }, ...ms.map((m, i) => ({ key: "m" + i, label: ymS(m), r: 1, fmt: x => i === 3 ? `<b>${nf1.format(x)}</b>` : (x ? nf1.format(x) : `<span class="note">–</span>`) })),
-    { key: "avg", label: "Rata 3 bln", r: 1, fmt: x => nf1.format(x) }, { key: "d", label: "Δ vs rata", r: 1, fmt: (x, r) => `${dJ(x)}<br><small>${dl(r.dp)}</small>` }], gr,
-    { sortKey: "m3", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", ...Object.fromEntries(ms.map((m, i) => ["m" + i, nf1.format(sum(gr, "m" + i))])), avg: nf1.format(sum(gr, "avg")), d: dJ(sum(gr, "m3") - sum(gr, "avg")) } });
+  const dJ = v => `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + nf1.format(Math.abs(v))}</span>`, kLbl = grp === "rm" ? RL.who : "Kantor cabang";
+  // lampiran 1
+  if (!ms.some(m => P.tx.some(t => t.d.startsWith(m)))) $("#tApx1").innerHTML = '<div class="empty">Belum ada data pencairan harian untuk bulan-bulan ini.</div>';
+  else {
+    const kcMap = new Map(P.months.map(x => [x.ym + "|" + nmKey(x.rm), x.kc]));
+    const gOf = t => grp === "rm" ? t.rm : (kcMap.get(t.d.slice(0, 7) + "|" + nmKey(t.rm)) || t.kc);
+    const cut = ms.map(m => txIn(m).filter(t => +t.d.slice(8) <= D));
+    const gr = uniq(cut.flat().map(gOf)).filter(Boolean).map(k => { const o = { k }; ms.forEach((m, i) => o["m" + i] = sum(cut[i].filter(t => gOf(t) === k), "pl")); o.avg = (o.m0 + o.m1 + o.m2) / 3; o.d = o.m3 - o.avg; o.dp = pc(o.m3, o.avg); return o; });
+    table($("#tApx1"), [{ key: "k", label: kLbl }, ...ms.map((m, i) => ({ key: "m" + i, label: ymS(m), r: 1, fmt: x => i === 3 ? `<b>${nf1.format(x)}</b>` : (x ? nf1.format(x) : `<span class="note">–</span>`) })),
+      { key: "avg", label: "Rata 3 bln", r: 1, fmt: x => nf1.format(x) }, { key: "d", label: "Δ vs rata", r: 1, fmt: (x, r) => `${dJ(x)}<br><small>${dl(r.dp)}</small>` }], gr,
+      { sortKey: "m3", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", ...Object.fromEntries(ms.map((m, i) => ["m" + i, nf1.format(sum(gr, "m" + i))])), avg: nf1.format(sum(gr, "avg")), d: dJ(sum(gr, "m3") - sum(gr, "avg")) } });
+  }
+  // lampiran 2
+  const upto = Array.from({ length: fullM }, (_, i) => String(i + 1).padStart(2, "0")), gKey = x => grp === "rm" ? x.rm : x.kc;
+  const yRows = P.months.filter(x => inScope(x) && (x.ym.startsWith(y1 + "-") || x.ym.startsWith(yr + "-")) && upto.includes(x.ym.slice(5)));
+  const g2 = uniq(yRows.map(gKey)).filter(Boolean).map(k => { const a = yRows.filter(x => gKey(x) === k);
+    const o = { k, a: sum(a.filter(x => x.ym.startsWith(y1)), "os"), b: sum(a.filter(x => x.ym.startsWith(yr)), "os"), ad: sum(a.filter(x => x.ym.startsWith(y1)), "deb"), bd: sum(a.filter(x => x.ym.startsWith(yr)), "deb") }; o.d = o.b - o.a; o.dp = pc(o.b, o.a); return o; });
+  table($("#tApx2"), [{ key: "k", label: kLbl },
+    { key: "a", label: `YtD ${y1}`, r: 1, fmt: (x, r) => `${nf1.format(x)}<br><small class="note">${r.ad} deb</small>` },
+    { key: "b", label: `YtD ${yr}`, r: 1, fmt: (x, r) => `<b>${nf1.format(x)}</b><br><small class="note">${r.bd} deb</small>` },
+    { key: "d", label: "Selisih", r: 1, fmt: x => dJ(x) }, { key: "dp", label: "Growth", r: 1, sortVal: r => r.dp ?? -9, fmt: x => dl(x) }], g2,
+    { sortKey: "b", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", a: nf1.format(sum(g2, "a")), b: `<b>${nf1.format(sum(g2, "b"))}</b>`, d: dJ(sum(g2, "b") - sum(g2, "a")), dp: dl(pc(sum(g2, "b"), sum(g2, "a"))) } });
 }
 /* ================= VIEW: Pipeline Brispot (dari file Pipeline BRISPOT) ================= */
 // DB.pipe = { asof, items[{kc,debitur,rm,pic,plafon,pengajuan,pencairan,putusan,tglPutusan,tatPrakarsa,tatClf,tatUker,tatTotal,status,tahap,akad,batal,proses,developer,jenis}], onhand[], rencana{dates[],rows[{kc,rm,v[]}]} }
@@ -2680,7 +2700,7 @@ const Exp = (() => {
   async function pdfNew(orientation, title) {
     await lib("pdf"); const { jsPDF } = window.jspdf, [dan, bri] = await Promise.all([logo("dan"), logo("bri")]);
     const doc = new jsPDF({ orientation, unit: "pt", format: "a4" }), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), m = 28;
-    const pos = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }), full = title + " - Posisi " + pos;
+    const pos = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }), full = /\bs\.d\.|posisi/i.test(title) ? title : title + " - Posisi " + pos;
     const head = () => {
       const cy = 30; let x = m, xr = W - m;
       if (dan) { const h = 22, w = h * dan.r; doc.addImage(dan.src, "PNG", x, cy - h / 2, w, h); x += w + 12; doc.setDrawColor(205); doc.setLineWidth(.8); doc.line(x, cy - 12, x, cy + 12); x += 12; }
@@ -2700,6 +2720,55 @@ const Exp = (() => {
     head();
     return { doc, W, H, m, top: 70, bot: H - 30, head, finish };
   }
+  // tata letak untuk pembagian halaman (dalam piksel kanvas, relatif ke atas elemen akar):
+  // keep = unit yang harus utuh dalam satu halaman (tabel, grafik, deret kotak, judul + isi berikutnya), dengan rentang kepala tabel (h0–h1);
+  // cuts = titik potong yang diperbolehkan (bawah baris tabel, panel, unit)
+  const KEEP = ".table-wrap, .chart, .grid.tiles, .rd-box, .rmc, .funnel, .kpis, .lb-row, .ds, .banner";
+  function layoutOf(root, pr) {
+    const t = root.getBoundingClientRect().top, Y = v => Math.round((v - t) * pr), keep = [], cuts = new Set();
+    const vis = e => e.getClientRects().length && !SKIP(e);
+    root.querySelectorAll(KEEP).forEach(e => { if (!vis(e)) return; const r = e.getBoundingClientRect(), th = e.querySelector("thead"), hr = th && th.getBoundingClientRect();
+      // pre = awal panel tempat tabel berada (judul, saringan) agar tidak tertinggal sendirian di halaman sebelumnya
+      const sec = e.closest("section.panel"), pre = sec && root.contains(sec) ? Y(sec.getBoundingClientRect().top) : null;
+      keep.push({ a: Y(r.top), b: Y(r.bottom), h0: hr ? Y(hr.top) : null, h1: hr ? Y(hr.bottom) : null, pre: pre != null && pre < Y(r.top) ? pre : null }); });
+    // judul (panel-h / h3) tidak boleh tertinggal sendirian di bawah halaman: satukan dengan unit sesudahnya
+    root.querySelectorAll(".panel-h, h3, .note").forEach(e => { const n = e.nextElementSibling; if (!vis(e) || !n || !vis(n)) return;
+      keep.push({ a: Y(e.getBoundingClientRect().top), b: Y(n.getBoundingClientRect().bottom), glue: 1 }); });
+    root.querySelectorAll("tr, section, .panel-h, .grid > *, .rd-grid > *, " + KEEP).forEach(e => { if (vis(e)) { const r = e.getBoundingClientRect(); cuts.add(Y(r.bottom)); cuts.add(Y(r.top)); } });
+    return { keep, cuts: [...cuts].sort((a, b) => a - b) };
+  }
+  // susun satu kanvas ke halaman PDF tanpa memotong unit: unit yang tidak muat di sisa halaman pindah ke halaman baru;
+  // unit sedikit lebih tinggi dari satu halaman diperkecil agar muat; hanya tabel yang jauh lebih panjang dari satu halaman
+  // dipotong di batas baris, dengan kepala tabel diulang di halaman lanjutan
+  const FIT = .7;
+  function place(P, cv, L, k) {
+    const { doc, m, top, bot } = P, gap = 10;
+    const draw = (sy, h, kk) => { const c = document.createElement("canvas"); c.width = cv.width; c.height = Math.max(1, Math.round(h));
+      c.getContext("2d").drawImage(cv, 0, sy, cv.width, h, 0, 0, cv.width, h);
+      doc.addImage(c.toDataURL("image/jpeg", .92), "JPEG", m, P.y, cv.width * kk, h * kk); P.y += h * kk; };
+    const pageH = (bot - top) / k, keep = L.keep.filter(r => r.b - r.a <= pageH / FIT);
+    // tabel yang jauh lebih panjang dari satu halaman: boleh dipotong di batas baris, tetapi kepala tabel + 3 baris pertama tidak dipisah
+    const bigT = L.keep.filter(r => r.h1 != null && r.b - r.a > pageH / FIT);
+    const inside = c => keep.some(r => r.a + 2 < c && c < r.b - 2) || bigT.some(r => (r.pre != null && r.a - r.pre < pageH * .3 ? r.pre : r.a) + 2 < c && c < r.h1 + 3 * (r.h1 - r.h0));
+    const cont = c => bigT.find(r => c > r.h1 && c < r.b - 2) || null;
+    let sy = 0, hdr = null;
+    while (sy < cv.height - 2) {
+      let avail = (bot - P.y) / k;
+      // kepala tabel diulang di halaman lanjutan
+      if (hdr && sy > hdr.h1 && sy < hdr.b && P.y === top) { draw(hdr.h0, hdr.h1 - hdr.h0, k); avail = (bot - P.y) / k; }
+      const rest = cv.height - sy;
+      if (rest * .85 <= avail) { draw(sy, rest, Math.min(k, avail * k / rest)); P.y += gap; return; }
+      const safe = L.cuts.filter(c => c > sy + 4 && c <= sy + avail && !inside(c)).pop();
+      if (safe) { draw(sy, safe - sy, k); sy = safe; hdr = cont(sy); P.next(); continue; }
+      if (P.y > top) { P.next(); continue; }
+      // di awal halaman dan tidak ada titik potong aman: unit pertama lebih tinggi dari satu halaman
+      const u = keep.filter(r => r.a <= sy + 4 && r.b > sy + avail).sort((x, y) => y.b - x.b)[0];
+      if (u) { const h = u.b - sy, kk = Math.min(k, (bot - P.y) / h); draw(sy, h, kk); sy = u.b; P.next(); continue; }
+      // tidak ada batas baris yang pas (baris sangat tinggi): potong pada batas halaman
+      const c = L.cuts.filter(x => x > sy + avail * .3 && x <= sy + avail).pop() || Math.floor(sy + avail);
+      draw(sy, c - sy, k); sy = c; hdr = cont(sy); P.next();
+    }
+  }
   async function run(sec, kind) {
     const title = titleOf(sec), name = fname(ctxOf() + "-" + title) + "-" + iso(new Date());
     if (kind === "csv" || kind === "xlsx") {
@@ -2711,56 +2780,40 @@ const Exp = (() => {
     }
     toast("Menyiapkan " + (kind === "pdf" ? "PDF" : "gambar") + "…");
     try {
-      const cv = await snap(sec);
+      // unduh satu bagian: judul bagian sudah ada di kop, jadi tidak digambar ulang
+      let L = null; sec.classList.add("xp-one");
+      const cv = await snap(sec, true, pr => { L = layoutOf(sec, pr); }).finally(() => sec.classList.remove("xp-one"));
       if (kind === "png") { const b = await new Promise(r => cv.toBlob(r, "image/png")); saveFile(name + ".png", b); return; }
-      const { doc, W, m, top, bot, head, finish } = await pdfNew(cv.width > cv.height * 1.1 ? "landscape" : "portrait", ctxOf() + " · " + title);
-      const iw = W - m * 2, scale = iw / cv.width, pageH = (bot - top) / scale;
-      for (let y = 0, p = 0; y < cv.height; y += pageH, p++) {
-        if (p) { doc.addPage(); head(); }
-        const h = Math.min(pageH, cv.height - y), part = document.createElement("canvas"); part.width = cv.width; part.height = Math.ceil(h);
-        part.getContext("2d").drawImage(cv, 0, y, cv.width, h, 0, 0, cv.width, h);
-        doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, top, iw, h * scale);
-      }
-      saveFile(name + ".pdf", finish());
+      const P = await pdfNew(cv.width > cv.height * 1.1 ? "landscape" : "portrait", ctxOf() + " · " + title);
+      P.y = P.top; P.next = () => { P.doc.addPage(); P.head(); P.y = P.top; };
+      place(P, cv, L, (P.W - P.m * 2) / cv.width);
+      saveFile(name + ".pdf", P.finish());
     } catch (er) { toast(er.message || "Gagal membuat file."); }
   }
-  // cetak satu menu utuh ke PDF (A4 mendatar): tiap blok di layar digambar terpisah lalu disusun per halaman,
-  // blok hanya dipotong bila lebih tinggi dari satu halaman. Tabel dicetak sebanyak baris yang sedang tampil.
+  // cetak satu menu utuh ke PDF (A4 mendatar): tiap blok di layar digambar terpisah lalu disusun per halaman tanpa memotong
+  // tabel/grafik (lihat place). Tabel dicetak sebanyak baris yang sedang tampil.
   async function page() {
     const v = $("#view"), title = ctxOf();
     const vis = e => !SKIP(e) && e.getClientRects().length && e.offsetHeight > 0;
     const top0 = [...v.children].filter(vis); if (!top0.length) { toast("Tidak ada isi untuk dicetak."); return; }
     toast("Menyiapkan PDF " + title + "…");
     try {
-      const { doc, W, m, top, bot, head, finish } = await pdfNew("landscape", title), iw = W - m * 2, gap = 10;
-      const bw = Math.max(...top0.map(e => e.offsetWidth)), pagePx = (bot - top) * bw / iw;
+      const P = await pdfNew("landscape", title), iw = P.W - P.m * 2;
+      P.y = P.top; P.next = () => { P.doc.addPage(); P.head(); P.y = P.top; };
+      const bw = Math.max(...top0.map(e => e.offsetWidth)), pagePx = (P.bot - P.top) * bw / iw;
       // blok pembungkus (grid) yang terlalu tinggi dipecah menjadi isinya agar potongan halaman jatuh di antara panel
       const blocks = [], walk = el => [...el.children].filter(vis).forEach(c => {
         const kids = [...c.children].filter(vis);
         if (c.offsetHeight > pagePx && kids.length > 1 && !c.matches("section, table, canvas, .panel")) walk(c); else blocks.push(c);
       });
       walk(v);
-      let y = top;
-      const next = () => { doc.addPage(); head(); y = top; };
       for (const b of blocks) {
-        // batas potong yang rapi (bawah baris tabel / panel), dalam piksel kanvas
-        let cuts = [];
-        const cv = await snap(b, false, pr => { const t = b.getBoundingClientRect().top;
-          cuts = [...b.querySelectorAll("tr, section, .panel-h, .grid > *")].map(e => Math.round((e.getBoundingClientRect().bottom - t) * pr)).sort((a, c) => a - c); });
-        const pr = cv._pr || 1, k = Math.min(iw / bw, iw * pr / cv.width) / pr; // pt per piksel kanvas
-        // sisa yang hanya sedikit melebihi ruang diperkecil (maks. 15%) agar tidak pindah halaman / menyisakan potongan kecil
-        const draw = (sy, h, kk) => { const part = document.createElement("canvas"); part.width = cv.width; part.height = h;
-          part.getContext("2d").drawImage(cv, 0, sy, cv.width, h, 0, 0, cv.width, h);
-          doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, y, cv.width * kk, h * kk); y += h * kk + gap; };
-        if (y > top && cv.height * k * .85 > bot - y) next();
-        for (let sy = 0; sy < cv.height;) {
-          const rest = cv.height - sy; if (rest * k * .85 <= bot - y) { draw(sy, rest, Math.min(k, (bot - y) / rest)); break; }
-          const room = Math.floor((bot - y) / k), cut = sy + room < cv.height ? cuts.filter(c => c > sy + room * .5 && c <= sy + room).pop() : null;
-          const h = cut ? cut - sy : room;
-          draw(sy, h, k); sy += h; next();
-        }
+        let L = null;
+        const cv = await snap(b, false, pr => { L = layoutOf(b, pr); L.keep.push({ a: 0, b: Math.round(b.scrollHeight * pr) }); });
+        const pr = cv._pr || 1;
+        place(P, cv, L, Math.min(iw / bw, iw * pr / cv.width) / pr);
       }
-      saveFile(fname(title) + "-" + iso(new Date()) + ".pdf", finish());
+      saveFile(fname(title) + "-" + iso(new Date()) + ".pdf", P.finish());
     } catch (er) { toast(er.message || "Gagal membuat PDF."); }
   }
   let pop = null;

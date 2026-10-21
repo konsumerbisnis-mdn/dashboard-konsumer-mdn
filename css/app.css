@@ -5,25 +5,25 @@
   --accent:#1f6fd1; --accent-ink:#ffffff; --accent-soft:#deebfb;
   --brand:#307fe0; --brand-deep:#1d63c4; --brand-red:#e8262d;
   --good:#18794a; --good-soft:#ddf2e6; --warn:#9a6300; --warn-soft:#fbeed2; --crit:#bf3329; --crit-soft:#fbe2df;
-  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+  --s1:#2b7ff6; --s2:#0a50c8; --s3:#4d4d4d;
   --kol1:#1f8a55; --kol2:#e3a21a; --kol3:#e8762c; --kol4:#d0482e; --kol5:#8f1d18;
-  --f-display:"Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
-  --f-body:"Plus Jakarta Sans", "Segoe UI", system-ui, sans-serif;
-  --f-num:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --f-display:"Inter", "Segoe UI", system-ui, sans-serif;
+  --f-body:"Inter", "Segoe UI", system-ui, sans-serif;
+  --f-num:"Inter", "Segoe UI", system-ui, sans-serif;
   --r:10px; --nav-w:232px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0c1417; --surface:#131e22; --surface-2:#1a282d; --ink:#e7eef0; --ink-2:#a7b8be; --muted:#7c8f96; --line:#25353b;
   --accent:#5ea4f2; --accent-ink:#06203f; --accent-soft:#16304f;
   --good:#4cc283; --good-soft:#12301f; --warn:#e8b54e; --warn-soft:#36290d; --crit:#f07466; --crit-soft:#3b1714;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --s1:#2b7ff6; --s2:#0a50c8; --s3:#4d4d4d;
   --kol1:#3aa86f; --kol2:#d9a032; --kol3:#e07a3a; --kol4:#e05a43; --kol5:#c23a33;
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0c1417; --surface:#131e22; --surface-2:#1a282d; --ink:#e7eef0; --ink-2:#a7b8be; --muted:#7c8f96; --line:#25353b;
   --accent:#5ea4f2; --accent-ink:#06203f; --accent-soft:#16304f;
   --good:#4cc283; --good-soft:#12301f; --warn:#e8b54e; --warn-soft:#36290d; --crit:#f07466; --crit-soft:#3b1714;
-  --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+  --s1:#2b7ff6; --s2:#0a50c8; --s3:#4d4d4d;
   --kol1:#3aa86f; --kol2:#d9a032; --kol3:#e07a3a; --kol4:#e05a43; --kol5:#c23a33;
   color-scheme:dark}
 *{box-sizing:border-box}
@@ -782,3 +782,8 @@ details.apx[open] > summary{margin-bottom:6px}
 .kt.rd2 thead tr:first-child th:first-child{width:13%}
 .kt.rp thead tr:first-child th:nth-child(-n+2){width:150px}
 .kt.rp td:nth-child(-n+2){white-space:normal}
+/* font Inter dengan angka sejajar; tabel: judul & penutup bold, isi regular */
+body{font-variant-numeric:tabular-nums}
+.table-wrap thead th,.table-wrap tfoot td,.table-wrap tfoot td b{font-weight:700}
+.table-wrap tbody td,.table-wrap tbody td b,.table-wrap tbody td strong{font-weight:400}
+.table-wrap tbody tr.ktl td,.table-wrap tbody tr.ktl td b,.table-wrap tbody tr.knv td,.table-wrap tbody tr.ktot td{font-weight:700}

@@ -184,3 +184,8 @@ details.apx[open] > summary{margin-bottom:6px}
 .kt.rd2 thead tr:first-child th:first-child{width:13%}
 .kt.rp thead tr:first-child th:nth-child(-n+2){width:150px}
 .kt.rp td:nth-child(-n+2){white-space:normal}
+/* font Inter dengan angka sejajar; tabel: judul & penutup bold, isi regular */
+body{font-variant-numeric:tabular-nums}
+.table-wrap thead th,.table-wrap tfoot td,.table-wrap tfoot td b{font-weight:700}
+.table-wrap tbody td,.table-wrap tbody td b,.table-wrap tbody td strong{font-weight:400}
+.table-wrap tbody tr.ktl td,.table-wrap tbody tr.ktl td b,.table-wrap tbody tr.knv td,.table-wrap tbody tr.ktot td{font-weight:700}

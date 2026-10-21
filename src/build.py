@@ -222,6 +222,10 @@ rm = rep(rm, '''{ key: "sub", label: "Subsidi", r: 1, fmt: x => nf1.format(x) },
 rm = rep(rm, '''  const ds = [["Subsidi", "sub", cssv("--s1")], ["Komersil", "kom", cssv("--s2")]].map(''', '''  const ds = [[RL.s, "sub", cssv("--s1")], [RL.k, "kom", cssv("--s2")]].map(''')
 rm = rep(rm, '''<span class="note" style="font-weight:700">Nama RM</span>''', '''<span class="note" style="font-weight:700">Nama ${RL.who}</span>''')
 
+# tema grafik (src/parts/charts.js): palet seragam + label angka
+chart = rep(chart, '  charts[id] = new Chart(el, cfg);', '  charts[id] = new Chart(el, chartTheme(cfg));')
+chart = rep(chart, 'family: cssv("--f-num")', 'family: cssv("--f-body")', 2)
+
 # laporan disburse realisasi harian (src/parts/rm_rep.js) di atas bagian perbandingan
 rm = rep(rm, '''    <section class="panel" id="rCmp"></section>''', '''    <section class="panel" id="rDay"></section>
     <section class="panel" id="rCmp"></section>''')
@@ -360,7 +364,7 @@ start = '''
   window.__appReady = true;
 })();
 '''
-js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + pipe + P('pipe_rep.js') + pimp + sim \
+js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + P('charts.js') + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + pipe + P('pipe_rep.js') + pimp + sim \
      + P('sim_brg.js') + P('nominatif.js') + P('admin.js') + P('export.js') + P('router.js') + zoom + P('boot.js') + start + intro
 # bagian bertanda data-nosec (mis. Lampiran, yang sudah punya buka-tutup per lampiran) tidak diberi tombol minimize
 js = rep(js, '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h"));''', '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h") && !x.hasAttribute("data-nosec"));''')

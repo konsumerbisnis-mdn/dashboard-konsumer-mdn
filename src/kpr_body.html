@@ -1,0 +1,136 @@
+</style>
+
+<!--INTRO-->
+<div class="intro" id="intro" hidden>
+  <canvas id="inCv" aria-hidden="true"></canvas>
+  <div class="in-rings" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="in-disc" id="inD1" aria-hidden="true"></div>
+  <div class="in-disc" id="inD2" aria-hidden="true"></div>
+  <div class="in-stage" aria-label="BRI KPR">
+    <div class="in-full" id="inFull"><div class="in-m blue" style="opacity:1;-webkit-mask-image:url(assets/asset_dbf5b96d.png);mask-image:url(assets/asset_dbf5b96d.png)"></div></div>
+    <div class="in-icon" id="inIcon">
+      <div class="in-emb" id="inEmb"><div class="in-m white" style="-webkit-mask-image:url(assets/asset_9baa2f96.png);mask-image:url(assets/asset_9baa2f96.png)"></div></div>
+      <div class="in-m blue" id="inBlue" style="-webkit-mask-image:url(assets/asset_9baa2f96.png);mask-image:url(assets/asset_9baa2f96.png)"></div>
+    </div>
+  </div>
+  <div class="in-cap" id="inCap">Dashboard KPR RO Medan</div>
+  <div class="in-wipe" id="inWipe"></div>
+  <button class="in-gate" id="inGate" type="button" aria-label="Mulai animasi pembuka" hidden><span class="gl-m" style="-webkit-mask-image:url(assets/asset_9baa2f96.png);mask-image:url(assets/asset_9baa2f96.png)"></span></button>
+  <button class="in-btn in-skip" id="inSkip" type="button">Lewati</button>
+  <audio id="inAudio" src="assets/asset_6d283018.m4a" preload="auto"></audio>
+</div>
+<!--/INTRO-->
+<section class="landing" id="landing" hidden></section>
+<div class="zoomctl" id="zoomCtl" role="group" aria-label="Perbesar tabel">
+  <button type="button" data-z="-1" aria-label="Perkecil"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-3.5-3.5"/></svg></button>
+  <button type="button" data-z="0" class="zv" aria-label="Ukuran normal">100%</button>
+  <button type="button" data-z="1" aria-label="Perbesar"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M11 8v6M20 20l-3.5-3.5"/></svg></button>
+  <button type="button" data-z="fit" class="zf" aria-label="Pas lebar layar" title="Pas lebar layar"><svg viewBox="0 0 24 24"><path d="M3 12h18M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4"/></svg></button>
+</div>
+
+<div class="app" id="app">
+  <nav class="nav" aria-label="Menu utama">
+    <div class="brand">
+      <div class="brand-mark"><img src="assets/asset_dbf5b96d.png" alt="BRI KPR" style="width:26px;height:auto"></div>
+      <div><b>Dashboard KPR</b><small>Monitoring kinerja</small></div>
+    </div>
+    <a href="#beranda" data-v="beranda"><svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg><span>Beranda</span></a>
+    <a href="#keragaan" data-v="keragaan"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg><span>Keragaan KPR</span></a>
+    <a href="#produktivitas" data-v="produktivitas"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="m16 9 2 2 4-4"/></svg><span>Produktivitas RM</span></a>
+    <a href="#pipeline" data-v="pipeline"><svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg><span>Pipeline Brispot</span></a>
+    <a href="#simulasi" data-v="simulasi"><svg viewBox="0 0 24 24"><rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h4"/></svg><span>Simulasi KPR</span></a>
+  </nav>
+
+  <div class="main">
+    <header class="topbar">
+      <svg class="tb-wave" viewBox="0 0 1200 80" preserveAspectRatio="none" aria-hidden="true"><g><path class="w1" d="M0 52 C100 30 200 74 300 52 S500 30 600 52 S800 74 900 52 S1100 30 1200 52 S1400 74 1500 52 S1700 30 1800 52 S2000 74 2100 52 S2300 30 2400 52"/><path class="w3" d="M0 60 C100 40 200 78 300 60 S500 40 600 60 S800 78 900 60 S1100 40 1200 60 S1400 78 1500 60 S1700 40 1800 60 S2000 78 2100 60 S2300 40 2400 60"/></g><g class="g2"><path class="w2" d="M0 44 C150 66 250 22 400 44 S650 66 800 44 S1050 22 1200 44 S1450 66 1600 44 S1850 22 2000 44 S2250 66 2400 44"/></g></svg>
+      <div class="ttl">
+        <a href="#beranda" title="Kembali ke menu utama"><img src="assets/asset_dbf5b96d.png" alt="BRI KPR"></a>
+        <div><div class="eyebrow" id="eyebrow">Dashboard KPR</div><h1 id="pageTitle">Beranda</h1></div>
+      </div>
+      <div class="filters">
+        <select class="ctl" id="fPeriode" aria-label="Periode"></select>
+        <select class="ctl" id="fUnit" aria-label="Unit kerja"></select>
+        <button class="btn" id="btnData" type="button" title="Impor / kelola data"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 17v3h16v-3"/></svg><span>Data</span></button>
+        <button class="btn icon" id="btnSnd" type="button" title="Suara klik" aria-label="Suara klik" aria-pressed="true"><svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg></button>
+        <button class="btn icon" id="btnTheme" type="button" title="Ganti tema terang/gelap" aria-label="Ganti tema"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></button>
+      </div>
+    </header>
+    <div class="content" id="view"></div>
+  </div>
+</div>
+
+<!-- Dialog: kelola data -->
+<dialog id="dlgData">
+  <div class="dlg-h"><h2>Kelola Data</h2><button class="btn icon" data-close aria-label="Tutup"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="dlg-b">
+    <p class="note" style="margin:0" id="upNote">Upload di tiap bagian hanya memperbarui data bagian itu. Data tersimpan di perangkat ini; bagikan ke anggota lewat Snapshot HTML.</p>
+    <div class="dgrid">
+      <section class="dcard" data-k="ker">
+        <div class="dc-h"><span class="dc-ico"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><div><h3>Keragaan KPR</h3><p class="dc-st" id="st_ker"></p></div></div>
+        <p class="note"><b>Gabung KAP DLY</b> harian atau <b>Master Keragaan</b> (sheet <code>Database</code>). Tanggal baru ditambahkan ke riwayat; RKA diperbarui bila ada sheet <code>Database RKA</code>.</p>
+        <label class="btn" for="f_ker"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/></svg>Upload</label>
+        <input type="file" id="f_ker" data-kind="ker" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+        <p class="note dc-prog" id="pr_ker" hidden></p>
+      </section>
+      <section class="dcard" data-k="pipe">
+        <div class="dc-h"><span class="dc-ico"><svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg></span><div><h3>Pipeline Brispot</h3><p class="dc-st" id="st_pipe"></p></div></div>
+        <p class="note"><b>Pipeline BRISPOT</b> (sheet <code>Pipeline</code>, <code>OnHand</code>, <code>Ref_Batal</code>, <code>Rencana Realisasi RM</code>). Menggantikan data pipeline sebelumnya.</p>
+        <label class="btn" for="f_pipe"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/></svg>Upload</label>
+        <input type="file" id="f_pipe" data-kind="pipe" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+        <p class="note dc-prog" id="pr_pipe" hidden></p>
+      </section>
+      <section class="dcard" data-k="rm">
+        <div class="dc-h"><span class="dc-ico"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="m16 9 2 2 4-4"/></svg></span><div><h3>Produktivitas RM</h3><p class="dc-st" id="st_rm"></p></div></div>
+        <p class="note"><b>Database bulan</b> harian, <b>Produktivitas Monthly</b>, atau <b>Produktivitas RM History</b> (sheet <code>Database</code>). Hanya bulan di file yang diperbarui.</p>
+        <label class="btn" for="f_rm"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/></svg>Upload</label>
+        <input type="file" id="f_rm" data-kind="rm" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+        <p class="note dc-prog" id="pr_rm" hidden></p>
+      </section>
+      <section class="dcard" data-k="rate">
+        <div class="dc-h"><span class="dc-ico"><svg viewBox="0 0 24 24"><rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h4"/></svg></span><div><h3>Simulasi KPR</h3><p class="dc-st" id="st_rate"></p></div></div>
+        <p class="note"><b>Tabel Perhitungan Suku Bunga KPR</b> (sheet <code>Tabel Suku Bunga</code>). Menggantikan tabel suku bunga sebelumnya.</p>
+        <label class="btn" for="f_rate"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/></svg>Upload</label>
+        <input type="file" id="f_rate" data-kind="rate" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+        <p class="note dc-prog" id="pr_rate" hidden></p>
+      </section>
+      <section class="dcard" data-k="foto">
+        <div class="dc-h"><span class="dc-ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15" rx="2"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 5l1.5-2h5L16 5"/></svg></span><div><h3>Foto RM</h3><p class="dc-st" id="st_foto"></p></div></div>
+        <p class="note">Pilih satu atau beberapa foto sekaligus. <b>Nama file = nama RM</b> (mis. <code>Melva Novelina S.jpg</code>). Foto dipotong persegi otomatis; foto lama dengan nama sama diganti.</p>
+        <label class="btn" for="f_foto"><svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v4h16v-4"/></svg>Upload foto</label>
+        <input type="file" id="f_foto" accept="image/*" multiple hidden>
+        <p class="note dc-prog" id="pr_foto" hidden></p>
+      </section>
+    </div>
+    <input type="file" id="fileImport" data-kind="auto" accept=".xlsx,.xlsm,.xls,.csv" hidden>
+    <section class="dsec" id="snapSec">
+      <h3>Bagikan ke anggota</h3>
+      <p class="note">Simpan dashboard beserta data saat ini menjadi satu file HTML. Kirim lewat WA/email; anggota cukup membukanya.</p>
+      <div class="toolbar"><button class="btn" id="btnSnap" type="button">Snapshot HTML</button></div>
+    </section>
+  </div>
+</dialog>
+
+<!-- Dialog: detail RM -->
+<dialog id="dlgRm">
+  <div class="dlg-h"><h2 id="rmTitle">Detail RM</h2><button class="btn icon" data-close aria-label="Tutup"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="dlg-b" id="rmBody"></div>
+</dialog>
+
+<!-- Dialog: tambah pipeline -->
+<dialog id="dlgPipe">
+  <form id="formPipe">
+    <div class="dlg-h"><h2>Tambah Pipeline</h2><button class="btn icon" type="button" data-close aria-label="Tutup"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+    <div class="dlg-b">
+      <div class="form">
+        <div class="field full"><label for="pDeb">Nama calon debitur</label><input class="ctl" id="pDeb" required placeholder="mis. Bpk. Andi Siregar"></div>
+        <div class="field"><label for="pRm">RM</label><select class="ctl" id="pRm" required></select></div>
+        <div class="field"><label for="pProduk">Produk</label><select class="ctl" id="pProduk"></select></div>
+        <div class="field"><label for="pPlafon">Plafon (juta Rp)</label><input class="ctl" id="pPlafon" type="number" inputmode="decimal" min="1" step="any" required placeholder="350"></div>
+        <div class="field"><label for="pTahap">Tahap</label><select class="ctl" id="pTahap"></select></div>
+      </div>
+      <div class="toolbar"><button class="btn primary" type="submit">Simpan pipeline</button></div>
+    </div>
+  </form>
+</dialog>
+

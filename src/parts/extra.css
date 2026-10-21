@@ -1,0 +1,96 @@
+
+/* ================= tambahan Dashboard Konsumer ================= */
+/* menu bawah HP: 7–8 menu, bisa digeser */
+@media (max-width:959px){
+  .nav{display:flex;overflow-x:auto;scrollbar-width:none;gap:2px;-webkit-overflow-scrolling:touch}
+  .nav::-webkit-scrollbar{display:none}
+  .nav a{flex:1 0 74px;min-width:74px}
+}
+@media (min-width:960px){.nav a[data-v="admin"]{margin-top:auto}}
+@media (min-width:720px){.l-cards > .l-card:last-child:nth-child(odd){grid-column:1 / -1}}
+/* pilihan segmen (Briguna Ritel / Mikro / KPR) di atas menu */
+.rm-mode.segbar{grid-template-columns:repeat(auto-fit,minmax(0,1fr));background:color-mix(in srgb,var(--accent) 10%,var(--surface-2))}
+.rm-mode.segbar button[aria-pressed="true"]{background:linear-gradient(135deg,#2f7be0,#1a53b3);color:#fff;box-shadow:0 4px 14px -6px rgba(26,83,179,.7)}
+.rm-mode.segbar button{font-size:13.5px;padding:9px 10px}
+@media (max-width:560px){.rm-mode.segbar button{font-size:12.5px;padding:8px 6px}}
+/* tab sub-bagian */
+.seg.wrap{flex-wrap:wrap}
+.seg button small{font-family:var(--f-num);font-weight:600}
+.ptabs{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px}
+.ptabs::-webkit-scrollbar{display:none}
+.ptabs button{flex:none;border:0;background:none;padding:8px 12px;border-radius:9px;font-weight:700;font-size:13px;color:var(--ink-2);cursor:pointer;display:inline-flex;gap:6px;align-items:center;white-space:nowrap}
+.ptabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+.ptabs .pc{font:700 11px/1.4 var(--f-num);padding:0 6px;border-radius:99px;background:var(--surface-2);color:var(--ink-2)}
+.ptabs .pc.warn{background:var(--warn-soft);color:var(--warn)} .ptabs .pc.crit{background:var(--crit-soft);color:var(--crit)}
+/* kartu EWS / pergerakan */
+.ewsg{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr))}
+.ewc{display:flex;flex-direction:column;gap:6px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:12px 14px;cursor:pointer;color:inherit;font:inherit;transition:border-color .15s,box-shadow .15s}
+.ewc:hover:not(:disabled){border-color:var(--accent)}
+.ewc:disabled{cursor:default;opacity:1}
+.ewc[aria-pressed="true"]:not(:disabled){border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.ewh{display:flex;gap:8px;justify-content:space-between;align-items:flex-start}
+.ewt{font-weight:700;font-size:13.5px;line-height:1.3}
+.ewv{font-size:16px;font-weight:600;letter-spacing:-.02em}
+.kolb{display:inline-grid;place-items:center;min-width:22px;height:20px;padding:0 5px;border-radius:5px;font:700 11.5px/1 var(--f-num);color:#fff}
+.kolb.k1{background:var(--kol1)} .kolb.k2{background:var(--kol2);color:#3a2a00} .kolb.k3{background:var(--kol3)} .kolb.k4{background:var(--kol4)} .kolb.k5{background:var(--kol5)}
+.kt td .good{color:var(--good);font-weight:700}
+td .bad,b.bad{color:var(--crit)} td .good,b.good{color:var(--good)}
+/* ikon KC di kartu cabang */
+.rmc .av.kc.img{background:#fff!important;padding:10px}
+.rmc .av.kc.img img{object-fit:contain}
+/* login */
+.login .l-center{max-width:460px}
+.lg-card{width:100%;display:grid;gap:14px;padding:22px;border-radius:18px;color:var(--ink);background:color-mix(in srgb,var(--surface) 92%,transparent);
+  border:1px solid rgba(255,255,255,.5);box-shadow:0 24px 60px -24px rgba(4,24,72,.75);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);animation:lIn .6s cubic-bezier(.2,.7,.2,1) .25s both}
+.lg-card h2{font-size:20px;font-weight:800}
+.lg-card .ctl{height:44px;font-size:15px}
+.lg-pw{position:relative}
+.lg-pw .ctl{padding-right:44px}
+.lg-eye{position:absolute;right:4px;top:4px;width:36px;height:36px;border:0;background:none;border-radius:8px;display:grid;place-items:center;cursor:pointer;color:var(--muted)}
+.lg-eye svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8}
+.lg-msg{margin:0;padding:9px 12px;border-radius:9px;background:var(--crit-soft);color:var(--crit);font-weight:600;font-size:13px}
+.lg-fine{margin:0;text-align:center}
+body.at-login .zoomctl{display:none!important}
+/* menu user di banner */
+.umenu{position:relative}
+#btnUser{gap:8px;padding:0 10px 0 4px}
+.uav{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.92);color:#1a53b3;font:800 11.5px/1 var(--f-body)}
+.u-txt{display:flex;flex-direction:column;line-height:1.1;text-align:left}
+.u-txt b{font-size:12.5px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.u-txt small{font-size:10.5px;opacity:.8}
+@media (max-width:640px){.u-txt{display:none}#btnUser{padding:0 4px}}
+.umenu-pop{position:absolute;right:0;top:calc(100% + 6px);z-index:40;min-width:190px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 18px 40px -16px rgba(0,0,0,.45);display:grid}
+.umenu-pop button{display:flex;gap:10px;align-items:center;border:0;background:none;text-align:left;padding:9px 10px;border-radius:8px;font-weight:600;cursor:pointer;color:inherit}
+.umenu-pop button:hover{background:var(--surface-2)}
+.umenu-pop svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.sync-st{font-size:11.5px;color:rgba(255,255,255,.85);font-weight:600}
+@media (max-width:640px){.sync-st{display:none}.topbar #btnSync span,.topbar #btnData span{display:none}.topbar #btnSync,.topbar #btnData{width:36px;padding:0;justify-content:center}}
+/* layar memuat */
+.boot{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:60;display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;
+  padding:10px 16px;border-radius:14px;background:var(--surface);color:var(--ink);border:1px solid var(--line);box-shadow:0 16px 40px -14px rgba(0,0,0,.45);min-width:min(300px,calc(100vw - 32px))}
+@media (min-width:960px){.boot{bottom:28px}}
+.boot .spin{width:18px;height:18px;border-radius:50%;border:2.5px solid var(--accent-soft);border-top-color:var(--accent);animation:bootSpin .8s linear infinite}
+.boot b{font-size:13px}
+.boot .bar{grid-column:1 / -1;height:5px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.boot .bar i{display:block;height:100%;width:5%;background:var(--accent);border-radius:99px;transition:width .3s}
+@keyframes bootSpin{to{transform:rotate(360deg)}}
+/* tombol & menu Unduh */
+.btn.xp{height:30px;padding:0 10px;font-size:12.5px}
+.btn.xp svg{width:15px;height:15px}
+.l-qvh .btn.xp{height:36px}
+.xp-legacy{display:none!important}
+.xp-pop{position:fixed;z-index:80;width:210px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:6px;box-shadow:0 18px 40px -16px rgba(0,0,0,.45);display:grid;gap:2px;animation:lIn .18s ease-out both}
+.xp-pop button{display:grid;border:0;background:none;text-align:left;padding:8px 10px;border-radius:8px;cursor:pointer;color:inherit}
+.xp-pop button:hover{background:var(--surface-2)}
+.xp-pop b{font-size:13px}
+.xp-pop small{font-size:11px;color:var(--muted)}
+.kv dt{font-size:12.5px}
+dialog#dlgDeb{width:min(820px,calc(100vw - 24px))}
+.dcard .toolbar .ctl{height:36px}
+/* tampilan per peran */
+:root[data-role="guest"] .nav a[data-v="nominatif"]{display:none}
+@media print{.nav,.topbar,.zoomctl,.sec-ctl,.xp{display:none!important}.main{margin:0!important}}
+.xp-shot{width:var(--xpw)!important;max-width:none!important;flex:none!important}
+.xp-shot .table-wrap{overflow:visible!important;margin:0!important;padding:0!important}
+.xp-shot .table-wrap > table{zoom:1!important}
+.xp-shot .kt .sk0,.xp-shot .kt .sk1{position:static!important}

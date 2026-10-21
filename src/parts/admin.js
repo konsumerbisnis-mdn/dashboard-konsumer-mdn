@@ -15,7 +15,7 @@ function dataCards() {
       ${card("sync", dIco('<path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/>'), "Google Sheets",
         `Keragaan s.d. <b>${K ? tglS(K.dates[K.dates.length - 1]) : "–"}</b>${K && K.rka ? " · RKA " + blnS(K.rka.months[0]) + "–" + blnS(K.rka.months[K.rka.months.length - 1]) : ""}<br>Ritel: ${rmSt("R")}<br>Mikro: ${rmSt("M")}<br>KPR: ${rmSt("K")}<br>Cache server: ${updS(M.updated)}`,
         "Sheet: keragaan, RKA, disburse ritel 2025/2026, disburse mikro, list RM ritel, list mantri mikro, produktivitas KPR (Database History & Database Monthly), RM & KC card.",
-        `<button class="btn primary" type="button" id="btnSyncF">${'<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/></svg>'}Sync sekarang</button>`)}
+        `<button class="btn primary" type="button" id="btnSyncF">${'<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/></svg>'}Sync sekarang</button>${syncResHtml()}`)}
       ${card("lwB", dIco('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h3M8 16h6"/>'), "LW321 Briguna", lwSt("B"),
         "LW321 Briguna Ritel + Mikro (semua sheet dibaca, rekening ganda dibuang, produk non-Briguna diabaikan). Posisi terkini yang lebih baru sebulan otomatis menggeser yang lama menjadi pembanding bulan lalu.", lwBody("B"))}
       ${card("lwK", dIco('<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>'), "LW321 KPR", lwSt("K"),
@@ -136,11 +136,25 @@ async function upFoto(files, kind, inp) {
   if (miss.length) setTimeout(() => toast(`Nama ${kind === "kc" ? "KC" : "RM"} tidak ditemukan untuk: ${miss.slice(0, 5).join(", ")}${miss.length > 5 ? ", dll." : ""}. Samakan nama file.`), 900);
   pg.done(); if (inp) inp.value = "";
 }
+// hasil sync terakhir (sesi ini): ditampilkan di kartu Google Sheets dan sebagai notifikasi
+let SYNC_RES = null;
+const syncJam = t => new Date(t).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+function syncResHtml() {
+  if (!SYNC_RES) return "";
+  const R = SYNC_RES, cls = R.state === "ok" ? "ok" : R.state === "run" ? "run" : R.state === "skip" ? "skip" : "err";
+  return `<div class="sync-res ${cls}" role="status">${R.state === "run" ? '<span class="spin" aria-hidden="true"></span>' : R.state === "ok" ? "✓ " : R.state === "skip" ? "ℹ " : "✕ "}${R.msg}</div>`;
+}
 async function doSync(force, btn) {
   if (btn) btn.disabled = true; const st = $("#syncSt"); if (st) st.textContent = "sinkronisasi…";
-  try { const j = await Auth.call("sync", { force: !!force && isAdmin() }); await loadAll(true); toast(j.skipped ? "Data sudah terbaru (sync terakhir < 2 menit lalu)." : "Data diperbarui dari Google Sheets."); refreshDataUI(); }
-  catch (er) { toast(er.message); }
-  if (btn) btn.disabled = false; syncLabel();
+  SYNC_RES = { state: "run", msg: "Sinkronisasi berjalan… server membaca ulang semua sheet (bisa 3–6 menit). Jangan tutup atau refresh halaman." }; refreshDataUI();
+  try {
+    const j = await Auth.call("sync", { force: !!force && isAdmin() }); await loadAll(true);
+    const upd = j.updated || (DB.meta && DB.meta.updated) || new Date().toISOString();
+    SYNC_RES = j.skipped ? { state: "skip", msg: `Data sudah terbaru (sync terakhir kurang dari 2 menit lalu) · update terakhir <b>${syncJam(upd)}</b>` }
+      : { state: "ok", msg: `Data berhasil di-sync · update terbaru <b>${syncJam(upd)}</b>` };
+    toast(j.skipped ? "Data sudah terbaru · update terakhir " + syncJam(upd) : "✓ Data berhasil di-sync · update terbaru " + syncJam(upd));
+  } catch (er) { SYNC_RES = { state: "err", msg: "Sync belum selesai: " + esc(er.message) + " Server mungkin masih memproses; tunggu beberapa menit lalu refresh halaman sebelum mencoba lagi." }; toast("Sync gagal: " + er.message); }
+  refreshDataUI(); if (btn && btn.isConnected) btn.disabled = false; syncLabel();
 }
 
 /* ---------- VIEW: Admin ---------- */

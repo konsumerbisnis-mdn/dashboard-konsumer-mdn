@@ -46,13 +46,18 @@ const okCard = k => { const c = document.querySelector(`.dcard[data-k="${k}"]`);
 async function readWB(f) { if (typeof XLSX === "undefined") throw new Error("Pustaka Excel gagal dimuat. Periksa koneksi internet."); return XLSX.read(await f.arrayBuffer(), { cellDates: false }); }
 function refreshDataUI() { const b = $("#dataBody"); if ($("#dlgData").open) { b.innerHTML = dataCards(); bindDataCards(b); } if (curView() === "admin") renderAdminTab(); }
 async function upLW(f, set, inp) {
-  const pg = progOf("lw" + set), info = $("#i_lw" + set), mode = $("#m_lw" + set).value;
+  const pg = progOf("lw" + set), info = $("#i_lw" + set); let mode = $("#m_lw" + set).value;
   try {
     pg.set("Membaca " + f.name + "…"); await new Promise(r => setTimeout(r, 40));
     const wb = await readWB(f); pg.set("Mengolah…"); await new Promise(r => setTimeout(r, 20));
     const P = parseLWUpload(wb, set), segN = {}; P.rows.forEach(r => segN[r[19]] = (segN[r[19]] || 0) + 1);
     pg.done();
-    info.innerHTML = `<div class="ds"><b>${nf0.format(P.rows.length)} rekening</b> · posisi <b>${tglS(P.asof)}</b> · ${Object.entries(segN).map(([k, n]) => esc(prodLbl(k)) + " " + nf0.format(n)).join(" · ")}${P.dropped ? ` · <span class="note">${nf0.format(P.dropped)} baris produk lain diabaikan</span>` : ""}<br>sheet: ${esc(P.sheets.join(", "))} · disimpan sebagai <b>${mode === "cur" ? "posisi terkini" : "bulan lalu"}</b></div>
+    // jaga urutan posisi: file lebih lama dari posisi terkini disimpan sebagai bulan lalu, dan sebaliknya
+    const cur = ((DB.meta || {}).lw || {})[set] || {}; let warn = "";
+    if (cur.asof && P.asof && mode === "cur" && P.asof < cur.asof) { mode = "prev"; warn = `File ini posisi <b>${tglS(P.asof)}</b>, lebih lama dari posisi terkini <b>${tglS(cur.asof)}</b>, jadi disimpan sebagai <b>bulan lalu</b>.`; }
+    else if (cur.asof && P.asof && mode === "prev" && P.asof >= cur.asof) { mode = "cur"; warn = `File ini posisi <b>${tglS(P.asof)}</b>, tidak lebih lama dari posisi terkini <b>${tglS(cur.asof)}</b>, jadi disimpan sebagai <b>posisi terkini</b>.`; }
+    if (warn) $("#m_lw" + set).value = mode;
+    info.innerHTML = `${warn ? `<div class="banner"><span>${warn}</span></div>` : ""}<div class="ds"><b>${nf0.format(P.rows.length)} rekening</b> · posisi <b>${tglS(P.asof)}</b> · ${Object.entries(segN).map(([k, n]) => esc(prodLbl(k)) + " " + nf0.format(n)).join(" · ")}${P.dropped ? ` · <span class="note">${nf0.format(P.dropped)} baris produk lain diabaikan</span>` : ""}<br>sheet: ${esc(P.sheets.join(", "))} · disimpan sebagai <b>${mode === "cur" ? "posisi terkini" : "bulan lalu"}</b></div>
       <div class="toolbar"><button class="btn primary" type="button" id="go_lw${set}">Kirim ke database</button><button class="btn" type="button" id="no_lw${set}">Batal</button></div>`;
     $("#no_lw" + set).onclick = () => { info.innerHTML = ""; };
     $("#go_lw" + set).onclick = async ev => {

@@ -1,4 +1,4 @@
-# Dashboard Konsumer RO Medan (Briguna Ritel · Briguna Mikro · KPR)
+# Dashboard Konsumer Region I - Medan (Briguna Ritel · Briguna Mikro · KPR)
 
 Website statis (GitHub Pages) + Google Apps Script (API & penjaga akses) + Google Sheets (database privat).
 Tampilan, animasi pembuka, dan suara mengikuti Dashboard KPR RO Medan.

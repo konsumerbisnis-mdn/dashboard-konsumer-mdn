@@ -109,7 +109,7 @@ function viewBeranda(v) {
     </div>
     <div class="l-center">
       <div class="l-head">
-        <h1>Dashboard Konsumer RO Medan</h1>
+        <h1>Dashboard Konsumer Region I - Medan</h1>
         <span class="l-rule"></span>
         <p>Halo, ${esc((Auth.user || {}).nama || (Auth.user || {}).username || "")} · silakan pilih dashboard</p>
         <span class="l-now" id="lNow"></span>

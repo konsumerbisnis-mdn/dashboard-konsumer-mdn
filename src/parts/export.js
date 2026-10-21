@@ -76,7 +76,7 @@ const Exp = (() => {
       for (let y = 0, p = 0; y < cv.height; y += pageH, p++) {
         if (p) doc.addPage();
         doc.setFontSize(11); doc.setTextColor(30); doc.text((ctxOf() + " · " + title).slice(0, 110), m, 26);
-        doc.setFontSize(8); doc.setTextColor(120); doc.text("Dashboard Konsumer RO Medan · diunduh " + new Date().toLocaleString("id-ID") + (p ? " · hal. " + (p + 1) : ""), m, 38);
+        doc.setFontSize(8); doc.setTextColor(120); doc.text("Dashboard Konsumer Region I - Medan · diunduh " + new Date().toLocaleString("id-ID") + (p ? " · hal. " + (p + 1) : ""), m, 38);
         const h = Math.min(pageH, cv.height - y), part = document.createElement("canvas"); part.width = cv.width; part.height = Math.ceil(h);
         part.getContext("2d").drawImage(cv, 0, y, cv.width, h, 0, 0, cv.width, h);
         doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, top, iw, h * scale);

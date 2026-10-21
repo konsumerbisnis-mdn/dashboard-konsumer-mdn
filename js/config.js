@@ -3,7 +3,7 @@
 window.APP_CONFIG = Object.freeze({
   // URL Web App Google Apps Script (Deploy → Web app → salin URL yang berakhiran /exec)
   API_URL: "https://script.google.com/macros/s/AKfycbzO3N5mWev3h5F6BIFktlfZm9BLhT184EbqrCJDviVH3bheqhp_9dflaLJ9iPMbidRv/exec",
-  APP_NAME: "Dashboard Konsumer RO Medan",
+  APP_NAME: "Dashboard Konsumer Region I - Medan",
   // awalan hash password di browser; harus sama dengan setup() di Apps Script ('briguna')
   HASH_PREFIX: "briguna",
   // keluar otomatis bila tidak ada aktivitas (menit)

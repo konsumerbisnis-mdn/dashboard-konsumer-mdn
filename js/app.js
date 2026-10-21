@@ -1046,7 +1046,8 @@ function renderRMPer(inScope) {
   const key = nmKey(RS.sel);
   const mine = P.months.filter(x => isKc ? x.kc === RS.selKc : nmKey(x.rm) === key), years = uniq(mine.map(x => x.ym.slice(0, 4))).sort();
   if (!years.includes(RS.selYr)) RS.selYr = years.includes(asofYm.slice(0, 4)) ? asofYm.slice(0, 4) : years[years.length - 1];
-  const yr = RS.selYr, endM = RS.co === "des" || yr < asofYm.slice(0, 4) ? 12 : +asofYm.slice(5, 7);
+  // carry over Jan s.d. bulan pilihan (1–12); "berjalan" = bulan posisi data (tahun lampau: s.d. Des)
+  const yr = RS.selYr, nowM = yr < asofYm.slice(0, 4) ? 12 : +asofYm.slice(5, 7), endM = (RS.co === "des" ? 12 : +RS.co) || nowM;
   const ms = Array.from({ length: 12 }, (_, i) => yr + "-" + String(i + 1).padStart(2, "0"));
   const me = mine.filter(x => x.ym.startsWith(yr)).pop() || mine[mine.length - 1] || {};
   // rincian per bulan: Subsidi (KPRS/FLPP) & Komersil dari history; bulan tanpa history dari data pencairan harian
@@ -1097,7 +1098,7 @@ function renderRMPer(inScope) {
       ${isKc ? `<label class="field" style="flex:2 1 220px"><span class="note" style="font-weight:700">Kantor cabang</span><select class="ctl" id="pKcSel">${kcList.map(n => `<option ${n === RS.selKc ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label>`
         : `<label class="field" style="flex:2 1 220px"><span class="note" style="font-weight:700">Nama ${RL.who}</span><select class="ctl" id="pRmSel">${rmList.map(n => `<option ${nmKey(n) === key ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></label>`}
       <label class="field" style="flex:1 1 110px"><span class="note" style="font-weight:700">Tahun</span><select class="ctl" id="pRmYr">${years.map(y => `<option ${y === yr ? "selected" : ""}>${y}</option>`).join("")}</select></label>
-      <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">Carry over</span><select class="ctl" id="pRmCo"><option value="berjalan" ${RS.co !== "des" ? "selected" : ""}>Jan s.d. bulan berjalan</option><option value="des" ${RS.co === "des" ? "selected" : ""}>Jan s.d. Des</option></select></label>
+      <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">Carry over</span><select class="ctl" id="pRmCo"><option value="berjalan">Jan s.d. bulan berjalan (${BULAN[nowM - 1]})</option>${BULAN.map((b, i) => `<option value="${i + 1}" ${(RS.co === "des" ? 12 : +RS.co) === i + 1 ? "selected" : ""}>Jan s.d. ${b}</option>`).join("")}</select></label>
     </div>
     ${card}
     <p class="note" style="margin:0">Rp juta · carry over ${coLbl}</p>
@@ -1106,7 +1107,7 @@ function renderRMPer(inScope) {
       ${tile({ label: "Target carry over", value: rpJ(coT), sub: `${coTD ? nf0.format(coTD) + " deb · " : ""}${coLbl}` })}
       ${tile({ label: "Pencapaian", value: coPen == null ? "–" : pct(coPen, 1), sub: kq(coK) + (coK ? " kuadran carry over" : ""), meter: coPen })}
       ${tile({ label: "Gap terhadap target", value: `<span class="delta ${dCls(coO - coT)}" style="font-size:inherit">${(coO - coT >= 0 ? "+" : "−") + nf1.format(Math.abs(coO - coT))}</span>`, sub: "Rp juta" })}
-      ${tile({ label: isKc ? "Ratas cabang per bulan" : "Ratas per bulan", value: rpJ(coO / elapsed), sub: `${elapsed} bulan aktif${RS.co === "des" && inCo.some(r => r.future) ? ` · perlu ${rpJ(Math.max(0, coT - coO) / inCo.filter(r => r.future).length)}/bln s.d. Des` : ""}` })}
+      ${tile({ label: isKc ? "Ratas cabang per bulan" : "Ratas per bulan", value: rpJ(coO / elapsed), sub: `${elapsed} bulan aktif${inCo.some(r => r.future) ? ` · perlu ${rpJ(Math.max(0, coT - coO) / inCo.filter(r => r.future).length)}/bln s.d. ${BULAN[endM - 1]}` : ""}` })}
     </div>
     <div class="chart"><canvas id="cRmPer"></canvas></div>
     <div id="tRmPer"></div>

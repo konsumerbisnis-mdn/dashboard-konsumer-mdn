@@ -126,7 +126,7 @@ function secApply(view, sec) {
   sec.classList.toggle("min", min); if (h) { h.setAttribute("aria-expanded", String(!min)); h.setAttribute("role", "button"); h.tabIndex = 0; }
 }
 function setupSections(v, view) {
-  const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h"));
+  const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h") && !x.hasAttribute("data-nosec"));
   if (!secs.length) return;
   secs.forEach(sec => { sec.classList.add("sec"); secApply(view, sec); });
   if (!v.querySelector(".sec-ctl")) {
@@ -901,7 +901,7 @@ function viewRM(v) {
     <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>Peringkat ${RL.who}</h2><div class="toolbar"><div class="seg" role="tablist" aria-label="Dasar peringkat"><button type="button" role="tab" aria-selected="${RS.rkm !== "co"}" data-rkm="m">Bulan berjalan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div><span class="sub" id="rLbS">garis = 100% target · klik nama untuk lihat pencapaiannya</span><button class="btn" id="rExp" type="button">Ekspor CSV</button></div></div><div class="lb" id="rLb"></div></section>
     <section class="panel" ${RS.pm === "kc" ? "" : "hidden"}><div class="panel-h"><h2>Per kantor cabang</h2><span class="sub">${ymS(ym)}</span></div><div id="rKc"></div></section>
     <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>History kuadran ${RL.who} ${yr}</h2><span class="sub">per bulan</span></div><div id="rHq"></div></section>
-    <section class="panel" id="rApx"></section>`;
+    <section class="panel" id="rApx" data-nosec></section>`;
   $("#rY").onchange = e => { RS.ym = e.target.value; saveRS(); render(); };
   bindSeg();
   v.querySelectorAll("[data-rmm]").forEach(b => b.onclick = () => { if (RS.pm === b.dataset.rmm) return; RS.pm = RS.cmpG = b.dataset.rmm; RS.selYr = null; saveRS(); render(); });

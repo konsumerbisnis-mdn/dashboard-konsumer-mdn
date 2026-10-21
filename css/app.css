@@ -693,3 +693,29 @@ dialog#dlgDeb{width:min(820px,calc(100vw - 24px))}
 .xp-shot .table-wrap{overflow:visible!important;margin:0!important;padding:0!important}
 .xp-shot .table-wrap > table{zoom:1!important}
 .xp-shot .kt .sk0,.xp-shot .kt .sk1{position:static!important}
+/* pipeline: tabel format laporan (rencana realisasi per minggu, rekap per KC per tahap, ringkasan jadwal akad) */
+.kt.rp thead th,.kt.rk thead th,.kt.as thead th{background:#0b56a8}
+.kt.rp thead th.wk{background:#1f6fd1}
+.kt.rp thead th.gt{background:#c00000}
+.kt.rp td.tw{background:#c9dcf3!important;color:#0e1c22}
+.kt.rp td.gt{font-weight:800}
+.kt.rp td:nth-child(-n+2),.kt.rk td:first-child{white-space:nowrap}
+.kt tr.ktl td{background:#c9dcf3!important;color:#0e1c22;font-weight:800}
+.kt.rk thead th.sb{background:#4a8fe0;font-size:13px;font-weight:800}
+.kt.rk thead th.nv{background:#0b2f6b;font-size:13px;font-weight:800}
+.kt.rk thead th.oh{background:#ddebf7;color:#2e75b6}
+.kt.rk thead th.yl{background:#ffc000;color:#1a1a1a}
+.kt.rk thead th.rd{background:#c00000}
+.kt.rk thead th.lt{background:#ddebf7;color:#0e1c22;font-weight:700}
+.kt tr.knv td{background:#0b2f6b!important;color:#fff;font-weight:800}
+.kt.as thead th{text-align:left;letter-spacing:.03em}
+.kt.as thead th.r{text-align:right}
+.ak-sum{margin:6px 0 14px}
+.ak-sum .panel-h h2{color:#1f6fd1}
+details.ms{position:relative;flex:1 1 170px}
+details.ms > summary{list-style:none;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center}
+details.ms > summary::-webkit-details-marker{display:none}
+details.ms > summary::after{content:"▾";margin-left:auto;padding-left:10px;font-size:12px;color:var(--muted)}
+details.ms .ms-pop{position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:240px;max-height:320px;overflow:auto;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:0 12px 30px rgba(0,0,0,.18);display:grid;gap:2px}
+details.ms .ms-pop label.check{padding:5px 2px}
+details.ms .ms-pop .toolbar{margin-top:6px;gap:6px}

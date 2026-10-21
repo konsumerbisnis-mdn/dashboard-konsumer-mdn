@@ -97,7 +97,7 @@ function mkChart(id, cfg) {
   const el = document.getElementById(id); if (!el) return;
   if (charts[id]) charts[id].destroy();
   if (typeof Chart === "undefined") { el.parentElement.innerHTML = '<div class="empty">Grafik butuh koneksi internet untuk memuat pustaka grafik.</div>'; return; }
-  charts[id] = new Chart(el, cfg);
+  charts[id] = new Chart(el, chartTheme(cfg));
 }
 function baseOpts(extra = {}) {
   const ink2 = cssv("--ink-2"), muted = cssv("--muted"), line = cssv("--line");
@@ -105,16 +105,100 @@ function baseOpts(extra = {}) {
     responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
     plugins: {
       legend: { position: "top", align: "start", labels: { color: ink2, usePointStyle: true, pointStyle: "rectRounded", boxWidth: 10, boxHeight: 10, font: { family: cssv("--f-body"), size: 12 } } },
-      tooltip: { padding: 10, cornerRadius: 8, titleFont: { family: cssv("--f-body"), weight: "700" }, bodyFont: { family: cssv("--f-num") } }
+      tooltip: { padding: 10, cornerRadius: 8, titleFont: { family: cssv("--f-body"), weight: "700" }, bodyFont: { family: cssv("--f-body") } }
     },
     scales: {
       x: { grid: { display: false }, border: { color: line }, ticks: { color: muted, font: { size: 11 } } },
-      y: { grid: { color: line }, border: { display: false }, ticks: { color: muted, font: { size: 11, family: cssv("--f-num") } }, beginAtZero: true }
+      y: { grid: { color: line }, border: { display: false }, ticks: { color: muted, font: { size: 11, family: cssv("--f-body") } }, beginAtZero: true }
     }
   }, extra);
 }
 const rpTick = v => { const a = Math.abs(v); return a >= 1e3 ? nf0.format(v / 1e3) + " M" : nf0.format(v) + " Jt"; };
 
+/* ================= tema grafik: palet seragam + label angka di setiap data ================= */
+// palet (biru, biru tua, biru muda, abu tua); garis pembanding di grafik batang memakai abu muda
+const CP_BAR = ["#2b7ff6", "#0a50c8", "#cddff7", "#4d4d4d", "#7fb2f9", "#8c8c8c"];
+const CP_LINE = ["#2b7ff6", "#0a50c8", "#4d4d4d", "#7fb2f9", "#163a73", "#8c8c8c"];
+const CP_DASH = "#a6a6a6";
+const CP_REF = "#c9c9c9";
+const isLight = c => { const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(c || "")); if (!m) return false;
+  const [r, g, b] = m.slice(1).map(h => parseInt(h, 16)); return .299 * r + .587 * g + .114 * b > 170; };
+function chartTheme(cfg) {
+  const ds = (cfg.data && cfg.data.datasets) || [], type = cfg.type;
+  if (type !== "bar" && type !== "line") return cfg;
+  const tOf = d => d.type || type, nBar = ds.filter(d => tOf(d) === "bar").length;
+  // garis utama (paling tebal / terakhir) mendapat biru
+  const lines = ds.filter(d => tOf(d) === "line" && !(d.borderDash && d.borderDash.length));
+  const main = lines.reduce((a, d) => !a || (d.borderWidth || 2) >= (a.borderWidth || 2) ? d : a, null);
+  let bi = 0, li = 1;
+  ds.forEach(d => {
+    if (tOf(d) === "bar") {
+      if (Array.isArray(d.backgroundColor)) return;   // warna per batang (mis. baik/buruk) dipertahankan
+      const c = CP_BAR[bi++ % CP_BAR.length]; d.backgroundColor = c; d.hoverBackgroundColor = c;
+    } else {
+      const dash = d.borderDash && d.borderDash.length;
+      const c = dash ? CP_DASH : nBar ? CP_REF : d === main ? CP_LINE[0] : CP_LINE[li++ % CP_LINE.length];
+      // grafik area: isi transparan dengan warna garis
+      d.borderColor = c; d.backgroundColor = d.fill ? c + "29" : c; d.pointBackgroundColor = c; d.pointBorderColor = c;
+      if (nBar && !dash) d.borderWidth = Math.max(d.borderWidth || 0, 3);
+    }
+  });
+  const o = cfg.options = cfg.options || {};
+  o.layout = o.layout || {}; const p = o.layout.padding || {};
+  o.layout.padding = typeof p === "number" ? { top: Math.max(p, 24), right: Math.max(p, 14), left: p, bottom: p } : { ...p, top: Math.max(p.top || 0, 24), right: Math.max(p.right || 0, 14) };
+  cfg.plugins = [...(cfg.plugins || []), DATA_LBL];
+  return cfg;
+}
+// teks label: persen mengikuti format sumbu; angka lain ditulis lengkap (pemisah ribuan)
+function lblText(ch, d, v) {
+  const ax = ch.scales[(ch.options.indexAxis === "y" ? d.xAxisID : d.yAxisID) || (ch.options.indexAxis === "y" ? "x" : "y")];
+  const cb = ax && ax.options && ax.options.ticks && ax.options.ticks.callback;
+  if (cb) { try { const t = String(cb.call(ax, v, 0, [])); if (/%/.test(t)) return t.replace(/\s+/g, ""); } catch (e) {} }
+  const a = Math.abs(v); return a >= 100 || Number.isInteger(v) ? nf0.format(Math.round(v)) : a >= 10 ? nf1.format(v) : nf2.format(v);
+}
+const DATA_LBL = { id: "dataLbl", afterDatasetsDraw(ch) {
+  const g = ch.ctx, A = ch.chartArea, horiz = ch.options.indexAxis === "y", placed = [], fs = 11, H = fs + 6;
+  g.save(); g.font = `700 ${fs}px Inter, system-ui, sans-serif`; g.textBaseline = "middle"; g.textAlign = "center";
+  const hit = r => placed.some(q => r.x < q.x + q.w + 2 && q.x < r.x + r.w + 2 && r.y < q.y + q.h + 1 && q.y < r.y + r.h + 1);
+  const inCanvas = r => r.x >= 0 && r.x + r.w <= ch.width && r.y >= 0 && r.y + r.h <= ch.height;
+  const put = (cx, cy, t, fill, cands) => { const w = g.measureText(t).width + 8;
+    for (const [dx, dy] of cands) { const r = { x: cx + dx - w / 2, y: cy + dy - H / 2, w, h: H }; if (inCanvas(r) && !hit(r)) { placed.push(r);
+      g.fillStyle = fill; g.beginPath(); g.roundRect ? g.roundRect(r.x, r.y, r.w, r.h, 3) : g.rect(r.x, r.y, r.w, r.h); g.fill();
+      g.fillStyle = isLight(fill) ? "#262626" : "#fff"; g.fillText(t, r.x + r.w / 2, r.y + r.h / 2 + .5); return; } } };
+  const steps = s => [0, -1, 1, -2, 2, -3, 3].map(k => k * s);
+  const stacked = !horiz && ch.options.scales && ch.options.scales.y && ch.options.scales.y.stacked;
+  // batang bertumpuk: total di atas tumpukan (prioritas pertama)
+  if (stacked) { const bars = ch.data.datasets.map((d, i) => i).filter(i => (ch.data.datasets[i].type || ch.config.type) === "bar" && ch.getDatasetMeta(i).visible);
+    (ch.data.labels || []).forEach((_, k) => { let tot = 0, top = Infinity, x = null;
+      bars.forEach(i => { const v = ch.data.datasets[i].data[k], el = ch.getDatasetMeta(i).data[k]; if (v == null || !el) return; tot += +v || 0; top = Math.min(top, el.y, el.base); x = el.x; });
+      if (x != null && tot && bars.length > 1) put(x, top - H / 2 - 3, lblText(ch, ch.data.datasets[bars[0]], tot), "#4d4d4d", [0, 1, 2].map(j => [0, -j * (H + 1)])); }); }
+  // batang dulu (prioritas), lalu garis
+  const order = ch.data.datasets.map((d, i) => i).sort((a, b) => ((ch.data.datasets[a].type || ch.config.type) === "bar" ? 0 : 1) - ((ch.data.datasets[b].type || ch.config.type) === "bar" ? 0 : 1));
+  order.forEach(i => {
+    const d = ch.data.datasets[i], meta = ch.getDatasetMeta(i); if (!meta.visible || d.datalabels === false) return;
+    const isBar = (d.type || ch.config.type) === "bar", n = meta.data.length;
+    const vals = d.data.map(v => v == null ? null : typeof v === "object" ? (horiz ? v.x : v.y) : v);
+    const lastI = vals.reduce((a, v, k) => v != null ? k : a, -1);
+    const dash = d.borderDash && d.borderDash.length, pr = d.pointRadius;
+    meta.data.forEach((el, k) => {
+      const v = vals[k]; if (v == null || !isFinite(v) || (isBar && v === 0)) return;
+      if (!isBar) {
+        // garis padat (banyak titik) atau garis target: hanya titik terakhir dan titik yang ditandai
+        const marked = Array.isArray(pr) ? pr[k] > 0 : false;
+        if ((dash || n > 14) && k !== lastI && !marked) return;
+      }
+      const t = lblText(ch, d, v), fill = isBar ? (Array.isArray(d.backgroundColor) ? d.backgroundColor[k] : d.backgroundColor) : (d.borderColor === CP_REF ? "#e3e3e3" : d.borderColor === CP_DASH ? "#d9d9d9" : d.borderColor);
+      if (isBar) {
+        if (horiz) { const w = g.measureText(t).width + 8; put(el.x + w / 2 + 4, el.y, t, fill, [[0, 0], [-(w + 8), 0], ...steps(H + 1).map(s => [0, s])]); return; }
+        const top = Math.min(el.y, el.base), hgt = Math.abs(el.base - el.y), bw = el.width || 20, w = g.measureText(t).width + 8;
+        // tumpukan: di tengah segmen bila muat, selain itu di samping segmen
+        if (stacked) { put(el.x, top + hgt / 2, t, fill, hgt >= H + 2 ? [[0, 0]] : [[bw / 2 + w / 2 + 2, 0], [-(bw / 2 + w / 2 + 2), 0]]); return; }
+        const up = v >= 0; put(el.x, up ? el.y - H / 2 - 3 : el.y + H / 2 + 3, t, fill, [0, 1, 2, 3].map(k => [0, (up ? -1 : 1) * k * (H + 1)]));
+      } else put(el.x, el.y, t, fill, [[0, 0], [0, -(H + 2)], [0, H + 2], [0, -2 * (H + 2)], [0, 2 * (H + 2)], [-(H * 1.5), 0], [H * 1.5, 0]]);
+    });
+  });
+  g.restore();
+} };
 /* ================= table helper ================= */
 // section yang bisa diminimize (klik judul). Pipeline Brispot: awalnya semua section diminimize. Pilihan diingat per perangkat.
 const SEC_DEFAULT_MIN = { pipeline: true };
@@ -126,7 +210,7 @@ function secApply(view, sec) {
   sec.classList.toggle("min", min); if (h) { h.setAttribute("aria-expanded", String(!min)); h.setAttribute("role", "button"); h.tabIndex = 0; }
 }
 function setupSections(v, view) {
-  const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h"));
+  const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h") && !x.hasAttribute("data-nosec"));
   if (!secs.length) return;
   secs.forEach(sec => { sec.classList.add("sec"); secApply(view, sec); });
   if (!v.querySelector(".sec-ctl")) {
@@ -901,7 +985,7 @@ function viewRM(v) {
     <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>Peringkat ${RL.who}</h2><div class="toolbar"><div class="seg" role="tablist" aria-label="Dasar peringkat"><button type="button" role="tab" aria-selected="${RS.rkm !== "co"}" data-rkm="m">Bulan berjalan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div><span class="sub" id="rLbS">garis = 100% target · klik nama untuk lihat pencapaiannya</span><button class="btn" id="rExp" type="button">Ekspor CSV</button></div></div><div class="lb" id="rLb"></div></section>
     <section class="panel" ${RS.pm === "kc" ? "" : "hidden"}><div class="panel-h"><h2>Per kantor cabang</h2><span class="sub">${ymS(ym)}</span></div><div id="rKc"></div></section>
     <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>History kuadran ${RL.who} ${yr}</h2><span class="sub">per bulan</span></div><div id="rHq"></div></section>
-    <section class="panel" id="rApx"></section>`;
+    <section class="panel" id="rApx" data-nosec></section>`;
   $("#rY").onchange = e => { RS.ym = e.target.value; saveRS(); render(); };
   bindSeg();
   v.querySelectorAll("[data-rmm]").forEach(b => b.onclick = () => { if (RS.pm === b.dataset.rmm) return; RS.pm = RS.cmpG = b.dataset.rmm; RS.selYr = null; saveRS(); render(); });
@@ -1234,16 +1318,7 @@ function renderRMDaily({ P, txIn, ym, isCur, day }) {
       <tr>${leaves.map(() => '<th class="lt">DEB</th><th class="lt">OS</th>').join("")}<th>DEB</th><th>OS</th><th class="yl">DEB</th><th class="yl">OS</th><th class="gr">OS</th><th class="gr">%</th></tr></thead>
       <tbody>${prRow(scope, cut[1], cut[2], "ktl")}</tbody></table></div>`;
   const maxD = Math.max(...ms.map(nDays));
-  // label nilai di titik terakhir tiap garis: posisi bulan berjalan & akhir 2 bulan sebelumnya
-  const endLbl = { id: "rdEnd", afterDatasetsDraw(ch) { const g = ch.ctx; g.save(); g.font = "600 11px " + (cssv("--f-num") || "monospace"); g.textBaseline = "middle";
-    const h = 18, L = ch.data.datasets.map((ds, i) => { const meta = ch.getDatasetMeta(i), pt = meta.data[meta.data.length - 1]; if (!pt || meta.hidden) return null;
-      const t = nf0.format(ds.data[ds.data.length - 1]), w = g.measureText(t).width + 10; return { t, w, c: ds.borderColor, x: Math.min(pt.x - w / 2, ch.chartArea.right + 26 - w), y: pt.y - 16 }; }).filter(Boolean);
-    // label yang bertumpuk digeser ke atas
-    L.sort((a, b) => b.y - a.y).forEach((l, i, a) => { for (let j = 0; j < i; j++) { const o = a[j]; if (Math.abs(l.y - o.y) < h + 2 && l.x < o.x + o.w && o.x < l.x + l.w) l.y = o.y - h - 2; } });
-    L.forEach(l => { g.fillStyle = cssv("--surface"); g.strokeStyle = l.c; g.lineWidth = 1; g.beginPath(); g.rect(l.x, l.y - h / 2, l.w, h); g.fill(); g.stroke();
-      g.fillStyle = cssv("--ink"); g.fillText(l.t, l.x + 5, l.y); });
-    g.restore(); } };
-  mkChart("cRDay", { type: "line", plugins: [endLbl], data: { labels: Array.from({ length: maxD }, (_, i) => i + 1), datasets: ms.map((m, i) => {
+  mkChart("cRDay", { type: "line", data: { labels: Array.from({ length: maxD }, (_, i) => i + 1), datasets: ms.map((m, i) => {
     const last = m === ym ? D : nDays(m), out = []; let c = 0;
     for (let d = 1; d <= last; d++) { c += sum(tx[i].filter(t => +t.d.slice(8) === d), "pl"); out.push(Math.round(c)); }
     return { label: BULAN_L[+m.slice(5, 7) - 1] + " " + m.slice(0, 4), data: out, borderColor: RD_PAL[i], backgroundColor: RD_PAL[i], borderWidth: m === ym ? 3 : 2, tension: .15,

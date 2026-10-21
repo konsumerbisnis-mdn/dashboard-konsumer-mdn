@@ -65,16 +65,7 @@ function renderRMDaily({ P, txIn, ym, isCur, day }) {
       <tr>${leaves.map(() => '<th class="lt">DEB</th><th class="lt">OS</th>').join("")}<th>DEB</th><th>OS</th><th class="yl">DEB</th><th class="yl">OS</th><th class="gr">OS</th><th class="gr">%</th></tr></thead>
       <tbody>${prRow(scope, cut[1], cut[2], "ktl")}</tbody></table></div>`;
   const maxD = Math.max(...ms.map(nDays));
-  // label nilai di titik terakhir tiap garis: posisi bulan berjalan & akhir 2 bulan sebelumnya
-  const endLbl = { id: "rdEnd", afterDatasetsDraw(ch) { const g = ch.ctx; g.save(); g.font = "600 11px " + (cssv("--f-num") || "monospace"); g.textBaseline = "middle";
-    const h = 18, L = ch.data.datasets.map((ds, i) => { const meta = ch.getDatasetMeta(i), pt = meta.data[meta.data.length - 1]; if (!pt || meta.hidden) return null;
-      const t = nf0.format(ds.data[ds.data.length - 1]), w = g.measureText(t).width + 10; return { t, w, c: ds.borderColor, x: Math.min(pt.x - w / 2, ch.chartArea.right + 26 - w), y: pt.y - 16 }; }).filter(Boolean);
-    // label yang bertumpuk digeser ke atas
-    L.sort((a, b) => b.y - a.y).forEach((l, i, a) => { for (let j = 0; j < i; j++) { const o = a[j]; if (Math.abs(l.y - o.y) < h + 2 && l.x < o.x + o.w && o.x < l.x + l.w) l.y = o.y - h - 2; } });
-    L.forEach(l => { g.fillStyle = cssv("--surface"); g.strokeStyle = l.c; g.lineWidth = 1; g.beginPath(); g.rect(l.x, l.y - h / 2, l.w, h); g.fill(); g.stroke();
-      g.fillStyle = cssv("--ink"); g.fillText(l.t, l.x + 5, l.y); });
-    g.restore(); } };
-  mkChart("cRDay", { type: "line", plugins: [endLbl], data: { labels: Array.from({ length: maxD }, (_, i) => i + 1), datasets: ms.map((m, i) => {
+  mkChart("cRDay", { type: "line", data: { labels: Array.from({ length: maxD }, (_, i) => i + 1), datasets: ms.map((m, i) => {
     const last = m === ym ? D : nDays(m), out = []; let c = 0;
     for (let d = 1; d <= last; d++) { c += sum(tx[i].filter(t => +t.d.slice(8) === d), "pl"); out.push(Math.round(c)); }
     return { label: BULAN_L[+m.slice(5, 7) - 1] + " " + m.slice(0, 4), data: out, borderColor: RD_PAL[i], backgroundColor: RD_PAL[i], borderWidth: m === ym ? 3 : 2, tension: .15,

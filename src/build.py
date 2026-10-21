@@ -222,6 +222,10 @@ rm = rep(rm, '''{ key: "sub", label: "Subsidi", r: 1, fmt: x => nf1.format(x) },
 rm = rep(rm, '''  const ds = [["Subsidi", "sub", cssv("--s1")], ["Komersil", "kom", cssv("--s2")]].map(''', '''  const ds = [[RL.s, "sub", cssv("--s1")], [RL.k, "kom", cssv("--s2")]].map(''')
 rm = rep(rm, '''<span class="note" style="font-weight:700">Nama RM</span>''', '''<span class="note" style="font-weight:700">Nama ${RL.who}</span>''')
 
+# tema grafik (src/parts/charts.js): palet seragam + label angka
+chart = rep(chart, '  charts[id] = new Chart(el, cfg);', '  charts[id] = new Chart(el, chartTheme(cfg));')
+chart = rep(chart, 'family: cssv("--f-num")', 'family: cssv("--f-body")', 2)
+
 # laporan disburse realisasi harian (src/parts/rm_rep.js) di atas bagian perbandingan
 rm = rep(rm, '''    <section class="panel" id="rCmp"></section>''', '''    <section class="panel" id="rDay"></section>
     <section class="panel" id="rCmp"></section>''')
@@ -239,7 +243,7 @@ rm = rep(rm, 'table($("#tCmpG"), [{ key: "k"', 'if ($("#tCmpG")) table($("#tCmpG
 rm = rep(rm, '''<h2>Perbandingan disbursement</h2><div class="seg" role="tablist" aria-label="Jenis perbandingan">
       <button type="button" role="tab" aria-selected="${!yo}" data-cmp="mtd">Bulan berjalan vs 3 bulan lalu</button><button type="button" role="tab" aria-selected="${yo}" data-cmp="yoy">${y1} vs ${yr}</button></div></div>''', '''<h2>Perbandingan disbursement ${y1} vs ${yr}</h2></div>''')
 rm = rep(rm, '''<span class="sub">per bulan</span></div><div id="rHq"></div></section>`;''', '''<span class="sub">per bulan</span></div><div id="rHq"></div></section>
-    <section class="panel" id="rApx"></section>`;''')
+    <section class="panel" id="rApx" data-nosec></section>`;''')
 # peringkat RM: bulan berjalan atau carry over (Jan s.d. batas carry over yang sama dengan Pencapaian per RM)
 rm = rep(rm, 'pm: "rm", selYr: null, co: "berjalan" }', 'pm: "rm", selYr: null, co: "berjalan", rkm: "m", apxG: "kc" }')
 rm = rep(rm, '''<div class="toolbar"><span class="sub">garis = 100% target · klik nama untuk lihat pencapaiannya</span>''', '''<div class="toolbar"><div class="seg" role="tablist" aria-label="Dasar peringkat"><button type="button" role="tab" aria-selected="${RS.rkm !== "co"}" data-rkm="m">Bulan berjalan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div><span class="sub" id="rLbS">garis = 100% target · klik nama untuk lihat pencapaiannya</span>''')
@@ -360,8 +364,10 @@ start = '''
   window.__appReady = true;
 })();
 '''
-js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + pipe + P('pipe_rep.js') + pimp + sim \
+js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + P('charts.js') + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + pipe + P('pipe_rep.js') + pimp + sim \
      + P('sim_brg.js') + P('nominatif.js') + P('admin.js') + P('export.js') + P('router.js') + zoom + P('boot.js') + start + intro
+# bagian bertanda data-nosec (mis. Lampiran, yang sudah punya buka-tutup per lampiran) tidak diberi tombol minimize
+js = rep(js, '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h"));''', '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h") && !x.hasAttribute("data-nosec"));''')
 open(os.path.join(ROOT, 'js', 'app.js'), 'w', encoding='utf8').write(js)
 css = open(os.path.join(HERE, 'kpr.css'), encoding='utf8').read() + '\n' + P('extra.css')
 open(os.path.join(ROOT, 'css', 'app.css'), 'w', encoding='utf8').write(css)

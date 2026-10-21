@@ -740,3 +740,22 @@ details.ms .ms-pop .toolbar{margin-top:6px;gap:6px}
 .kt td.c-lg{background:#d9ead3!important;color:#0a5a1f}
 .kt td.c-g{background:#8fd18f!important;color:#063d14}
 .kt td.c-r .neg,.kt td.c-y .neg{color:inherit}
+details.rm-more{border-top:1px solid var(--line);padding-top:10px}
+details.rm-more > summary{cursor:pointer;font-weight:700;color:var(--brand);padding:4px 0;list-style:none}
+details.rm-more > summary::-webkit-details-marker{display:none}
+details.rm-more > summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+details.rm-more[open] > summary::before{transform:rotate(90deg)}
+details.rm-more[open] > summary{margin-bottom:10px}
+/* tabel standar (helper table()) berformat laporan: kepala biru, baris berselang, total pita biru tua */
+.table-wrap > table:not(.kt){border-collapse:separate;border-spacing:0}
+.table-wrap > table:not(.kt) thead th{background:#0b56a8;color:#fff;font-weight:700;letter-spacing:.04em;border-bottom:0;padding-top:10px;padding-bottom:10px}
+.table-wrap > table:not(.kt) thead th:first-child{border-top-left-radius:6px}
+.table-wrap > table:not(.kt) thead th:last-child{border-top-right-radius:6px}
+.table-wrap > table:not(.kt) thead th.sortable:hover{color:#fff;background:#0a4b93}
+.table-wrap > table:not(.kt) tbody td{border-bottom:0}
+.table-wrap > table:not(.kt) tbody tr:nth-child(even) td{background:color-mix(in srgb,#2f7be0 7%,var(--surface))}
+.table-wrap > table:not(.kt) tbody tr:hover td{background:color-mix(in srgb,#2f7be0 15%,var(--surface))}
+.table-wrap > table:not(.kt) tfoot td{background:#0b56a8;color:#fff;font-weight:800}
+.table-wrap > table:not(.kt) tfoot td .note,.table-wrap > table:not(.kt) tfoot td small{color:rgba(255,255,255,.8)}
+.table-wrap > table:not(.kt) tfoot td .delta{color:#fff}
+.table-wrap > table:not(.kt) td.empty{background:transparent!important}

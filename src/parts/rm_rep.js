@@ -43,7 +43,6 @@ function renderRMDaily({ P, txIn, ym, isCur, day }) {
   const prRow = (lbl, a, b, cls) => { const x = tot(b), y = tot(a), d = x.os - y.os;
     return `<tr${cls ? ` class="${cls}"` : ""}><td><b>${esc(lbl)}</b></td>${leaves.map(j => { const z = tot(b, j); return `<td class="r">${n(z.deb)}</td><td class="r">${n(z.os)}</td>`; }).join("")}
       <td class="r">${n(x.deb)}</td><td class="r">${n(x.os)}</td><td class="r">${n(y.deb)}</td><td class="r">${n(y.os)}</td><td class="r">${n(d)}</td><td class="r ${mCls(y.os ? d / y.os : null)}">${pc(y.os ? d / y.os : null)}</td></tr>`; };
-  const kcB = uniq(cut[2].map(kcOf)).sort((x, y) => sum(cut[2].filter(t => kcOf(t) === y), "pl") - sum(cut[2].filter(t => kcOf(t) === x), "pl"));
   el.innerHTML = `<div class="panel-h"><h2>Disburse realisasi harian ${esc(RL.seg)} – (s.d. ${mL(ym, D)})</h2><span class="sub">Rp juta · ${esc(scope)}</span></div>
     <div class="rd-grid">
       <div><h3 class="rd-h">Tren realisasi ${esc(RL.seg)} 3 bulan terakhir</h3>
@@ -64,15 +63,45 @@ function renderRMDaily({ P, txIn, ym, isCur, day }) {
       <tr>${cats.filter(c => c[1].length > 1).map(c => c[1].map(j => `<th colspan="2" class="lt">${esc(j)}</th>`).join("")).join("")}</tr>`
       : `<tr>${leaves.map(j => `<th colspan="2" class="lt">${esc(j)}</th>`).join("")}</tr>`}
       <tr>${leaves.map(() => '<th class="lt">DEB</th><th class="lt">OS</th>').join("")}<th>DEB</th><th>OS</th><th class="yl">DEB</th><th class="yl">OS</th><th class="gr">OS</th><th class="gr">%</th></tr></thead>
-      <tbody>${kcB.length > 1 ? kcB.map(kc => prRow(kc, cut[1].filter(t => kcOf(t) === kc), cut[2].filter(t => kcOf(t) === kc))).join("") : ""}</tbody>
-      <tfoot>${prRow(scope, cut[1], cut[2], "ktl")}</tfoot></table></div>`;
+      <tbody>${prRow(scope, cut[1], cut[2], "ktl")}</tbody></table></div>`;
   const maxD = Math.max(...ms.map(nDays));
-  mkChart("cRDay", { type: "line", data: { labels: Array.from({ length: maxD }, (_, i) => i + 1), datasets: ms.map((m, i) => {
+  // label nilai di titik terakhir tiap garis: posisi bulan berjalan & akhir 2 bulan sebelumnya
+  const endLbl = { id: "rdEnd", afterDatasetsDraw(ch) { const g = ch.ctx; g.save(); g.font = "600 11px " + (cssv("--f-num") || "monospace"); g.textBaseline = "middle";
+    const h = 18, L = ch.data.datasets.map((ds, i) => { const meta = ch.getDatasetMeta(i), pt = meta.data[meta.data.length - 1]; if (!pt || meta.hidden) return null;
+      const t = nf0.format(ds.data[ds.data.length - 1]), w = g.measureText(t).width + 10; return { t, w, c: ds.borderColor, x: Math.min(pt.x - w / 2, ch.chartArea.right + 26 - w), y: pt.y - 16 }; }).filter(Boolean);
+    // label yang bertumpuk digeser ke atas
+    L.sort((a, b) => b.y - a.y).forEach((l, i, a) => { for (let j = 0; j < i; j++) { const o = a[j]; if (Math.abs(l.y - o.y) < h + 2 && l.x < o.x + o.w && o.x < l.x + l.w) l.y = o.y - h - 2; } });
+    L.forEach(l => { g.fillStyle = cssv("--surface"); g.strokeStyle = l.c; g.lineWidth = 1; g.beginPath(); g.rect(l.x, l.y - h / 2, l.w, h); g.fill(); g.stroke();
+      g.fillStyle = cssv("--ink"); g.fillText(l.t, l.x + 5, l.y); });
+    g.restore(); } };
+  mkChart("cRDay", { type: "line", plugins: [endLbl], data: { labels: Array.from({ length: maxD }, (_, i) => i + 1), datasets: ms.map((m, i) => {
     const last = m === ym ? D : nDays(m), out = []; let c = 0;
     for (let d = 1; d <= last; d++) { c += sum(tx[i].filter(t => +t.d.slice(8) === d), "pl"); out.push(Math.round(c)); }
     return { label: BULAN_L[+m.slice(5, 7) - 1] + " " + m.slice(0, 4), data: out, borderColor: RD_PAL[i], backgroundColor: RD_PAL[i], borderWidth: m === ym ? 3 : 2, tension: .15,
       pointRadius: out.map((_, k) => k === out.length - 1 || k === D - 1 ? 4 : 0) }; }) },
-    options: baseOpts({ plugins: { ...baseOpts().plugins, tooltip: { ...baseOpts().plugins.tooltip, callbacks: { title: c => "s.d. tanggal " + c[0].label, label: c => ` ${c.dataset.label}: ${nf0.format(c.parsed.y)} jt` } } },
-      scales: { x: { ...baseOpts().scales.x, title: { display: true, text: "Tanggal" }, ticks: { ...baseOpts().scales.x.ticks, maxRotation: 0, autoSkip: false, color: c => c.index === D - 1 ? cssv("--ink") : cssv("--muted") } },
+    options: baseOpts({ layout: { padding: { top: 18, right: 26 } }, plugins: { ...baseOpts().plugins, tooltip: { ...baseOpts().plugins.tooltip, callbacks: { title: c => "s.d. tanggal " + c[0].label, label: c => ` ${c.dataset.label}: ${nf0.format(c.parsed.y)} jt` } } },
+      scales: { x: { ...baseOpts().scales.x, title: { display: true, text: "Tanggal" }, ticks: { ...baseOpts().scales.x.ticks, maxRotation: 0, autoSkip: true, autoSkipPadding: 2, color: c => c.index === D - 1 ? cssv("--ink") : cssv("--muted") } },
         y: { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x) } } } }) });
+}
+
+// lampiran: disbursement per cabang / per RM s.d. tanggal yang sama, 3 bulan lalu + bulan berjalan
+function renderRMAppx({ P, txIn, ym, isCur, day }) {
+  const el = $("#rApx"); if (!el) return;
+  const addM = (m, k) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); };
+  const nDays = m => new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
+  const ms = [addM(ym, -3), addM(ym, -2), addM(ym, -1), ym], D = isCur ? day : nDays(ym), grp = RS.apxG === "rm" ? "rm" : "kc";
+  el.innerHTML = `<div class="panel-h"><h2>Lampiran · per ${grp === "rm" ? "RM" : "cabang"} s.d. tanggal ${D}</h2>
+    <div class="seg" role="tablist" aria-label="Kelompokkan"><button type="button" role="tab" aria-selected="${grp === "kc"}" data-ag="kc">Per cabang</button><button type="button" role="tab" aria-selected="${grp === "rm"}" data-ag="rm">Per RM</button></div></div>
+    <p class="note" style="margin:0">Disbursement s.d. tanggal ${D} di ${ymS(ym)} dibanding tanggal yang sama di 3 bulan sebelumnya · Rp juta.</p><div id="tApx"></div>`;
+  el.querySelectorAll("[data-ag]").forEach(b => b.onclick = () => { RS.apxG = b.dataset.ag; saveRS(); renderRMAppx({ P, txIn, ym, isCur, day }); });
+  if (!ms.some(m => P.tx.some(t => t.d.startsWith(m)))) { $("#tApx").innerHTML = '<div class="empty">Belum ada data pencairan harian untuk bulan-bulan ini.</div>'; return; }
+  const kcMap = new Map(P.months.map(x => [x.ym + "|" + nmKey(x.rm), x.kc]));
+  const gOf = t => grp === "rm" ? t.rm : (kcMap.get(t.d.slice(0, 7) + "|" + nmKey(t.rm)) || t.kc);
+  const cut = ms.map(m => txIn(m).filter(t => +t.d.slice(8) <= D));
+  const pc = (a, b) => b ? (a / b - 1) : null, dl = v => v == null ? "–" : `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + pct(Math.abs(v), 1)}</span>`;
+  const dJ = v => `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + nf1.format(Math.abs(v))}</span>`;
+  const gr = uniq(cut.flat().map(gOf)).filter(Boolean).map(k => { const o = { k }; ms.forEach((m, i) => o["m" + i] = sum(cut[i].filter(t => gOf(t) === k), "pl")); o.avg = (o.m0 + o.m1 + o.m2) / 3; o.d = o.m3 - o.avg; o.dp = pc(o.m3, o.avg); return o; });
+  table($("#tApx"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" }, ...ms.map((m, i) => ({ key: "m" + i, label: ymS(m), r: 1, fmt: x => i === 3 ? `<b>${nf1.format(x)}</b>` : (x ? nf1.format(x) : `<span class="note">–</span>`) })),
+    { key: "avg", label: "Rata 3 bln", r: 1, fmt: x => nf1.format(x) }, { key: "d", label: "Δ vs rata", r: 1, fmt: (x, r) => `${dJ(x)}<br><small>${dl(r.dp)}</small>` }], gr,
+    { sortKey: "m3", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", ...Object.fromEntries(ms.map((m, i) => ["m" + i, nf1.format(sum(gr, "m" + i))])), avg: nf1.format(sum(gr, "avg")), d: dJ(sum(gr, "m3") - sum(gr, "avg")) } });
 }

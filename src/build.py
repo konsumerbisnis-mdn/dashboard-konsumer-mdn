@@ -256,28 +256,38 @@ pipe = rep(pipe, '''background:var(--s1);margin-right:5px"></i>Subsidi</span>'''
 pipe = rep(pipe, '''background:var(--s2);margin-right:5px"></i>Komersil</span>''', '''background:var(--s2);margin-right:5px"></i>${PL.j[1]}</span>''')
 pipe = rep(pipe, '''datasets: ["Subsidi", "Komersil"].map((j, k) =>''', '''datasets: PL.j.map((j, k) =>''')
 # tabel format laporan (src/parts/pipe_rep.js): rencana realisasi per minggu, rekap per KC per tahap, ringkasan jadwal akad
-pipe = rep(pipe, 'tahap: "ALL", usia: "ALL", q: "", batal: false }, lsGet(STORE + "-pipe") || {});', 'tahap: "ALL", usia: "ALL", q: "", batal: false, akad: [] }, lsGet(STORE + "-pipe") || {});\nif (!Array.isArray(PS.akad)) PS.akad = [];')
+pipe = rep(pipe, 'tahap: "ALL", usia: "ALL", q: "", batal: false }, lsGet(STORE + "-pipe") || {});', 'tahap: "ALL", usia: "ALL", q: "", batal: false, akad: [], prosesM: [], jenisM: [] }, lsGet(STORE + "-pipe") || {});\n["akad", "prosesM", "jenisM"].forEach(k => { if (!Array.isArray(PS[k])) PS[k] = []; });\nPS.proses = "ALL"; PS.batal = false;')
 i0 = pipe.index('  // rencana realisasi RM\n'); i2 = pipe.index('  // per RM\n')
 pipe = pipe[:i0] + '  if ($("#pRen")) pipeRencana($("#pRen"), P.rencana);\n\n  pipeKcRekap($("#pKc"), aktif);\n\n' + pipe[i2:]
 pipe = rep(pipe, '<h2>Rekap per kantor cabang</h2><span class="sub">debitur / plafon (Rp juta)</span>', '<h2>Rekap per kantor cabang</h2><span class="sub">debitur / plafon (Rp juta) per tahap</span>')
-pipe = rep(pipe, '''        <label class="check"><input type="checkbox" id="pB" ${PS.batal ? "checked" : ""}> Tampilkan batal</label>
-      </div>
-      <div id="pList"></div>''', '''        <div id="pAk"></div>
+pipe = rep(pipe, '''        <select class="ctl" id="pP"><option value="ALL">HOT/WARM/COLD</option>${["HOT", "WARM", "COLD"].map(p => `<option ${PS.proses === p ? "selected" : ""}>${p}</option>`).join("")}</select>
         <label class="check"><input type="checkbox" id="pB" ${PS.batal ? "checked" : ""}> Tampilkan batal</label>
+      </div>
+      <div id="pList"></div>''', '''        <div id="pPr"></div>
+        <div id="pJn"></div>
+        <div id="pAk"></div>
       </div>
       <div id="pAkS" class="ak-sum" hidden></div>
       <div id="pList"></div>''')
 pipe = rep(pipe, '''    const rows = pipeFilter(base);
-    table($("#pList"),''', '''    const all = pipeFilter(base), rows = PS.akad.length ? all.filter(x => x.akad && PS.akad.includes(x.akad)) : all;
+    table($("#pList"),''', '''    const all = pipeFilter(base, { noProses: true, withBatal: true }).filter(x => prosesIn(x) && jenisIn(x)), rows = PS.akad.length ? all.filter(x => x.akad && PS.akad.includes(x.akad)) : all;
     pipeAkadSum($("#pAkS"), rows);
     table($("#pList"),''')
 pipe = rep(pipe, '''  draw();
   $("#pq").oninput''', '''  // pilihan jadwal akad: tanggal dari pipeline aktif dalam saringan area/KC/RM/jenis
   const akD = uniq(aktif.filter(x => x.akad).map(x => x.akad)).sort();
   PS.akad = PS.akad.filter(d => akD.includes(d));
-  akadPicker($("#pAk"), akD.map(d => [d, aktif.filter(x => x.akad === d).length]), () => { savePS(); draw(); });
+  msPicker($("#pAk"), "akad", akD.map(d => [d, tglS(d), aktif.filter(x => x.akad === d).length]), "Semua jadwal akad", d => tglS(d).replace(/ \\d{4}$/, ""), () => { savePS(); draw(); });
+  const lst = pipeFilter(base, { noProses: true, withBatal: true });
+  PS.prosesM = PS.prosesM.filter(p => ["HOT", "WARM", "COLD", "BATAL"].includes(p)); PS.jenisM = PS.jenisM.filter(j => PL.j.includes(j));
+  msPicker($("#pPr"), "prosesM", ["HOT", "WARM", "COLD", "BATAL"].map(p => [p, chip(p, p === "BATAL" ? "crit" : prosesCls(p)), lst.filter(x => p === "BATAL" ? x.batal : !x.batal && x.proses === p).length]), "HOT/WARM/COLD/BATAL", p => p, () => { savePS(); draw(); });
+  msPicker($("#pJn"), "jenisM", PL.j.map(j => [j, j, lst.filter(x => !x.batal && x.jenis === j).length]), PL.j.join(" & "), j => j, () => { savePS(); draw(); });
   draw();
   $("#pq").oninput''')
+pipe = rep(pipe, '''  $("#pP").onchange = e => { PS.proses = e.target.value; savePS(); draw(); };
+''', '')
+pipe = rep(pipe, '''  $("#pB").onchange = e => { PS.batal = e.target.checked; savePS(); draw(); };
+''', '')
 pipe = rep(pipe, '''exportCSV("pipeline-brispot-" + asof,''', '''exportCSV("pipeline-brispot-" + (SEG.pipe === "K" ? "kpr" : "briguna") + "-" + asof,''')
 
 pimp = cut('/* ---------- impor file Pipeline BRISPOT ---------- */', '/* ================= VIEW: Simulasi KPR')

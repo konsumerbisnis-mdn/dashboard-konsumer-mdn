@@ -1158,8 +1158,9 @@ function renderRMPer(inScope) {
 /* ================= VIEW: Pipeline Brispot (dari file Pipeline BRISPOT) ================= */
 // DB.pipe = { asof, items[{kc,debitur,rm,pic,plafon,pengajuan,pencairan,putusan,tglPutusan,tatPrakarsa,tatClf,tatUker,tatTotal,status,tahap,akad,batal,proses,developer,jenis}], onhand[], rencana{dates[],rows[{kc,rm,v[]}]} }
 const PTAHAP = ["On Hand", "Prakarsa", "Rekomendasi", "Penilaian Agunan", "Analis", "Menunggu Putusan", "Putus & Siap Cair", "Verifikasi Pencairan"];
-const PS = Object.assign({ area: "ALL", kc: "ALL", rm: "ALL", jenis: "ALL", proses: "ALL", tahap: "ALL", usia: "ALL", q: "", batal: false, akad: [] }, lsGet(STORE + "-pipe") || {});
-if (!Array.isArray(PS.akad)) PS.akad = [];
+const PS = Object.assign({ area: "ALL", kc: "ALL", rm: "ALL", jenis: "ALL", proses: "ALL", tahap: "ALL", usia: "ALL", q: "", batal: false, akad: [], prosesM: [], jenisM: [] }, lsGet(STORE + "-pipe") || {});
+["akad", "prosesM", "jenisM"].forEach(k => { if (!Array.isArray(PS[k])) PS[k] = []; });
+PS.proses = "ALL"; PS.batal = false;
 const savePS = () => lsSet(STORE + "-pipe", { ...PS, q: "" });
 const tahapOf = s => { s = String(s || "").toLowerCase();
   return /verifikasi pencairan/.test(s) ? 7 : /diputus|siap cair/.test(s) ? 6 : /menunggu.*putusan/.test(s) ? 5 : /analis/.test(s) ? 4 : /agunan|penilaian/.test(s) ? 3 : /rekomendasi/.test(s) ? 2 : /prakarsa/.test(s) ? 1 : 1; };
@@ -1258,9 +1259,9 @@ function viewPipeline(v) {
       <div class="toolbar">
         <input class="ctl" id="pq" type="search" placeholder="Cari debitur / RM / developer" value="${esc(PS.q)}">
         <select class="ctl" id="pT"><option value="ALL">Semua tahap</option>${PTAHAP.map((t, i) => `<option value="${i}" ${PS.tahap === String(i) ? "selected" : ""}>${t}</option>`).join("")}</select>
-        <select class="ctl" id="pP"><option value="ALL">HOT/WARM/COLD</option>${["HOT", "WARM", "COLD"].map(p => `<option ${PS.proses === p ? "selected" : ""}>${p}</option>`).join("")}</select>
+        <div id="pPr"></div>
+        <div id="pJn"></div>
         <div id="pAk"></div>
-        <label class="check"><input type="checkbox" id="pB" ${PS.batal ? "checked" : ""}> Tampilkan batal</label>
       </div>
       <div id="pAkS" class="ak-sum" hidden></div>
       <div id="pList"></div>
@@ -1305,7 +1306,7 @@ function viewPipeline(v) {
   // daftar
   const tstate = { key: "tahap", dir: -1 };
   const draw = () => {
-    const all = pipeFilter(base), rows = PS.akad.length ? all.filter(x => x.akad && PS.akad.includes(x.akad)) : all;
+    const all = pipeFilter(base, { noProses: true, withBatal: true }).filter(x => prosesIn(x) && jenisIn(x)), rows = PS.akad.length ? all.filter(x => x.akad && PS.akad.includes(x.akad)) : all;
     pipeAkadSum($("#pAkS"), rows);
     table($("#pList"), [
       { key: "debitur", label: "Debitur", fmt: (x, r) => `<b>${esc(x)}</b>${r.batal ? " " + chip("BATAL", "crit") : ""}<br><small class="note">${esc(r.developer && r.developer !== "-" ? r.developer : "")}</small>` },
@@ -1322,13 +1323,15 @@ function viewPipeline(v) {
   // pilihan jadwal akad: tanggal dari pipeline aktif dalam saringan area/KC/RM/jenis
   const akD = uniq(aktif.filter(x => x.akad).map(x => x.akad)).sort();
   PS.akad = PS.akad.filter(d => akD.includes(d));
-  akadPicker($("#pAk"), akD.map(d => [d, aktif.filter(x => x.akad === d).length]), () => { savePS(); draw(); });
+  msPicker($("#pAk"), "akad", akD.map(d => [d, tglS(d), aktif.filter(x => x.akad === d).length]), "Semua jadwal akad", d => tglS(d).replace(/ \d{4}$/, ""), () => { savePS(); draw(); });
+  const lst = pipeFilter(base, { noProses: true, withBatal: true });
+  PS.prosesM = PS.prosesM.filter(p => ["HOT", "WARM", "COLD", "BATAL"].includes(p)); PS.jenisM = PS.jenisM.filter(j => PL.j.includes(j));
+  msPicker($("#pPr"), "prosesM", ["HOT", "WARM", "COLD", "BATAL"].map(p => [p, chip(p, p === "BATAL" ? "crit" : prosesCls(p)), lst.filter(x => p === "BATAL" ? x.batal : !x.batal && x.proses === p).length]), "HOT/WARM/COLD/BATAL", p => p, () => { savePS(); draw(); });
+  msPicker($("#pJn"), "jenisM", PL.j.map(j => [j, j, lst.filter(x => !x.batal && x.jenis === j).length]), PL.j.join(" & "), j => j, () => { savePS(); draw(); });
   draw();
   $("#pq").oninput = e => { PS.q = e.target.value; draw(); };
   $("#pT").onchange = e => { PS.tahap = e.target.value; savePS(); draw(); };
-  $("#pP").onchange = e => { PS.proses = e.target.value; savePS(); draw(); };
 
-  $("#pB").onchange = e => { PS.batal = e.target.checked; savePS(); draw(); };
 }
 
 /* ================= Pipeline: tabel format laporan (rencana realisasi, rekap per KC, ringkasan jadwal akad) ================= */
@@ -1378,16 +1381,22 @@ function pipeKcRekap(el, aktif) {
     ${kcs.length ? `<tfoot><tr class="knv"><td>GRAND TOTAL</td>${cells(aktif)}</tr>${areas.length > 1 ? areas.map(ar => `<tr class="knv"><td>${esc(ar.replace(/\s*\/\s*/, "/"))}</td>${cells(aktif.filter(x => x.area === ar))}</tr>`).join("") : ""}</tfoot>` : ""}</table></div>`;
 }
 
-// pilihan jadwal akad (bisa lebih dari satu tanggal)
-function akadPicker(el, dates, onChange) {
-  const lbl = () => !PS.akad.length ? "Semua jadwal akad" : PS.akad.length <= 2 ? PS.akad.map(d => tglS(d).replace(/ \d{4}$/, "")).join(", ") : PS.akad.length + " tanggal akad";
-  el.innerHTML = `<details class="ms"><summary class="ctl">${lbl()}</summary><div class="ms-pop">
-    ${dates.length ? dates.map(([d, n]) => `<label class="check"><input type="checkbox" value="${d}" ${PS.akad.includes(d) ? "checked" : ""}> ${tglS(d)} <small class="note">${n} deb</small></label>`).join("") : '<span class="note">Belum ada jadwal akad.</span>'}
+// pilihan ceklis (bisa lebih dari satu): PS[key] = nilai terpilih; kosong = semua. opts = [[nilai, label, jumlah deb]]
+function msPicker(el, key, opts, allLbl, short, onChange) {
+  const lbl = () => { const v = PS[key]; return !v.length ? allLbl : v.length <= 2 ? v.map(x => short(x)).join(", ") : v.length + " dipilih"; };
+  el.innerHTML = `<details class="ms"><summary class="ctl">${esc(lbl())}</summary><div class="ms-pop">
+    ${opts.length ? opts.map(([v, l, n]) => `<label class="check"><input type="checkbox" value="${esc(v)}" ${PS[key].includes(v) ? "checked" : ""}> ${l}${n != null ? ` <small class="note">${nf0.format(n)} deb</small>` : ""}</label>`).join("") : '<span class="note">Belum ada pilihan.</span>'}
     <div class="toolbar"><button class="btn" type="button" data-ms="all">Pilih semua</button><button class="btn" type="button" data-ms="clr">Hapus pilihan</button></div></div></details>`;
-  const set = v => { PS.akad = v; el.querySelector("summary").textContent = lbl(); onChange(); };
-  el.querySelectorAll("input").forEach(i => i.onchange = () => set([...el.querySelectorAll("input:checked")].map(x => x.value).sort()));
-  el.querySelectorAll("[data-ms]").forEach(b => b.onclick = () => { const on = b.dataset.ms === "all"; el.querySelectorAll("input").forEach(i => i.checked = on); set(on ? dates.map(x => x[0]) : []); });
+  const set = v => { PS[key] = v; el.querySelector("summary").textContent = lbl(); onChange(); };
+  const order = opts.map(o => o[0]);
+  el.querySelectorAll("input").forEach(i => i.onchange = () => set([...el.querySelectorAll("input:checked")].map(x => x.value).sort((a, b) => order.indexOf(a) - order.indexOf(b))));
+  el.querySelectorAll("[data-ms]").forEach(b => b.onclick = () => { const on = b.dataset.ms === "all"; el.querySelectorAll("input").forEach(i => i.checked = on); set(on ? [...order] : []); });
 }
+// saringan Proses (HOT/WARM/COLD/BATAL) dan Jenis di daftar pipeline. Tanpa pilihan: semua berkas aktif (batal tidak ikut);
+// BATAL dicentang: berkas batal ikut tampil (hanya batal bila tidak ada HOT/WARM/COLD yang dicentang)
+const prosesIn = x => { const v = PS.prosesM, hwc = v.filter(p => p !== "BATAL");
+  return !v.length ? !x.batal : x.batal ? v.includes("BATAL") : hwc.includes(x.proses); };
+const jenisIn = x => !PS.jenisM.length || PS.jenisM.includes(x.jenis);
 document.addEventListener("click", e => document.querySelectorAll("details.ms[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }));
 
 // ringkasan debitur pada jadwal akad terpilih

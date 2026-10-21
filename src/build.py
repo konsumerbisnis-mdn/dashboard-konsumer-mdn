@@ -255,9 +255,29 @@ pipe = rep(pipe, '''s: sum(a.filter(x => x.jenis === "Subsidi"), "plafon"), k: s
 pipe = rep(pipe, '''background:var(--s1);margin-right:5px"></i>Subsidi</span>''', '''background:var(--s1);margin-right:5px"></i>${PL.j[0]}</span>''')
 pipe = rep(pipe, '''background:var(--s2);margin-right:5px"></i>Komersil</span>''', '''background:var(--s2);margin-right:5px"></i>${PL.j[1]}</span>''')
 pipe = rep(pipe, '''datasets: ["Subsidi", "Komersil"].map((j, k) =>''', '''datasets: PL.j.map((j, k) =>''')
-pipe = rep(pipe, '''s = a.filter(x => x.jenis === "Subsidi"), k = a.filter(x => x.jenis === "Komersil");''', '''s = a.filter(x => x.jenis === PL.j[0]), k = a.filter(x => x.jenis === PL.j[1]);''')
-pipe = rep(pipe, '''{ key: "sDeb", label: "Subsidi deb", r: 1 }, { key: "sPl", label: "Subsidi plafon", r: 1, fmt: nfJ }, { key: "kDeb", label: "Komersil deb", r: 1 }, { key: "kPl", label: "Komersil plafon", r: 1, fmt: nfJ },''',
-'''{ key: "sDeb", label: PL.j[0] + " deb", r: 1 }, { key: "sPl", label: PL.j[0] + " plafon", r: 1, fmt: nfJ }, { key: "kDeb", label: PL.j[1] + " deb", r: 1 }, { key: "kPl", label: PL.j[1] + " plafon", r: 1, fmt: nfJ },''')
+# tabel format laporan (src/parts/pipe_rep.js): rencana realisasi per minggu, rekap per KC per tahap, ringkasan jadwal akad
+pipe = rep(pipe, 'tahap: "ALL", usia: "ALL", q: "", batal: false }, lsGet(STORE + "-pipe") || {});', 'tahap: "ALL", usia: "ALL", q: "", batal: false, akad: [] }, lsGet(STORE + "-pipe") || {});\nif (!Array.isArray(PS.akad)) PS.akad = [];')
+i0 = pipe.index('  // rencana realisasi RM\n'); i2 = pipe.index('  // per RM\n')
+pipe = pipe[:i0] + '  if ($("#pRen")) pipeRencana($("#pRen"), P.rencana);\n\n  pipeKcRekap($("#pKc"), aktif);\n\n' + pipe[i2:]
+pipe = rep(pipe, '<h2>Rekap per kantor cabang</h2><span class="sub">debitur / plafon (Rp juta)</span>', '<h2>Rekap per kantor cabang</h2><span class="sub">debitur / plafon (Rp juta) per tahap</span>')
+pipe = rep(pipe, '''        <label class="check"><input type="checkbox" id="pB" ${PS.batal ? "checked" : ""}> Tampilkan batal</label>
+      </div>
+      <div id="pList"></div>''', '''        <div id="pAk"></div>
+        <label class="check"><input type="checkbox" id="pB" ${PS.batal ? "checked" : ""}> Tampilkan batal</label>
+      </div>
+      <div id="pAkS" class="ak-sum" hidden></div>
+      <div id="pList"></div>''')
+pipe = rep(pipe, '''    const rows = pipeFilter(base);
+    table($("#pList"),''', '''    const all = pipeFilter(base), rows = PS.akad.length ? all.filter(x => x.akad && PS.akad.includes(x.akad)) : all;
+    pipeAkadSum($("#pAkS"), rows);
+    table($("#pList"),''')
+pipe = rep(pipe, '''  draw();
+  $("#pq").oninput''', '''  // pilihan jadwal akad: tanggal dari pipeline aktif dalam saringan area/KC/RM/jenis
+  const akD = uniq(aktif.filter(x => x.akad).map(x => x.akad)).sort();
+  PS.akad = PS.akad.filter(d => akD.includes(d));
+  akadPicker($("#pAk"), akD.map(d => [d, aktif.filter(x => x.akad === d).length]), () => { savePS(); draw(); });
+  draw();
+  $("#pq").oninput''')
 pipe = rep(pipe, '''exportCSV("pipeline-brispot-" + asof,''', '''exportCSV("pipeline-brispot-" + (SEG.pipe === "K" ? "kpr" : "briguna") + "-" + asof,''')
 
 pimp = cut('/* ---------- impor file Pipeline BRISPOT ---------- */', '/* ================= VIEW: Simulasi KPR')
@@ -286,7 +306,7 @@ start = '''
   window.__appReady = true;
 })();
 '''
-js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + pipe + pimp + sim \
+js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + pipe + P('pipe_rep.js') + pimp + sim \
      + P('sim_brg.js') + P('nominatif.js') + P('admin.js') + P('export.js') + P('router.js') + zoom + P('boot.js') + start + intro
 open(os.path.join(ROOT, 'js', 'app.js'), 'w', encoding='utf8').write(js)
 css = open(os.path.join(HERE, 'kpr.css'), encoding='utf8').read() + '\n' + P('extra.css')

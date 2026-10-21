@@ -2448,6 +2448,36 @@ const Exp = (() => {
       cv._pr = pr; return cv;
     } finally { sec.classList.remove("xp-shot"); sec.style.removeProperty("--xpw"); }
   }
+  // kop PDF: logo Danantara | judul biru "<judul> - Posisi <tanggal>" | logo BRI, garis biru di bawahnya;
+  // kaki halaman: nama aplikasi, waktu cetak, pengguna, nomor halaman
+  const LOGO = { dan: "assets/logo-danantara-hitam.png", bri: "assets/logo-bri-biru.png" }, logos = {};
+  const logo = k => logos[k] || (logos[k] = new Promise(res => { const im = new Image();
+    im.onload = () => { const c = document.createElement("canvas"); c.width = im.naturalWidth; c.height = im.naturalHeight; c.getContext("2d").drawImage(im, 0, 0); res({ src: c.toDataURL("image/png"), r: im.naturalWidth / im.naturalHeight }); };
+    im.onerror = () => { delete logos[k]; res(null); }; im.src = LOGO[k]; }));
+  const BLUE = [37, 99, 214];
+  async function pdfNew(orientation, title) {
+    await lib("pdf"); const { jsPDF } = window.jspdf, [dan, bri] = await Promise.all([logo("dan"), logo("bri")]);
+    const doc = new jsPDF({ orientation, unit: "pt", format: "a4" }), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), m = 28;
+    const pos = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }), full = title + " - Posisi " + pos;
+    const head = () => {
+      const cy = 30; let x = m, xr = W - m;
+      if (dan) { const h = 22, w = h * dan.r; doc.addImage(dan.src, "PNG", x, cy - h / 2, w, h); x += w + 12; doc.setDrawColor(205); doc.setLineWidth(.8); doc.line(x, cy - 12, x, cy + 12); x += 12; }
+      if (bri) { const h = 22, w = h * bri.r; doc.addImage(bri.src, "PNG", xr - w, cy - h / 2, w, h); xr -= w + 14; }
+      doc.setFont("helvetica", "bold"); doc.setTextColor(...BLUE);
+      let fs = 17; doc.setFontSize(fs); while (fs > 9 && doc.getTextWidth(full) > xr - x) doc.setFontSize(--fs);
+      doc.text(doc.splitTextToSize(full, xr - x)[0], x, cy + fs * .35);
+      doc.setDrawColor(...BLUE); doc.setLineWidth(2); doc.line(0, 56, W, 56); doc.setFont("helvetica", "normal");
+    };
+    const finish = () => {
+      const n = doc.getNumberOfPages(), user = (($("#uName") || {}).textContent || "").trim(), when = new Date().toLocaleString("id-ID");
+      for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120);
+        doc.text(APP_CONFIG.APP_NAME + " · dicetak " + when + (user && user !== "-" ? " oleh " + user : ""), m, H - 14);
+        doc.text("hal. " + i + " / " + n, W - m, H - 14, { align: "right" }); }
+      return doc.output("blob");
+    };
+    head();
+    return { doc, W, H, m, top: 70, bot: H - 30, head, finish };
+  }
   async function run(sec, kind) {
     const title = titleOf(sec), name = fname(ctxOf() + "-" + title) + "-" + iso(new Date());
     if (kind === "csv" || kind === "xlsx") {
@@ -2461,18 +2491,15 @@ const Exp = (() => {
     try {
       const cv = await snap(sec);
       if (kind === "png") { const b = await new Promise(r => cv.toBlob(r, "image/png")); saveFile(name + ".png", b); return; }
-      await lib("pdf"); const { jsPDF } = window.jspdf;
-      const land = cv.width > cv.height * 1.1, doc = new jsPDF({ orientation: land ? "landscape" : "portrait", unit: "pt", format: "a4" });
-      const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), m = 28, top = 46, iw = W - m * 2, scale = iw / cv.width, pageH = (H - top - m) / scale;
+      const { doc, W, m, top, bot, head, finish } = await pdfNew(cv.width > cv.height * 1.1 ? "landscape" : "portrait", ctxOf() + " · " + title);
+      const iw = W - m * 2, scale = iw / cv.width, pageH = (bot - top) / scale;
       for (let y = 0, p = 0; y < cv.height; y += pageH, p++) {
-        if (p) doc.addPage();
-        doc.setFontSize(11); doc.setTextColor(30); doc.text((ctxOf() + " · " + title).slice(0, 110), m, 26);
-        doc.setFontSize(8); doc.setTextColor(120); doc.text("Dashboard Konsumer Region I - Medan · diunduh " + new Date().toLocaleString("id-ID") + (p ? " · hal. " + (p + 1) : ""), m, 38);
+        if (p) { doc.addPage(); head(); }
         const h = Math.min(pageH, cv.height - y), part = document.createElement("canvas"); part.width = cv.width; part.height = Math.ceil(h);
         part.getContext("2d").drawImage(cv, 0, y, cv.width, h, 0, 0, cv.width, h);
         doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, top, iw, h * scale);
       }
-      saveFile(name + ".pdf", doc.output("blob"));
+      saveFile(name + ".pdf", finish());
     } catch (er) { toast(er.message || "Gagal membuat file."); }
   }
   // cetak satu menu utuh ke PDF (A4 mendatar): tiap blok di layar digambar terpisah lalu disusun per halaman,
@@ -2483,20 +2510,15 @@ const Exp = (() => {
     const top0 = [...v.children].filter(vis); if (!top0.length) { toast("Tidak ada isi untuk dicetak."); return; }
     toast("Menyiapkan PDF " + title + "…");
     try {
-      await lib("pdf"); const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
-      const W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), m = 28, top = 50, bot = H - 30, iw = W - m * 2, gap = 10;
+      const { doc, W, m, top, bot, head, finish } = await pdfNew("landscape", title), iw = W - m * 2, gap = 10;
       const bw = Math.max(...top0.map(e => e.offsetWidth)), pagePx = (bot - top) * bw / iw;
-      const user = (($("#uName") || {}).textContent || "").trim(), when = new Date().toLocaleString("id-ID");
-      const head = () => { doc.setFontSize(12); doc.setTextColor(30); doc.text(title.slice(0, 110), m, 26);
-        doc.setFontSize(8); doc.setTextColor(120); doc.text(APP_CONFIG.APP_NAME + " · dicetak " + when + (user && user !== "-" ? " oleh " + user : ""), m, 38); };
       // blok pembungkus (grid) yang terlalu tinggi dipecah menjadi isinya agar potongan halaman jatuh di antara panel
       const blocks = [], walk = el => [...el.children].filter(vis).forEach(c => {
         const kids = [...c.children].filter(vis);
         if (c.offsetHeight > pagePx && kids.length > 1 && !c.matches("section, table, canvas, .panel")) walk(c); else blocks.push(c);
       });
       walk(v);
-      head(); let y = top;
+      let y = top;
       const next = () => { doc.addPage(); head(); y = top; };
       for (const b of blocks) {
         // batas potong yang rapi (bawah baris tabel / panel), dalam piksel kanvas
@@ -2504,18 +2526,19 @@ const Exp = (() => {
         const cv = await snap(b, false, pr => { const t = b.getBoundingClientRect().top;
           cuts = [...b.querySelectorAll("tr, section, .panel-h, .grid > *")].map(e => Math.round((e.getBoundingClientRect().bottom - t) * pr)).sort((a, c) => a - c); });
         const pr = cv._pr || 1, k = Math.min(iw / bw, iw * pr / cv.width) / pr; // pt per piksel kanvas
-        if (y > top && y + cv.height * k > bot) next();
-        for (let sy = 0; sy < cv.height;) {
-          const room = Math.floor((bot - y) / k), cut = sy + room < cv.height ? cuts.filter(c => c > sy + room * .5 && c <= sy + room).pop() : null;
-          const h = cut ? cut - sy : Math.min(room, cv.height - sy), part = document.createElement("canvas"); part.width = cv.width; part.height = h;
+        // sisa yang hanya sedikit melebihi ruang diperkecil (maks. 15%) agar tidak pindah halaman / menyisakan potongan kecil
+        const draw = (sy, h, kk) => { const part = document.createElement("canvas"); part.width = cv.width; part.height = h;
           part.getContext("2d").drawImage(cv, 0, sy, cv.width, h, 0, 0, cv.width, h);
-          doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, y, cv.width * k, h * k);
-          sy += h; y += h * k + gap; if (sy < cv.height) next();
+          doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, y, cv.width * kk, h * kk); y += h * kk + gap; };
+        if (y > top && cv.height * k * .85 > bot - y) next();
+        for (let sy = 0; sy < cv.height;) {
+          const rest = cv.height - sy; if (rest * k * .85 <= bot - y) { draw(sy, rest, Math.min(k, (bot - y) / rest)); break; }
+          const room = Math.floor((bot - y) / k), cut = sy + room < cv.height ? cuts.filter(c => c > sy + room * .5 && c <= sy + room).pop() : null;
+          const h = cut ? cut - sy : room;
+          draw(sy, h, k); sy += h; next();
         }
       }
-      const n = doc.getNumberOfPages();
-      for (let i = 1; i <= n; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(120); doc.text("hal. " + i + " / " + n, W - m, H - 14, { align: "right" }); }
-      saveFile(fname(title) + "-" + iso(new Date()) + ".pdf", doc.output("blob"));
+      saveFile(fname(title) + "-" + iso(new Date()) + ".pdf", finish());
     } catch (er) { toast(er.message || "Gagal membuat PDF."); }
   }
   let pop = null;

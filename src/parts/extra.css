@@ -89,6 +89,7 @@ dialog#dlgDeb{width:min(820px,calc(100vw - 24px))}
 .dcard .toolbar .ctl{height:36px}
 /* tampilan per peran */
 :root[data-role="guest"] .nav a[data-v="nominatif"]{display:none}
+@media (max-width:640px){.topbar #btnPdf span{display:none}.topbar #btnPdf{width:36px;padding:0;justify-content:center}}
 @media print{.nav,.topbar,.zoomctl,.sec-ctl,.xp{display:none!important}.main{margin:0!important}}
 .xp-shot{width:var(--xpw)!important;max-width:none!important;flex:none!important}
 .xp-shot .table-wrap{overflow:visible!important;margin:0!important;padding:0!important}

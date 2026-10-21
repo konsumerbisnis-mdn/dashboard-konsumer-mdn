@@ -192,3 +192,34 @@ body{font-variant-numeric:tabular-nums}
 .kt.rd2 thead th,.kt.rp thead th{white-space:normal;overflow-wrap:anywhere;word-break:normal}
 .kt.rd2{min-width:1040px}
 .kt.rp{min-width:900px}
+/* perpindahan layar: beranda→menu zoom in + fade, menu→beranda zoom out + fade, antar menu naik/turun + fade */
+@keyframes vtZinOld{to{opacity:0;transform:scale(1.12)}}
+@keyframes vtZinNew{from{opacity:0;transform:scale(.88)}}
+@keyframes vtZoutOld{to{opacity:0;transform:scale(.88)}}
+@keyframes vtZoutNew{from{opacity:0;transform:scale(1.1)}}
+@keyframes vtUpOld{to{opacity:0;transform:translateY(-48px)}}
+@keyframes vtUpNew{from{opacity:0;transform:translateY(56px)}}
+@keyframes vtDownOld{to{opacity:0;transform:translateY(48px)}}
+@keyframes vtDownNew{from{opacity:0;transform:translateY(-56px)}}
+:root[data-vt="zin"]::view-transition-old(root){animation:vtZinOld .32s cubic-bezier(.4,0,1,1) both}
+:root[data-vt="zin"]::view-transition-new(root){animation:vtZinNew .5s cubic-bezier(.16,.84,.3,1) .18s both}
+:root[data-vt="zout"]::view-transition-old(root){animation:vtZoutOld .32s cubic-bezier(.4,0,1,1) both}
+:root[data-vt="zout"]::view-transition-new(root){animation:vtZoutNew .5s cubic-bezier(.16,.84,.3,1) .18s both}
+:root[data-vt="up"] #view,:root[data-vt="down"] #view{view-transition-name:main}
+:root[data-vt="up"]::view-transition-old(root),:root[data-vt="up"]::view-transition-new(root),:root[data-vt="down"]::view-transition-old(root),:root[data-vt="down"]::view-transition-new(root){animation:none}
+:root[data-vt="up"]::view-transition-old(main){animation:vtUpOld .24s cubic-bezier(.4,0,1,1) both}
+:root[data-vt="up"]::view-transition-new(main){animation:vtUpNew .48s cubic-bezier(.16,.84,.3,1) .16s both}
+:root[data-vt="down"]::view-transition-old(main){animation:vtDownOld .24s cubic-bezier(.4,0,1,1) both}
+:root[data-vt="down"]::view-transition-new(main){animation:vtDownNew .48s cubic-bezier(.16,.84,.3,1) .16s both}
+.v-zin{animation:vtZinNew .5s cubic-bezier(.16,.84,.3,1) both}
+.v-zout{animation:vtZoutNew .5s cubic-bezier(.16,.84,.3,1) both}
+.v-up{animation:vtUpNew .48s cubic-bezier(.16,.84,.3,1) both}
+.v-down{animation:vtDownNew .48s cubic-bezier(.16,.84,.3,1) both}
+/* menu samping: saat disorot, tulisan & ikon membesar dan maju */
+@media (min-width:960px) and (hover:hover){
+  .nav a{transform-origin:left center;transition:background .2s,color .2s,transform .22s cubic-bezier(.2,.8,.2,1),letter-spacing .22s}
+  .nav a:hover{transform:translateX(6px) scale(1.06);color:var(--accent)}
+  .nav a:hover svg{transform:scale(1.08)}
+  .nav a svg{transition:transform .22s cubic-bezier(.2,.8,.2,1)}
+}
+@media (prefers-reduced-motion:reduce){.nav a:hover,.nav a:hover svg{transform:none}.v-zin,.v-zout,.v-up,.v-down{animation:none}}

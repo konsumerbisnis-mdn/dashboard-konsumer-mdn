@@ -59,15 +59,16 @@ function navTo() {
   const k = curView(), changed = k !== lastView, prev = lastView; lastView = k;
   if (changed && prev !== null) uiSound(k === "beranda" ? "home" : "nav");
   if (!changed || prev === null || reduceMotion) { render(); if (changed) window.scrollTo(0, 0); return; }
-  const kind = k === "beranda" || prev === "beranda" ? "zoom" : "slide";
+  // beranda → menu: zoom in; menu → beranda: zoom out; antar menu: naik (menu di bawahnya) atau turun (menu di atasnya)
+  const order = Object.keys(VIEWS), kind = prev === "beranda" ? "zin" : k === "beranda" ? "zout" : order.indexOf(k) > order.indexOf(prev) ? "up" : "down";
   if (document.startViewTransition) {
     document.documentElement.dataset.vt = kind;
     const vt = document.startViewTransition(() => { render(); window.scrollTo(0, 0); });
     vt.finished.finally(() => { delete document.documentElement.dataset.vt; });
   } else {
     render(); window.scrollTo(0, 0);
-    const el = k === "beranda" ? $("#landing") : $("#view"); el.classList.remove("v-enter", "v-zoom"); void el.offsetWidth;
-    el.classList.add(kind === "zoom" ? "v-zoom" : "v-enter"); setTimeout(() => el.classList.remove("v-enter", "v-zoom"), 600);
+    const el = k === "beranda" ? $("#landing") : $("#view"), cls = ["v-zin", "v-zout", "v-up", "v-down"]; el.classList.remove(...cls); void el.offsetWidth;
+    el.classList.add("v-" + kind); setTimeout(() => el.classList.remove(...cls), 700);
   }
 }
 window.addEventListener("hashchange", navTo);

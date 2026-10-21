@@ -2285,7 +2285,7 @@ function dataCards() {
   const pSt = s => { const x = M["pipe_" + s]; return x ? `<b>${nf0.format(x.n)} berkas</b> + ${nf0.format(x.oh)} on hand, posisi <b>${tglS(x.asof)}</b> · diunggah ${updS(x.updated)}` : "belum ada data"; };
   const card = (k, ico, title, st, note, body) => `<section class="dcard" data-k="${k}"><div class="dc-h">${ico}<div><h3>${title}</h3><p class="dc-st">${st}</p></div></div><p class="note">${note}</p>${body}<p class="note dc-prog" id="pr_${k}" hidden></p></section>`;
   const file = (k, accept = ".xlsx,.xlsm,.xls,.csv", multi = false, lbl = "Upload") => `<label class="btn" for="f_${k}">${ICO_UP}${lbl}</label><input type="file" id="f_${k}" data-up="${k}" accept="${accept}" ${multi ? "multiple" : ""} hidden>`;
-  const lwBody = s => `<div class="toolbar"><select class="ctl" id="m_lw${s}" style="flex:1 1 180px"><option value="cur">Posisi terkini</option><option value="prev">Bulan lalu (pembanding DG/UG)</option></select>${file("lw" + s)}</div><div id="i_lw${s}"></div>`;
+  const lwBody = s => `<div class="toolbar"><select class="ctl" id="m_lw${s}" style="flex:1 1 180px"><option value="cur">Posisi terkini</option><option value="prev">Bulan lalu (pembanding DG/UG)</option></select>${file("lw" + s, undefined, true)}</div><p class="note" style="margin:6px 0 0">Bisa pilih 2 file sekaligus (posisi terkini &amp; bulan lalu): yang tanggalnya lebih baru otomatis jadi posisi terkini.</p><div id="i_lw${s}"></div>`;
   return `<p class="note" style="margin:0">Data keragaan, RKA, disburse, list RM/mantri, dan produktivitas KPR dibaca langsung dari Google Sheets lewat <b>Sync</b>. File di bawah diolah di browser lalu disimpan ke Google Sheets / Drive milik admin, dan langsung tampil untuk semua pengguna sesuai perannya.</p>
     <div class="dgrid">
       ${card("sync", dIco('<path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/>'), "Google Sheets",
@@ -2313,7 +2313,7 @@ function bindDataCards(root) {
   const b = root.querySelector("#btnSyncF"); if (b) b.onclick = () => doSync(true, b);
   root.querySelectorAll("input[type=file][data-up]").forEach(inp => inp.addEventListener("change", e => {
     const k = inp.dataset.up, files = [...e.target.files]; if (!files.length) return;
-    (k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files[0], k.slice(-1), inp) : upPart(files[0], k, inp));
+    (k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
   }));
 }
 function openData() { if (!isAdmin()) return; const b = $("#dataBody"); b.innerHTML = dataCards(); bindDataCards(b); $("#dlgData").showModal(); }
@@ -2321,24 +2321,51 @@ const progOf = k => { const p = document.querySelector("#pr_" + k); if (p) p.hid
 const okCard = k => { const c = document.querySelector(`.dcard[data-k="${k}"]`); if (c) { c.classList.add("ok"); setTimeout(() => c.classList.remove("ok"), 2500); } };
 async function readWB(f) { if (typeof XLSX === "undefined") throw new Error("Pustaka Excel gagal dimuat. Periksa koneksi internet."); return XLSX.read(await f.arrayBuffer(), { cellDates: false }); }
 function refreshDataUI() { const b = $("#dataBody"); if ($("#dlgData").open) { b.innerHTML = dataCards(); bindDataCards(b); } if (curView() === "admin") renderAdminTab(); }
-async function upLW(f, set, inp) {
-  const pg = progOf("lw" + set), info = $("#i_lw" + set), mode = $("#m_lw" + set).value;
+// LW321: 1 file (posisi mengikuti pilihan, dijaga urutan tanggalnya) atau 2 file sekaligus (yang lebih baru = posisi terkini, yang lebih lama = bulan lalu)
+async function upLW(files, set, inp) {
+  const pg = progOf("lw" + set), info = $("#i_lw" + set);
   try {
-    pg.set("Membaca " + f.name + "…"); await new Promise(r => setTimeout(r, 40));
-    const wb = await readWB(f); pg.set("Mengolah…"); await new Promise(r => setTimeout(r, 20));
-    const P = parseLWUpload(wb, set), segN = {}; P.rows.forEach(r => segN[r[19]] = (segN[r[19]] || 0) + 1);
+    if (files.length > 2) throw new Error("Pilih paling banyak 2 file: posisi terkini dan bulan lalu.");
+    const L = [];
+    for (const f of files) {
+      pg.set("Membaca " + f.name + "…"); await new Promise(r => setTimeout(r, 40));
+      const wb = await readWB(f); pg.set("Mengolah " + f.name + "…"); await new Promise(r => setTimeout(r, 20));
+      L.push({ f, P: parseLWUpload(wb, set) });
+    }
     pg.done();
-    info.innerHTML = `<div class="ds"><b>${nf0.format(P.rows.length)} rekening</b> · posisi <b>${tglS(P.asof)}</b> · ${Object.entries(segN).map(([k, n]) => esc(prodLbl(k)) + " " + nf0.format(n)).join(" · ")}${P.dropped ? ` · <span class="note">${nf0.format(P.dropped)} baris produk lain diabaikan</span>` : ""}<br>sheet: ${esc(P.sheets.join(", "))} · disimpan sebagai <b>${mode === "cur" ? "posisi terkini" : "bulan lalu"}</b></div>
+    let warn = "";
+    if (L.length === 2) {
+      L.sort((a, b) => b.P.asof.localeCompare(a.P.asof));
+      if (!L[0].P.asof || L[0].P.asof === L[1].P.asof) throw new Error(`Kedua file berposisi sama (${tglS(L[0].P.asof)}). Pilih file posisi terkini dan file bulan lalu.`);
+      L[0].mode = "cur"; L[1].mode = "prev";
+    } else {
+      // jaga urutan posisi: file lebih lama dari posisi terkini disimpan sebagai bulan lalu, dan sebaliknya
+      // posisi tersimpan di meta berupa nomor hari (lihat nS) → ubah ke yyyy-mm-dd agar bisa dibandingkan
+      const P = L[0].P, cm = ((DB.meta || {}).lw || {})[set] || {}, cur = { asof: typeof cm.asof === "number" ? nIso(cm.asof) : cm.asof ? dateX(cm.asof) : "" }; let mode = $("#m_lw" + set).value;
+      if (cur.asof && P.asof && mode === "cur" && P.asof < cur.asof) { mode = "prev"; warn = `File ini posisi <b>${tglS(P.asof)}</b>, lebih lama dari posisi terkini <b>${tglS(cur.asof)}</b>, jadi disimpan sebagai <b>bulan lalu</b>.`; }
+      else if (cur.asof && P.asof && mode === "prev" && P.asof >= cur.asof) { mode = "cur"; warn = `File ini posisi <b>${tglS(P.asof)}</b>, tidak lebih lama dari posisi terkini <b>${tglS(cur.asof)}</b>, jadi disimpan sebagai <b>posisi terkini</b>.`; }
+      if (warn) $("#m_lw" + set).value = mode;
+      L[0].mode = mode;
+    }
+    const mLbl = m => m === "cur" ? "posisi terkini" : "bulan lalu";
+    const desc = ({ f, P, mode }) => { const segN = {}; P.rows.forEach(r => segN[r[19]] = (segN[r[19]] || 0) + 1);
+      return `<div class="ds"><b>${esc(f.name)}</b><br><b>${nf0.format(P.rows.length)} rekening</b> · posisi <b>${tglS(P.asof)}</b> · ${Object.entries(segN).map(([k, n]) => esc(prodLbl(k)) + " " + nf0.format(n)).join(" · ")}${P.dropped ? ` · <span class="note">${nf0.format(P.dropped)} baris produk lain diabaikan</span>` : ""}<br>sheet: ${esc(P.sheets.join(", "))} · disimpan sebagai <b>${mLbl(mode)}</b></div>`; };
+    info.innerHTML = `${warn ? `<div class="banner"><span>${warn}</span></div>` : ""}${L.map(desc).join("")}
       <div class="toolbar"><button class="btn primary" type="button" id="go_lw${set}">Kirim ke database</button><button class="btn" type="button" id="no_lw${set}">Batal</button></div>`;
     $("#no_lw" + set).onclick = () => { info.innerHTML = ""; };
     $("#go_lw" + set).onclick = async ev => {
-      ev.currentTarget.disabled = true; const N = window.APP_CONFIG.UPLOAD_CHUNK || 4000, total = Math.ceil(P.rows.length / N);
+      ev.currentTarget.disabled = true; const N = window.APP_CONFIG.UPLOAD_CHUNK || 4000, done = [];
       try {
-        for (let i = 0; i < total; i++) { pg.set(`Mengirim ${i + 1} / ${total}…`); await Auth.call("lwUpload", { set, mode, seq: i, total, asof: P.asof, rows: P.rows.slice(i * N, (i + 1) * N) }); }
+        // posisi terkini dikirim lebih dulu, lalu bulan lalu
+        for (const [k, { P, mode }] of L.entries()) {
+          const total = Math.ceil(P.rows.length / N);
+          for (let i = 0; i < total; i++) { pg.set(`${L.length > 1 ? `File ${k + 1}/${L.length} · ` : ""}Mengirim ${i + 1} / ${total}…`); await Auth.call("lwUpload", { set, mode, seq: i, total, asof: P.asof, rows: P.rows.slice(i * N, (i + 1) * N) }); }
+          done.push(`${nf0.format(P.rows.length)} rekening posisi ${tglS(P.asof)} sebagai ${mLbl(mode)}`);
+        }
         pg.set("Memuat ulang data…"); await loadParts(["meta", "gerak", "lw_" + set]);
-        render(); refreshDataUI(); const inf = $("#i_lw" + set); if (inf) inf.innerHTML = `<div class="ds">Upload selesai: ${nf0.format(P.rows.length)} rekening tersimpan sebagai ${mode === "cur" ? "posisi terkini" : "bulan lalu"}.</div>`;
+        render(); refreshDataUI(); const inf = $("#i_lw" + set); if (inf) inf.innerHTML = `<div class="ds">Upload selesai: ${done.join("; ")}.</div>`;
         okCard("lw" + set); toast("LW321 " + LWL[set].seg + " tersimpan.");
-      } catch (er) { const inf = $("#i_lw" + set) || info; inf.innerHTML = `<div class="banner"><span>Upload gagal: ${esc(er.message)}. Ulangi dari awal.</span></div>`; }
+      } catch (er) { const inf = $("#i_lw" + set) || info; inf.innerHTML = `<div class="banner"><span>Upload gagal: ${esc(er.message)}.${done.length ? " Sudah tersimpan: " + esc(done.join("; ")) + "." : ""} Ulangi dari awal.</span></div>`; }
       pg.done();
     };
   } catch (er) { pg.done(); toast(er.message); }

@@ -175,3 +175,12 @@ details.apx > summary::before{content:"▸ ";display:inline-block;transition:tra
 details.apx[open] > summary::before{transform:rotate(90deg)}
 details.apx[open] > summary{margin-bottom:6px}
 #apxSel{max-width:420px}
+/* judul kolom panjang dibungkus ke baris berikutnya (di batas kata) agar kolom tidak melebar; tabel laporan dengan lebar kolom lebih rata */
+.kt thead th,.table-wrap > table thead th{white-space:normal;line-height:1.25}
+.kt thead th.lt,.kt.rk thead th.nv:only-child{white-space:nowrap}
+.table-wrap > table:not(.kt) thead th{min-width:64px}
+.kt.rk thead th.oh,.kt.rk thead th.yl,.kt.rk thead th.rd{min-width:76px;max-width:110px}
+.kt.rd2,.kt.rp{table-layout:fixed}
+.kt.rd2 thead tr:first-child th:first-child{width:13%}
+.kt.rp thead tr:first-child th:nth-child(-n+2){width:150px}
+.kt.rp td:nth-child(-n+2){white-space:normal}

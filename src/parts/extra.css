@@ -121,3 +121,24 @@ details.ms > summary::after{content:"▾";margin-left:auto;padding-left:10px;fon
 details.ms .ms-pop{position:absolute;z-index:30;top:calc(100% + 4px);left:0;min-width:240px;max-height:320px;overflow:auto;padding:8px 10px;border:1px solid var(--line);border-radius:12px;background:var(--surface);box-shadow:0 12px 30px rgba(0,0,0,.18);display:grid;gap:2px}
 details.ms .ms-pop label.check{padding:5px 2px}
 details.ms .ms-pop .toolbar{margin-top:6px;gap:6px}
+/* produktivitas: laporan disburse realisasi harian */
+.rd-grid{display:grid;grid-template-columns:minmax(320px,1fr) minmax(0,auto);gap:18px;align-items:start}
+@media (max-width:1200px){.rd-grid{grid-template-columns:minmax(0,1fr)}}
+.kt.rd{font-size:11.5px}
+.rd-h{font-size:15px;color:#1f6fd1;margin:0 0 8px}
+.rd-box{display:grid;gap:3px;width:max-content;margin-bottom:8px}
+.rd-box span{display:grid;grid-template-columns:110px 110px;font-size:13px}
+.rd-box b{background:var(--c);color:#fff;padding:3px 8px;text-align:center}
+.rd-box i{font-style:normal;text-align:right;padding:3px 8px;background:color-mix(in srgb,var(--c) 18%,var(--surface));font-family:var(--f-num)}
+.kt.rd thead th,.kt.rd2 thead th{background:#3f74c0}
+.kt.rd thead th.nv{background:#0b2f6b}
+.kt.rd2 thead th.big{font-size:15px;font-weight:800}
+.kt.rd2 thead th.lt{background:#ddebf7;color:#0e1c22}
+.kt.rd2 thead th.yl{background:#ffc000;color:#1a1a1a}
+.kt.rd2 thead th.gr{background:#92d050;color:#1a1a1a}
+.kt td .neg{color:var(--crit)}
+.kt td.c-r{background:#ff7c80!important;color:#5a0006}
+.kt td.c-y{background:#ffe699!important;color:#5a4300}
+.kt td.c-lg{background:#d9ead3!important;color:#0a5a1f}
+.kt td.c-g{background:#8fd18f!important;color:#063d14}
+.kt td.c-r .neg,.kt td.c-y .neg{color:inherit}

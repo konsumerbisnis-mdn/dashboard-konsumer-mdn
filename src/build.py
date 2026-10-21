@@ -222,6 +222,14 @@ rm = rep(rm, '''{ key: "sub", label: "Subsidi", r: 1, fmt: x => nf1.format(x) },
 rm = rep(rm, '''  const ds = [["Subsidi", "sub", cssv("--s1")], ["Komersil", "kom", cssv("--s2")]].map(''', '''  const ds = [[RL.s, "sub", cssv("--s1")], [RL.k, "kom", cssv("--s2")]].map(''')
 rm = rep(rm, '''<span class="note" style="font-weight:700">Nama RM</span>''', '''<span class="note" style="font-weight:700">Nama ${RL.who}</span>''')
 
+# laporan disburse realisasi harian (src/parts/rm_rep.js) di atas bagian perbandingan
+rm = rep(rm, '''    <section class="panel" id="rCmp"></section>''', '''    <section class="panel" id="rDay"></section>
+    <section class="panel" id="rCmp"></section>''')
+rm = rep(rm, '''  renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
+  const allYm''', '''  renderRMDaily({ P, txIn, ym, isCur, day });
+  renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
+  const allYm''')
+
 # ---------- pipeline ----------
 pipe = cut('/* ================= VIEW: Pipeline Brispot', '// gabungkan data baru ke riwayat')
 pipe = rep(pipe, 'let PIPE_LOADING = /^https?:/.test(location.protocol);\n', '')
@@ -316,7 +324,7 @@ start = '''
   window.__appReady = true;
 })();
 '''
-js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + pipe + P('pipe_rep.js') + pimp + sim \
+js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + pipe + P('pipe_rep.js') + pimp + sim \
      + P('sim_brg.js') + P('nominatif.js') + P('admin.js') + P('export.js') + P('router.js') + zoom + P('boot.js') + start + intro
 open(os.path.join(ROOT, 'js', 'app.js'), 'w', encoding='utf8').write(js)
 css = open(os.path.join(HERE, 'kpr.css'), encoding='utf8').read() + '\n' + P('extra.css')

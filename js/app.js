@@ -803,7 +803,7 @@ const numX = v => { if (typeof v === "number") return isFinite(v) ? v : 0; const
 const isoX = v => typeof v === "number" ? new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10) : v instanceof Date ? iso(v) : normDate(v);
 /* ================= VIEW: Produktivitas RM (dari Database history + database harian) ================= */
 // DB.rmk = { months[{ym,kc,rm,jg,area,tDeb,tDisb,sDeb,sOs,kDeb,kOs,deb,os,kuad}], tx[{d,rm,kc,pl,deb,jenis}], asof }
-const RS = Object.assign({ ym: null, area: "ALL", kc: "ALL", cmp: "mtd", cmpG: "kc", sel: null, selKc: null, pm: "rm", selYr: null, co: "berjalan" }, lsGet(STORE + "-rm") || {});
+const RS = Object.assign({ ym: null, area: "ALL", kc: "ALL", cmp: "mtd", cmpG: "kc", sel: null, selKc: null, pm: "rm", selYr: null, co: "berjalan", rkm: "m", apxG: "kc" }, lsGet(STORE + "-rm") || {});
 const saveRS = () => lsSet(STORE + "-rm", RS);
 const kuadOf = p => p == null ? null : p >= 1.05 ? 1 : p >= 1 ? 2 : p >= .5 ? 3 : 4;
 const kq = k => k ? `<span class="kq k${k}" title="Kuadran ${k}">K${k}</span>` : `<span class="kq k0">–</span>`;
@@ -898,9 +898,10 @@ function viewRM(v) {
       <section class="panel"><div class="panel-h"><h2>Disbursement bulanan vs target</h2><span class="sub">${RL.s} & ${RL.k}</span></div><div class="chart"><canvas id="cRmMon"></canvas></div></section>
       <section class="panel"><div class="panel-h"><h2>Komposisi ${RL.s} & ${RL.k}</h2><span class="sub">${per}</span></div><div class="chart"><canvas id="cRmJen"></canvas></div></section>
     </div>
-    <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>Peringkat ${RL.who}</h2><div class="toolbar"><span class="sub">garis = 100% target · klik nama untuk lihat pencapaiannya</span><button class="btn" id="rExp" type="button">Ekspor CSV</button></div></div><div class="lb" id="rLb"></div></section>
+    <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>Peringkat ${RL.who}</h2><div class="toolbar"><div class="seg" role="tablist" aria-label="Dasar peringkat"><button type="button" role="tab" aria-selected="${RS.rkm !== "co"}" data-rkm="m">Bulan berjalan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div><span class="sub" id="rLbS">garis = 100% target · klik nama untuk lihat pencapaiannya</span><button class="btn" id="rExp" type="button">Ekspor CSV</button></div></div><div class="lb" id="rLb"></div></section>
     <section class="panel" ${RS.pm === "kc" ? "" : "hidden"}><div class="panel-h"><h2>Per kantor cabang</h2><span class="sub">${ymS(ym)}</span></div><div id="rKc"></div></section>
-    <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>History kuadran ${RL.who} ${yr}</h2><span class="sub">per bulan</span></div><div id="rHq"></div></section>`;
+    <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>History kuadran ${RL.who} ${yr}</h2><span class="sub">per bulan</span></div><div id="rHq"></div></section>
+    <section class="panel" id="rApx"></section>`;
   $("#rY").onchange = e => { RS.ym = e.target.value; saveRS(); render(); };
   bindSeg();
   v.querySelectorAll("[data-rmm]").forEach(b => b.onclick = () => { if (RS.pm === b.dataset.rmm) return; RS.pm = RS.cmpG = b.dataset.rmm; RS.selYr = null; saveRS(); render(); });
@@ -908,7 +909,15 @@ function viewRM(v) {
   $("#rK").onchange = e => { RS.kc = e.target.value; saveRS(); render(); };
 
   // peringkat
-  const lb = [...rows].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);
+  const coEnd = (RS.co === "des" ? 12 : +RS.co) || (yr < (P.asof || "9").slice(0, 4) ? 12 : +(P.asof || "").slice(5, 7) || 12), isCo = RS.rkm === "co";
+  const coMs = Array.from({ length: coEnd }, (_, i) => yr + "-" + String(i + 1).padStart(2, "0"));
+  const coRows = () => uniq(P.months.filter(x => coMs.includes(x.ym) && inScope(x) && (x.tDisb > 0 || x.os > 0)).map(x => nmKey(x.rm))).map(k => {
+    const a = P.months.filter(x => coMs.includes(x.ym) && inScope(x) && nmKey(x.rm) === k), l = a[a.length - 1];
+    const o = { rm: l.rm, kc: l.kc, jg: l.jg, tDisb: sum(a, "tDisb"), tDeb: sum(a, "tDeb"), os: sum(a, "os"), deb: sum(a, "deb"), sDeb: sum(a, "sDeb"), sOs: sum(a, "sOs"), kDeb: sum(a, "kDeb"), kOs: sum(a, "kOs") };
+    o.pen = o.tDisb ? o.os / o.tDisb : null; return o; });
+  const lb = [...(isCo ? coRows() : rows)].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);
+  $("#rLbS").textContent = (isCo ? `carry over Jan s.d. ${BULAN[coEnd - 1]} ${yr} · ` : `${ymS(ym)} · `) + "garis = 100% target · klik nama untuk lihat pencapaiannya";
+  v.querySelectorAll("[data-rkm]").forEach(b => b.onclick = () => { if (RS.rkm === b.dataset.rkm) return; RS.rkm = b.dataset.rkm; saveRS(); render(); });
   const last6 = (() => { const out = []; for (let i = 5; i >= 0; i--) { const d = new Date(+yr, +ym.slice(5, 7) - 1 - i, 1); out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); } return out; })();
   const kOf = (rm, m) => { const r = P.months.find(x => x.ym === m && nmKey(x.rm) === nmKey(rm)); return r && r.tDisb ? kuadOf(r.os / r.tDisb) : null; };
   $("#rLb").innerHTML = lb.length ? lb.map((x, i) => `<div class="lb-row" style="grid-template-columns:28px minmax(0,1.4fr) minmax(0,2fr) auto">
@@ -920,7 +929,7 @@ function viewRM(v) {
   $("#rLb").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => openRM(b.dataset.rm));
   if (!RS.sel || !P.months.some(x => nmKey(x.rm) === nmKey(RS.sel) && inScope(x))) RS.sel = lb.length ? lb[0].rm : null;
   renderRMPer(inScope);
-  $("#rExp").onclick = () => exportCSV("produktivitas-" + RL.seg.toLowerCase().replace(/\W+/g, "-") + "-" + ym, [["rm","RM"],["kc","KC"],["jg","JG"],["tDisb","Target disb (juta)"],["os","Realisasi (juta)"],["pen","Pencapaian"],["tDeb","Target deb"],["deb","Deb"],["sDeb","Deb " + RL.s.toLowerCase()],["sOs",RL.s + " (juta)"],["kDeb","Deb " + RL.k.toLowerCase()],["kOs",RL.k + " (juta)"]], lb);
+  $("#rExp").onclick = () => exportCSV("produktivitas-" + RL.seg.toLowerCase().replace(/\W+/g, "-") + "-" + (isCo ? "carry-over-" + yr + "-" + String(coEnd).padStart(2, "0") : ym), [["rm","RM"],["kc","KC"],["jg","JG"],["tDisb","Target disb (juta)"],["os","Realisasi (juta)"],["pen","Pencapaian"],["tDeb","Target deb"],["deb","Deb"],["sDeb","Deb " + RL.s.toLowerCase()],["sOs",RL.s + " (juta)"],["kDeb","Deb " + RL.k.toLowerCase()],["kOs",RL.k + " (juta)"]], lb);
 
   // per KC
   const kcRows = uniq(rows.map(x => x.kc)).map(kc => { const a = rows.filter(x => x.kc === kc), t = a.filter(x => x.tDisb > 0), tt = sum(t, "tDisb"), o = sum(a, "os");
@@ -948,6 +957,7 @@ function viewRM(v) {
       scales: { x: { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x / 1000) + " M" } }, y: { ...baseOpts().scales.x, ticks: { ...baseOpts().scales.x.ticks, color: ink2, font: { size: 12 } } } } }) });
   renderRMDaily({ P, txIn, ym, isCur, day });
   renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
+  renderRMAppx({ P, txIn, ym, isCur, day });
   const allYm = uniq(P.months.map(x => x.ym)).sort().filter(m => m <= (P.asof || "9").slice(0, 7)).slice(-18);
   const mAgg = allYm.map(m => { const a = P.months.filter(x => x.ym === m && inScope(x)); return { s: sum(a, "sOs"), k: sum(a, "kOs"), t: sum(a.filter(x => x.tDisb > 0), "tDisb") }; });
   mkChart("cRmMon", { type: "bar", data: { labels: allYm.map(ymS), datasets: [
@@ -960,7 +970,7 @@ function viewRM(v) {
 // perbandingan: bulan berjalan s.d. tanggal yang sama vs 3 bulan sebelumnya, dan tahun lalu vs tahun ini
 function renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }) {
   const el = $("#rCmp"); if (!el) return;
-  const mode = RS.cmp === "yoy" ? "yoy" : "mtd", grp = RS.cmpG === "rm" ? "rm" : "kc", y1 = String(+yr - 1);
+  const mode = "yoy", grp = RS.cmpG === "rm" ? "rm" : "kc", y1 = String(+yr - 1);
   const addM = (m, k) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); };
   const nDays = m => new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
   const D = isCur ? day : nDays(ym);
@@ -970,8 +980,7 @@ function renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }) {
   const pc = (a, b) => b ? (a / b - 1) : null, dl = v => v == null ? "–" : `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + pct(Math.abs(v), 1)}</span>`;
   const dJ = v => `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + nf1.format(Math.abs(v))}</span>`;
   const yo = mode === "yoy";
-  el.innerHTML = `<div class="panel-h"><h2>Perbandingan disbursement</h2><div class="seg" role="tablist" aria-label="Jenis perbandingan">
-      <button type="button" role="tab" aria-selected="${!yo}" data-cmp="mtd">Bulan berjalan vs 3 bulan lalu</button><button type="button" role="tab" aria-selected="${yo}" data-cmp="yoy">${y1} vs ${yr}</button></div></div>
+  el.innerHTML = `<div class="panel-h"><h2>Perbandingan disbursement ${y1} vs ${yr}</h2></div>
     <p class="note" style="margin:0">${yo ? `Disbursement per bulan ${y1} dibanding ${yr} dan kumulatif (YtD). ${isCur ? `${BULAN[+ym.slice(5, 7) - 1]} ${yr} baru s.d. ${tglS(P.asof)}, sedangkan ${BULAN[+ym.slice(5, 7) - 1]} ${y1} sebulan penuh (data harian ${y1} tidak tersedia), jadi selisih bulan ini belum sebanding.` : ""}` : `Disbursement s.d. tanggal ${D} di ${ymS(ym)} dibanding tanggal yang sama di 3 bulan sebelumnya. Rp juta.`}</p>
     <div class="chart tall"><canvas id="cCmp"></canvas></div>
     <div id="tCmp"></div>
@@ -1111,14 +1120,17 @@ function renderRMPer(inScope) {
       ${tile({ label: "Gap terhadap target", value: `<span class="delta ${dCls(coO - coT)}" style="font-size:inherit">${(coO - coT >= 0 ? "+" : "−") + nf1.format(Math.abs(coO - coT))}</span>`, sub: "Rp juta" })}
       ${tile({ label: isKc ? "Ratas cabang per bulan" : "Ratas per bulan", value: rpJ(coO / elapsed), sub: `${elapsed} bulan aktif${inCo.some(r => r.future) ? ` · perlu ${rpJ(Math.max(0, coT - coO) / inCo.filter(r => r.future).length)}/bln s.d. ${BULAN[endM - 1]}` : ""}` })}
     </div>
+    <details class="rm-more" ${RS.perOpen ? "open" : ""}><summary>Rincian per bulan ${yr}${isKc ? " & RM di cabang" : ""} <small class="note">grafik & tabel Jan–Des, carry over ${coLbl}</small></summary>
     <div class="chart"><canvas id="cRmPer"></canvas></div>
     <div id="tRmPer"></div>
     ${isKc ? `<h3 style="font-size:14px;margin-top:4px">RM di ${esc(RS.selKc)} · carry over ${coLbl}</h3><div id="tKcRm"></div>` : ""}
+    </details>
     <p class="note" style="margin:0">${RL.note} Kuadran: K1 ≥105%, K2 100–105%, K3 50–100%, K4 &lt;50%.</p>`;
   if ($("#pRmSel")) $("#pRmSel").onchange = e => { RS.sel = e.target.value; RS.selYr = null; saveRS(); renderRMPer(); };
   if ($("#pKcSel")) $("#pKcSel").onchange = e => { RS.selKc = e.target.value; RS.selYr = null; saveRS(); renderRMPer(); };
   $("#pRmYr").onchange = e => { RS.selYr = e.target.value; saveRS(); renderRMPer(); };
-  $("#pRmCo").onchange = e => { RS.co = e.target.value; saveRS(); renderRMPer(); };
+  $("#pRmCo").onchange = e => { RS.co = e.target.value; saveRS(); if (RS.rkm === "co") render(); else renderRMPer(); };
+  { const dt = el.querySelector("details.rm-more"); if (dt) dt.ontoggle = () => { RS.perOpen = dt.open; if (dt.open && charts.cRmPer) charts.cRmPer.resize(); }; }
   // kartu hologram: kilau mengikuti arah kursor / sentuhan (miring halus)
   const hc = el.querySelector(".rmc.holo");
   if (hc && !reduceMotion) {
@@ -1130,6 +1142,7 @@ function renderRMPer(inScope) {
   // klik kuadran di kartu: urutkan & loncat ke tabel rinciannya
   el.querySelectorAll("[data-kgo]").forEach(b => b.onclick = () => {
     if (isKc) { RS.kcSort = { key: b.dataset.kgo, dir: 1 }; saveRS(); renderRMPer(); }
+    const dt = el.querySelector("details.rm-more"); if (dt && !dt.open) dt.open = true;
     const tg = $(isKc ? "#tKcRm" : "#tRmPer"); if (!tg) return;
     tg.scrollIntoView({ behavior: "smooth", block: "start" }); tg.classList.remove("flash"); void tg.offsetWidth; tg.classList.add("flash");
   });
@@ -1241,6 +1254,28 @@ function renderRMDaily({ P, txIn, ym, isCur, day }) {
     options: baseOpts({ layout: { padding: { top: 18, right: 26 } }, plugins: { ...baseOpts().plugins, tooltip: { ...baseOpts().plugins.tooltip, callbacks: { title: c => "s.d. tanggal " + c[0].label, label: c => ` ${c.dataset.label}: ${nf0.format(c.parsed.y)} jt` } } },
       scales: { x: { ...baseOpts().scales.x, title: { display: true, text: "Tanggal" }, ticks: { ...baseOpts().scales.x.ticks, maxRotation: 0, autoSkip: true, autoSkipPadding: 2, color: c => c.index === D - 1 ? cssv("--ink") : cssv("--muted") } },
         y: { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x) } } } }) });
+}
+
+// lampiran: disbursement per cabang / per RM s.d. tanggal yang sama, 3 bulan lalu + bulan berjalan
+function renderRMAppx({ P, txIn, ym, isCur, day }) {
+  const el = $("#rApx"); if (!el) return;
+  const addM = (m, k) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); };
+  const nDays = m => new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
+  const ms = [addM(ym, -3), addM(ym, -2), addM(ym, -1), ym], D = isCur ? day : nDays(ym), grp = RS.apxG === "rm" ? "rm" : "kc";
+  el.innerHTML = `<div class="panel-h"><h2>Lampiran · per ${grp === "rm" ? "RM" : "cabang"} s.d. tanggal ${D}</h2>
+    <div class="seg" role="tablist" aria-label="Kelompokkan"><button type="button" role="tab" aria-selected="${grp === "kc"}" data-ag="kc">Per cabang</button><button type="button" role="tab" aria-selected="${grp === "rm"}" data-ag="rm">Per RM</button></div></div>
+    <p class="note" style="margin:0">Disbursement s.d. tanggal ${D} di ${ymS(ym)} dibanding tanggal yang sama di 3 bulan sebelumnya · Rp juta.</p><div id="tApx"></div>`;
+  el.querySelectorAll("[data-ag]").forEach(b => b.onclick = () => { RS.apxG = b.dataset.ag; saveRS(); renderRMAppx({ P, txIn, ym, isCur, day }); });
+  if (!ms.some(m => P.tx.some(t => t.d.startsWith(m)))) { $("#tApx").innerHTML = '<div class="empty">Belum ada data pencairan harian untuk bulan-bulan ini.</div>'; return; }
+  const kcMap = new Map(P.months.map(x => [x.ym + "|" + nmKey(x.rm), x.kc]));
+  const gOf = t => grp === "rm" ? t.rm : (kcMap.get(t.d.slice(0, 7) + "|" + nmKey(t.rm)) || t.kc);
+  const cut = ms.map(m => txIn(m).filter(t => +t.d.slice(8) <= D));
+  const pc = (a, b) => b ? (a / b - 1) : null, dl = v => v == null ? "–" : `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + pct(Math.abs(v), 1)}</span>`;
+  const dJ = v => `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + nf1.format(Math.abs(v))}</span>`;
+  const gr = uniq(cut.flat().map(gOf)).filter(Boolean).map(k => { const o = { k }; ms.forEach((m, i) => o["m" + i] = sum(cut[i].filter(t => gOf(t) === k), "pl")); o.avg = (o.m0 + o.m1 + o.m2) / 3; o.d = o.m3 - o.avg; o.dp = pc(o.m3, o.avg); return o; });
+  table($("#tApx"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" }, ...ms.map((m, i) => ({ key: "m" + i, label: ymS(m), r: 1, fmt: x => i === 3 ? `<b>${nf1.format(x)}</b>` : (x ? nf1.format(x) : `<span class="note">–</span>`) })),
+    { key: "avg", label: "Rata 3 bln", r: 1, fmt: x => nf1.format(x) }, { key: "d", label: "Δ vs rata", r: 1, fmt: (x, r) => `${dJ(x)}<br><small>${dl(r.dp)}</small>` }], gr,
+    { sortKey: "m3", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", ...Object.fromEntries(ms.map((m, i) => ["m" + i, nf1.format(sum(gr, "m" + i))])), avg: nf1.format(sum(gr, "avg")), d: dJ(sum(gr, "m3") - sum(gr, "avg")) } });
 }
 /* ================= VIEW: Pipeline Brispot (dari file Pipeline BRISPOT) ================= */
 // DB.pipe = { asof, items[{kc,debitur,rm,pic,plafon,pengajuan,pencairan,putusan,tglPutusan,tatPrakarsa,tatClf,tatUker,tatTotal,status,tahap,akad,batal,proses,developer,jenis}], onhand[], rencana{dates[],rows[{kc,rm,v[]}]} }

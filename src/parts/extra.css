@@ -142,3 +142,9 @@ details.ms .ms-pop .toolbar{margin-top:6px;gap:6px}
 .kt td.c-lg{background:#d9ead3!important;color:#0a5a1f}
 .kt td.c-g{background:#8fd18f!important;color:#063d14}
 .kt td.c-r .neg,.kt td.c-y .neg{color:inherit}
+details.rm-more{border-top:1px solid var(--line);padding-top:10px}
+details.rm-more > summary{cursor:pointer;font-weight:700;color:var(--brand);padding:4px 0;list-style:none}
+details.rm-more > summary::-webkit-details-marker{display:none}
+details.rm-more > summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+details.rm-more[open] > summary::before{transform:rotate(90deg)}
+details.rm-more[open] > summary{margin-bottom:10px}

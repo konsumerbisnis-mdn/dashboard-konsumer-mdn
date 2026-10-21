@@ -228,7 +228,39 @@ rm = rep(rm, '''    <section class="panel" id="rCmp"></section>''', '''    <sect
 rm = rep(rm, '''  renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
   const allYm''', '''  renderRMDaily({ P, txIn, ym, isCur, day });
   renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
+  renderRMAppx({ P, txIn, ym, isCur, day });
   const allYm''')
+# perbandingan: hanya tahun lalu vs tahun ini (bulan berjalan vs 3 bulan lalu sudah ada di laporan harian; per cabang/RM jadi lampiran)
+rm = rep(rm, 'const mode = RS.cmp === "yoy" ? "yoy" : "mtd", grp', 'const mode = "yoy", grp')
+rm = rep(rm, '''<h2>Perbandingan disbursement</h2><div class="seg" role="tablist" aria-label="Jenis perbandingan">
+      <button type="button" role="tab" aria-selected="${!yo}" data-cmp="mtd">Bulan berjalan vs 3 bulan lalu</button><button type="button" role="tab" aria-selected="${yo}" data-cmp="yoy">${y1} vs ${yr}</button></div></div>''', '''<h2>Perbandingan disbursement ${y1} vs ${yr}</h2></div>''')
+rm = rep(rm, '''<span class="sub">per bulan</span></div><div id="rHq"></div></section>`;''', '''<span class="sub">per bulan</span></div><div id="rHq"></div></section>
+    <section class="panel" id="rApx"></section>`;''')
+# peringkat RM: bulan berjalan atau carry over (Jan s.d. batas carry over yang sama dengan Pencapaian per RM)
+rm = rep(rm, 'pm: "rm", selYr: null, co: "berjalan" }', 'pm: "rm", selYr: null, co: "berjalan", rkm: "m", apxG: "kc" }')
+rm = rep(rm, '''<div class="toolbar"><span class="sub">garis = 100% target · klik nama untuk lihat pencapaiannya</span>''', '''<div class="toolbar"><div class="seg" role="tablist" aria-label="Dasar peringkat"><button type="button" role="tab" aria-selected="${RS.rkm !== "co"}" data-rkm="m">Bulan berjalan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div><span class="sub" id="rLbS">garis = 100% target · klik nama untuk lihat pencapaiannya</span>''')
+rm = rep(rm, '''  const lb = [...rows].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);''', '''  const coEnd = (RS.co === "des" ? 12 : +RS.co) || (yr < (P.asof || "9").slice(0, 4) ? 12 : +(P.asof || "").slice(5, 7) || 12), isCo = RS.rkm === "co";
+  const coMs = Array.from({ length: coEnd }, (_, i) => yr + "-" + String(i + 1).padStart(2, "0"));
+  const coRows = () => uniq(P.months.filter(x => coMs.includes(x.ym) && inScope(x) && (x.tDisb > 0 || x.os > 0)).map(x => nmKey(x.rm))).map(k => {
+    const a = P.months.filter(x => coMs.includes(x.ym) && inScope(x) && nmKey(x.rm) === k), l = a[a.length - 1];
+    const o = { rm: l.rm, kc: l.kc, jg: l.jg, tDisb: sum(a, "tDisb"), tDeb: sum(a, "tDeb"), os: sum(a, "os"), deb: sum(a, "deb"), sDeb: sum(a, "sDeb"), sOs: sum(a, "sOs"), kDeb: sum(a, "kDeb"), kOs: sum(a, "kOs") };
+    o.pen = o.tDisb ? o.os / o.tDisb : null; return o; });
+  const lb = [...(isCo ? coRows() : rows)].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);
+  $("#rLbS").textContent = (isCo ? `carry over Jan s.d. ${BULAN[coEnd - 1]} ${yr} · ` : `${ymS(ym)} · `) + "garis = 100% target · klik nama untuk lihat pencapaiannya";
+  v.querySelectorAll("[data-rkm]").forEach(b => b.onclick = () => { if (RS.rkm === b.dataset.rkm) return; RS.rkm = b.dataset.rkm; saveRS(); render(); });''')
+rm = rep(rm, '''.replace(/\\W+/g, "-") + "-" + ym,''', '''.replace(/\\W+/g, "-") + "-" + (isCo ? "carry-over-" + yr + "-" + String(coEnd).padStart(2, "0") : ym),''')
+# pencapaian per RM / cabang: rincian bulanan (grafik & tabel Jan s.d. Des, RM di cabang) disembunyikan, dibuka bila perlu
+rm = rep(rm, '''    <div class="chart"><canvas id="cRmPer"></canvas></div>
+    <div id="tRmPer"></div>''', '''    <details class="rm-more" ${RS.perOpen ? "open" : ""}><summary>Rincian per bulan ${yr}${isKc ? " & RM di cabang" : ""} <small class="note">grafik & tabel Jan–Des, carry over ${coLbl}</small></summary>
+    <div class="chart"><canvas id="cRmPer"></canvas></div>
+    <div id="tRmPer"></div>''')
+rm = rep(rm, '''<div id="tKcRm"></div>` : ""}''', '''<div id="tKcRm"></div>` : ""}
+    </details>''')
+rm = rep(rm, '''    const tg = $(isKc ? "#tKcRm" : "#tRmPer"); if (!tg) return;''', '''    const dt = el.querySelector("details.rm-more"); if (dt && !dt.open) dt.open = true;
+    const tg = $(isKc ? "#tKcRm" : "#tRmPer"); if (!tg) return;''')
+rm = rep(rm, '''  $("#pRmCo").onchange = e => { RS.co = e.target.value; saveRS(); renderRMPer(); };''', '''  $("#pRmCo").onchange = e => { RS.co = e.target.value; saveRS(); if (RS.rkm === "co") render(); else renderRMPer(); };
+  { const dt = el.querySelector("details.rm-more"); if (dt) dt.ontoggle = () => { RS.perOpen = dt.open; if (dt.open && charts.cRmPer) charts.cRmPer.resize(); }; }''')
+
 
 # ---------- pipeline ----------
 pipe = cut('/* ================= VIEW: Pipeline Brispot', '// gabungkan data baru ke riwayat')

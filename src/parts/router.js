@@ -16,7 +16,7 @@ function render() {
   $("#landing").hidden = !home; $("#app").hidden = home; document.body.classList.toggle("at-home", home); document.body.classList.toggle("qv-open", !!LQV.key);
   const v = home ? $("#landing") : $("#view");
   document.querySelectorAll(".nav a").forEach(a => a.dataset.v === k ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
-  $("#pageTitle").textContent = title; $("#eyebrow").textContent = eb; $("#btnPdf").hidden = home || k === "admin";
+  $("#pageTitle").textContent = title; $("#eyebrow").textContent = eb; $("#btnPdf").hidden = home || k === "admin"; updateSyncPart(k);
   { const tt = document.querySelector(".topbar .ttl"); if (tt && tt.dataset.v !== title) { tt.dataset.v = title; tt.classList.remove("tb-in"); void tt.offsetWidth; tt.classList.add("tb-in"); } }
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; });
   try { fn(v); } catch (er) { console.error(er); v.innerHTML = `<section class="panel"><div class="empty"><p style="font-weight:700;margin:0 0 6px">Bagian ini belum bisa ditampilkan</p>${esc(er.message || er)}</div></section>`; }
@@ -38,6 +38,7 @@ document.querySelectorAll("dialog").forEach(d => {
 });
 $("#btnData").onclick = () => { if (curView() === "admin") { AD.tab = "data"; renderAdminTab(); } else openData(); };
 $("#btnSync").onclick = e => doSync(isAdmin(), e.currentTarget);
+$("#btnSyncPart").onclick = e => doSyncPart(e.currentTarget);
 $("#btnPdf").onclick = () => Exp.page();
 $("#btnTheme").onclick = () => {
   const root = document.documentElement, dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
@@ -46,8 +47,11 @@ $("#btnTheme").onclick = () => {
 const th = lsGet(STORE + "-theme"); if (th) document.documentElement.dataset.theme = th;
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
 new MutationObserver(() => render()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-$("#btnUser").onclick = () => { const m = $("#userMenu"); m.hidden = !m.hidden; $("#btnUser").setAttribute("aria-expanded", String(!m.hidden)); };
-document.addEventListener("click", e => { if (!e.target.closest(".umenu")) $("#userMenu").hidden = true; });
+// banner atas memotong isinya (overflow hidden), jadi menu profil memakai posisi fixed yang dihitung dari tombolnya
+const placeUserMenu = () => { const m = $("#userMenu"), r = $("#btnUser").getBoundingClientRect(); if (m.parentElement !== document.body) document.body.appendChild(m); m.style.top = Math.round(r.bottom + 6) + "px"; m.style.right = Math.max(8, Math.round(innerWidth - r.right)) + "px"; };
+$("#btnUser").onclick = () => { const m = $("#userMenu"); m.hidden = !m.hidden; if (!m.hidden) placeUserMenu(); $("#btnUser").setAttribute("aria-expanded", String(!m.hidden)); };
+addEventListener("resize", () => { if (!$("#userMenu").hidden) placeUserMenu(); });
+document.addEventListener("click", e => { if (!e.target.closest(".umenu, #userMenu")) $("#userMenu").hidden = true; });
 $("#umOut").onclick = () => Auth.logout("manual");
 $("#umPw").onclick = openPw;
 function syncLabel() { const M = DB.meta; const s = $("#syncSt"); if (s) s.textContent = M && M.updated ? "update " + new Date(M.updated).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""; }
@@ -64,7 +68,8 @@ function navTo() {
   if (document.startViewTransition) {
     document.documentElement.dataset.vt = kind;
     const vt = document.startViewTransition(() => { render(); window.scrollTo(0, 0); });
-    vt.finished.finally(() => { delete document.documentElement.dataset.vt; });
+    // perpindahan yang dilewati (pindah menu cepat-cepat) menolak janji transisinya: tangkap supaya tidak muncul sebagai galat
+    vt.ready.catch(() => {}); vt.updateCallbackDone.catch(() => {}); vt.finished.catch(() => {}).finally(() => { delete document.documentElement.dataset.vt; });
   } else {
     render(); window.scrollTo(0, 0);
     const el = k === "beranda" ? $("#landing") : $("#view"), cls = ["v-zin", "v-zout", "v-up", "v-down"]; el.classList.remove(...cls); void el.offsetWidth;

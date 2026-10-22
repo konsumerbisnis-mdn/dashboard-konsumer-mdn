@@ -872,3 +872,12 @@ body{font-variant-numeric:tabular-nums}
 .kt.brs tfoot .ng{color:#ffb4bd}
 .brs-wa{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:13px}
 .kt.nett td.tg{background:rgba(245,185,164,.22)!important}
+
+/* menu profil: tidak terpotong banner atas */
+.umenu-pop{position:fixed;left:auto;z-index:60}
+
+/* ---------- kalender rentang tanggal tabel Nett ---------- */
+.toolbar.nrange{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
+.toolbar.nrange label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted)}
+.toolbar.nrange input[type=date]{width:auto;padding:5px 8px;color-scheme:light dark}
+.toolbar.nrange .sub{flex:1 1 100%}

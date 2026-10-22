@@ -192,6 +192,26 @@ async function doSyncRmk(btn) {
   refreshDataUI(); if (btn && btn.isConnected) btn.disabled = false;
 }
 
+// sync per menu (admin): tiap menu hanya membangun ulang datanya sendiri lewat action syncParts, tanpa menunggu sync penuh
+const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG" };
+const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"] };
+const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : [];
+function updateSyncPart(k) {
+  const b = $("#btnSyncPart"); if (!b) return; const p = syncPartsOf(k); b.hidden = !(isAdmin() && p.length); b.dataset.p = p.join(",");
+  const sp = b.querySelector("span"); if (sp) sp.textContent = "Sync " + (p.length ? SP_LBL[p[0]] : "menu ini"); b.title = "Sync hanya " + (p.length ? SP_LBL[p[0]] : "data menu ini") + " (admin)";
+}
+async function doSyncPart(btn) {
+  const parts = (btn.dataset.p || "").split(",").filter(Boolean); if (!parts.length) return;
+  const name = parts.map(p => SP_LBL[p]).join(" + "), sp = btn.querySelector("span"), old = sp.textContent;
+  btn.disabled = true; sp.textContent = "Menyinkronkan…";
+  try {
+    const j = await Auth.call("syncParts", { parts }); await loadParts(["meta", ...parts.flatMap(p => SP_LOAD[p])], null, true);
+    const st = j.stats || {}, ms = parts.reduce((a, p) => a + (st["ms_" + p] || 0), 0);
+    toast(`✓ ${name} diperbarui${ms ? " · " + Math.round(ms / 1000) + " dtk" : ""}`); render();
+  } catch (er) { toast("Sync " + name + " gagal: " + er.message); }
+  btn.disabled = false; sp.textContent = old;
+}
+
 /* ---------- VIEW: Admin ---------- */
 const AD = { tab: lsGet(STORE + "-adtab") || "data" };
 function viewAdmin(v) {

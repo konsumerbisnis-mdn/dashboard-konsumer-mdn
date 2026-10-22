@@ -97,7 +97,7 @@ function mkChart(id, cfg) {
   const el = document.getElementById(id); if (!el) return;
   if (charts[id]) charts[id].destroy();
   if (typeof Chart === "undefined") { el.parentElement.innerHTML = '<div class="empty">Grafik butuh koneksi internet untuk memuat pustaka grafik.</div>'; return; }
-  charts[id] = new Chart(el, cfg);
+  charts[id] = new Chart(el, chartTheme(cfg));
 }
 function baseOpts(extra = {}) {
   const ink2 = cssv("--ink-2"), muted = cssv("--muted"), line = cssv("--line");
@@ -105,16 +105,100 @@ function baseOpts(extra = {}) {
     responsive: true, maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
     plugins: {
       legend: { position: "top", align: "start", labels: { color: ink2, usePointStyle: true, pointStyle: "rectRounded", boxWidth: 10, boxHeight: 10, font: { family: cssv("--f-body"), size: 12 } } },
-      tooltip: { padding: 10, cornerRadius: 8, titleFont: { family: cssv("--f-body"), weight: "700" }, bodyFont: { family: cssv("--f-num") } }
+      tooltip: { padding: 10, cornerRadius: 8, titleFont: { family: cssv("--f-body"), weight: "700" }, bodyFont: { family: cssv("--f-body") } }
     },
     scales: {
       x: { grid: { display: false }, border: { color: line }, ticks: { color: muted, font: { size: 11 } } },
-      y: { grid: { color: line }, border: { display: false }, ticks: { color: muted, font: { size: 11, family: cssv("--f-num") } }, beginAtZero: true }
+      y: { grid: { color: line }, border: { display: false }, ticks: { color: muted, font: { size: 11, family: cssv("--f-body") } }, beginAtZero: true }
     }
   }, extra);
 }
 const rpTick = v => { const a = Math.abs(v); return a >= 1e3 ? nf0.format(v / 1e3) + " M" : nf0.format(v) + " Jt"; };
 
+/* ================= tema grafik: palet seragam + label angka di setiap data ================= */
+// palet (biru, biru tua, biru muda, abu tua); garis pembanding di grafik batang memakai abu muda
+const CP_BAR = ["#2b7ff6", "#0a50c8", "#cddff7", "#4d4d4d", "#7fb2f9", "#8c8c8c"];
+const CP_LINE = ["#2b7ff6", "#0a50c8", "#4d4d4d", "#7fb2f9", "#163a73", "#8c8c8c"];
+const CP_DASH = "#a6a6a6";
+const CP_REF = "#c9c9c9";
+const isLight = c => { const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(String(c || "")); if (!m) return false;
+  const [r, g, b] = m.slice(1).map(h => parseInt(h, 16)); return .299 * r + .587 * g + .114 * b > 170; };
+function chartTheme(cfg) {
+  const ds = (cfg.data && cfg.data.datasets) || [], type = cfg.type;
+  if (type !== "bar" && type !== "line") return cfg;
+  const tOf = d => d.type || type, nBar = ds.filter(d => tOf(d) === "bar").length;
+  // garis utama (paling tebal / terakhir) mendapat biru
+  const lines = ds.filter(d => tOf(d) === "line" && !(d.borderDash && d.borderDash.length));
+  const main = lines.reduce((a, d) => !a || (d.borderWidth || 2) >= (a.borderWidth || 2) ? d : a, null);
+  let bi = 0, li = 1;
+  ds.forEach(d => {
+    if (tOf(d) === "bar") {
+      if (Array.isArray(d.backgroundColor)) return;   // warna per batang (mis. baik/buruk) dipertahankan
+      const c = CP_BAR[bi++ % CP_BAR.length]; d.backgroundColor = c; d.hoverBackgroundColor = c;
+    } else {
+      const dash = d.borderDash && d.borderDash.length;
+      const c = dash ? CP_DASH : nBar ? CP_REF : d === main ? CP_LINE[0] : CP_LINE[li++ % CP_LINE.length];
+      // grafik area: isi transparan dengan warna garis
+      d.borderColor = c; d.backgroundColor = d.fill ? c + "29" : c; d.pointBackgroundColor = c; d.pointBorderColor = c;
+      if (nBar && !dash) d.borderWidth = Math.max(d.borderWidth || 0, 3);
+    }
+  });
+  const o = cfg.options = cfg.options || {};
+  o.layout = o.layout || {}; const p = o.layout.padding || {};
+  o.layout.padding = typeof p === "number" ? { top: Math.max(p, 24), right: Math.max(p, 14), left: p, bottom: p } : { ...p, top: Math.max(p.top || 0, 24), right: Math.max(p.right || 0, 14) };
+  cfg.plugins = [...(cfg.plugins || []), DATA_LBL];
+  return cfg;
+}
+// teks label: persen mengikuti format sumbu; angka lain ditulis lengkap (pemisah ribuan)
+function lblText(ch, d, v) {
+  const ax = ch.scales[(ch.options.indexAxis === "y" ? d.xAxisID : d.yAxisID) || (ch.options.indexAxis === "y" ? "x" : "y")];
+  const cb = ax && ax.options && ax.options.ticks && ax.options.ticks.callback;
+  if (cb) { try { const t = String(cb.call(ax, v, 0, [])); if (/%/.test(t)) return t.replace(/\s+/g, ""); } catch (e) {} }
+  const a = Math.abs(v); return a >= 100 || Number.isInteger(v) ? nf0.format(Math.round(v)) : a >= 10 ? nf1.format(v) : nf2.format(v);
+}
+const DATA_LBL = { id: "dataLbl", afterDatasetsDraw(ch) {
+  const g = ch.ctx, A = ch.chartArea, horiz = ch.options.indexAxis === "y", placed = [], fs = 11, H = fs + 6;
+  g.save(); g.font = `700 ${fs}px Inter, system-ui, sans-serif`; g.textBaseline = "middle"; g.textAlign = "center";
+  const hit = r => placed.some(q => r.x < q.x + q.w + 2 && q.x < r.x + r.w + 2 && r.y < q.y + q.h + 1 && q.y < r.y + r.h + 1);
+  const inCanvas = r => r.x >= 0 && r.x + r.w <= ch.width && r.y >= 0 && r.y + r.h <= ch.height;
+  const put = (cx, cy, t, fill, cands) => { const w = g.measureText(t).width + 8;
+    for (const [dx, dy] of cands) { const r = { x: cx + dx - w / 2, y: cy + dy - H / 2, w, h: H }; if (inCanvas(r) && !hit(r)) { placed.push(r);
+      g.fillStyle = fill; g.beginPath(); g.roundRect ? g.roundRect(r.x, r.y, r.w, r.h, 3) : g.rect(r.x, r.y, r.w, r.h); g.fill();
+      g.fillStyle = isLight(fill) ? "#262626" : "#fff"; g.fillText(t, r.x + r.w / 2, r.y + r.h / 2 + .5); return; } } };
+  const steps = s => [0, -1, 1, -2, 2, -3, 3].map(k => k * s);
+  const stacked = !horiz && ch.options.scales && ch.options.scales.y && ch.options.scales.y.stacked;
+  // batang bertumpuk: total di atas tumpukan (prioritas pertama)
+  if (stacked) { const bars = ch.data.datasets.map((d, i) => i).filter(i => (ch.data.datasets[i].type || ch.config.type) === "bar" && ch.getDatasetMeta(i).visible);
+    (ch.data.labels || []).forEach((_, k) => { let tot = 0, top = Infinity, x = null;
+      bars.forEach(i => { const v = ch.data.datasets[i].data[k], el = ch.getDatasetMeta(i).data[k]; if (v == null || !el) return; tot += +v || 0; top = Math.min(top, el.y, el.base); x = el.x; });
+      if (x != null && tot && bars.length > 1) put(x, top - H / 2 - 3, lblText(ch, ch.data.datasets[bars[0]], tot), "#4d4d4d", [0, 1, 2].map(j => [0, -j * (H + 1)])); }); }
+  // batang dulu (prioritas), lalu garis
+  const order = ch.data.datasets.map((d, i) => i).sort((a, b) => ((ch.data.datasets[a].type || ch.config.type) === "bar" ? 0 : 1) - ((ch.data.datasets[b].type || ch.config.type) === "bar" ? 0 : 1));
+  order.forEach(i => {
+    const d = ch.data.datasets[i], meta = ch.getDatasetMeta(i); if (!meta.visible || d.datalabels === false) return;
+    const isBar = (d.type || ch.config.type) === "bar", n = meta.data.length;
+    const vals = d.data.map(v => v == null ? null : typeof v === "object" ? (horiz ? v.x : v.y) : v);
+    const lastI = vals.reduce((a, v, k) => v != null ? k : a, -1);
+    const dash = d.borderDash && d.borderDash.length, pr = d.pointRadius;
+    meta.data.forEach((el, k) => {
+      const v = vals[k]; if (v == null || !isFinite(v) || (isBar && v === 0)) return;
+      if (!isBar) {
+        // garis padat (banyak titik) atau garis target: hanya titik terakhir dan titik yang ditandai
+        const marked = Array.isArray(pr) ? pr[k] > 0 : false;
+        if ((dash || n > 14) && k !== lastI && !marked) return;
+      }
+      const t = lblText(ch, d, v), fill = isBar ? (Array.isArray(d.backgroundColor) ? d.backgroundColor[k] : d.backgroundColor) : (d.borderColor === CP_REF ? "#e3e3e3" : d.borderColor === CP_DASH ? "#d9d9d9" : d.borderColor);
+      if (isBar) {
+        if (horiz) { const w = g.measureText(t).width + 8; put(el.x + w / 2 + 4, el.y, t, fill, [[0, 0], [-(w + 8), 0], ...steps(H + 1).map(s => [0, s])]); return; }
+        const top = Math.min(el.y, el.base), hgt = Math.abs(el.base - el.y), bw = el.width || 20, w = g.measureText(t).width + 8;
+        // tumpukan: di tengah segmen bila muat, selain itu di samping segmen
+        if (stacked) { put(el.x, top + hgt / 2, t, fill, hgt >= H + 2 ? [[0, 0]] : [[bw / 2 + w / 2 + 2, 0], [-(bw / 2 + w / 2 + 2), 0]]); return; }
+        const up = v >= 0; put(el.x, up ? el.y - H / 2 - 3 : el.y + H / 2 + 3, t, fill, [0, 1, 2, 3].map(k => [0, (up ? -1 : 1) * k * (H + 1)]));
+      } else put(el.x, el.y, t, fill, [[0, 0], [0, -(H + 2)], [0, H + 2], [0, -2 * (H + 2)], [0, 2 * (H + 2)], [-(H * 1.5), 0], [H * 1.5, 0]]);
+    });
+  });
+  g.restore();
+} };
 /* ================= table helper ================= */
 // section yang bisa diminimize (klik judul). Pipeline Brispot: awalnya semua section diminimize. Pilihan diingat per perangkat.
 const SEC_DEFAULT_MIN = { pipeline: true };
@@ -126,7 +210,7 @@ function secApply(view, sec) {
   sec.classList.toggle("min", min); if (h) { h.setAttribute("aria-expanded", String(!min)); h.setAttribute("role", "button"); h.tabIndex = 0; }
 }
 function setupSections(v, view) {
-  const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h"));
+  const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h") && !x.hasAttribute("data-nosec"));
   if (!secs.length) return;
   secs.forEach(sec => { sec.classList.add("sec"); secApply(view, sec); });
   if (!v.querySelector(".sec-ctl")) {
@@ -803,7 +887,7 @@ const numX = v => { if (typeof v === "number") return isFinite(v) ? v : 0; const
 const isoX = v => typeof v === "number" ? new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10) : v instanceof Date ? iso(v) : normDate(v);
 /* ================= VIEW: Produktivitas RM (dari Database history + database harian) ================= */
 // DB.rmk = { months[{ym,kc,rm,jg,area,tDeb,tDisb,sDeb,sOs,kDeb,kOs,deb,os,kuad}], tx[{d,rm,kc,pl,deb,jenis}], asof }
-const RS = Object.assign({ ym: null, area: "ALL", kc: "ALL", cmp: "mtd", cmpG: "kc", sel: null, selKc: null, pm: "rm", selYr: null, co: "berjalan" }, lsGet(STORE + "-rm") || {});
+const RS = Object.assign({ ym: null, area: "ALL", kc: "ALL", cmp: "mtd", cmpG: "kc", sel: null, selKc: null, pm: "rm", selYr: null, co: "berjalan", rkm: "m", apxG: "kc" }, lsGet(STORE + "-rm") || {});
 const saveRS = () => lsSet(STORE + "-rm", RS);
 const kuadOf = p => p == null ? null : p >= 1.05 ? 1 : p >= 1 ? 2 : p >= .5 ? 3 : 4;
 const kq = k => k ? `<span class="kq k${k}" title="Kuadran ${k}">K${k}</span>` : `<span class="kq k0">–</span>`;
@@ -893,14 +977,16 @@ function viewRM(v) {
     </div>
     ${SEG.rm === "R" ? '<section class="panel" id="rNett"></section>' : ""}
     <section class="panel" id="rPer"></section>
+    <section class="panel" id="rDay"></section>
     <section class="panel" id="rCmp"></section>
     <div class="grid cols-2">
       <section class="panel"><div class="panel-h"><h2>Disbursement bulanan vs target</h2><span class="sub">${RL.s} & ${RL.k}</span></div><div class="chart"><canvas id="cRmMon"></canvas></div></section>
       <section class="panel"><div class="panel-h"><h2>Komposisi ${RL.s} & ${RL.k}</h2><span class="sub">${per}</span></div><div class="chart"><canvas id="cRmJen"></canvas></div></section>
     </div>
-    <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>Peringkat ${RL.who}</h2><div class="toolbar"><span class="sub">garis = 100% target · klik nama untuk lihat pencapaiannya</span><button class="btn" id="rExp" type="button">Ekspor CSV</button></div></div><div class="lb" id="rLb"></div></section>
+    <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>Peringkat ${RL.who}</h2><div class="toolbar"><div class="seg" role="tablist" aria-label="Dasar peringkat"><button type="button" role="tab" aria-selected="${RS.rkm !== "co"}" data-rkm="m">Bulan berjalan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div><span class="sub" id="rLbS">garis = 100% target · klik nama untuk lihat pencapaiannya</span><button class="btn" id="rExp" type="button">Ekspor CSV</button></div></div><div class="lb" id="rLb"></div></section>
     <section class="panel" ${RS.pm === "kc" ? "" : "hidden"}><div class="panel-h"><h2>Per kantor cabang</h2><span class="sub">${ymS(ym)}</span></div><div id="rKc"></div></section>
-    <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>History kuadran ${RL.who} ${yr}</h2><span class="sub">per bulan</span></div><div id="rHq"></div></section>`;
+    <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>History kuadran ${RL.who} ${yr}</h2><span class="sub">per bulan</span></div><div id="rHq"></div></section>
+    <section class="panel" id="rApx" data-nosec></section>`;
   $("#rY").onchange = e => { RS.ym = e.target.value; saveRS(); render(); };
   bindSeg();
   v.querySelectorAll("[data-rmm]").forEach(b => b.onclick = () => { if (RS.pm === b.dataset.rmm) return; RS.pm = RS.cmpG = b.dataset.rmm; RS.selYr = null; saveRS(); render(); });
@@ -908,7 +994,15 @@ function viewRM(v) {
   $("#rK").onchange = e => { RS.kc = e.target.value; saveRS(); render(); };
 
   // peringkat
-  const lb = [...rows].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);
+  const coEnd = (RS.co === "des" ? 12 : +RS.co) || (yr < (P.asof || "9").slice(0, 4) ? 12 : +(P.asof || "").slice(5, 7) || 12), isCo = RS.rkm === "co";
+  const coMs = Array.from({ length: coEnd }, (_, i) => yr + "-" + String(i + 1).padStart(2, "0"));
+  const coRows = () => uniq(P.months.filter(x => coMs.includes(x.ym) && inScope(x) && (x.tDisb > 0 || x.os > 0)).map(x => nmKey(x.rm))).map(k => {
+    const a = P.months.filter(x => coMs.includes(x.ym) && inScope(x) && nmKey(x.rm) === k), l = a[a.length - 1];
+    const o = { rm: l.rm, kc: l.kc, jg: l.jg, tDisb: sum(a, "tDisb"), tDeb: sum(a, "tDeb"), os: sum(a, "os"), deb: sum(a, "deb"), sDeb: sum(a, "sDeb"), sOs: sum(a, "sOs"), kDeb: sum(a, "kDeb"), kOs: sum(a, "kOs") };
+    o.pen = o.tDisb ? o.os / o.tDisb : null; return o; });
+  const lb = [...(isCo ? coRows() : rows)].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);
+  $("#rLbS").textContent = (isCo ? `carry over Jan s.d. ${BULAN[coEnd - 1]} ${yr} · ` : `${ymS(ym)} · `) + "garis = 100% target · klik nama untuk lihat pencapaiannya";
+  v.querySelectorAll("[data-rkm]").forEach(b => b.onclick = () => { if (RS.rkm === b.dataset.rkm) return; RS.rkm = b.dataset.rkm; saveRS(); render(); });
   const last6 = (() => { const out = []; for (let i = 5; i >= 0; i--) { const d = new Date(+yr, +ym.slice(5, 7) - 1 - i, 1); out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); } return out; })();
   const kOf = (rm, m) => { const r = P.months.find(x => x.ym === m && nmKey(x.rm) === nmKey(rm)); return r && r.tDisb ? kuadOf(r.os / r.tDisb) : null; };
   $("#rLb").innerHTML = lb.length ? lb.map((x, i) => `<div class="lb-row" style="grid-template-columns:28px minmax(0,1.4fr) minmax(0,2fr) auto">
@@ -921,7 +1015,7 @@ function viewRM(v) {
   if (!RS.sel || !P.months.some(x => nmKey(x.rm) === nmKey(RS.sel) && inScope(x))) RS.sel = lb.length ? lb[0].rm : null;
   renderRMPer(inScope);
   if (SEG.rm === "R") renderRmNett({ P, inScope, ym, isCur });
-  $("#rExp").onclick = () => exportCSV("produktivitas-" + RL.seg.toLowerCase().replace(/\W+/g, "-") + "-" + ym, [["rm","RM"],["kc","KC"],["jg","JG"],["tDisb","Target disb (juta)"],["os","Realisasi (juta)"],["pen","Pencapaian"],["tDeb","Target deb"],["deb","Deb"],["sDeb","Deb " + RL.s.toLowerCase()],["sOs",RL.s + " (juta)"],["kDeb","Deb " + RL.k.toLowerCase()],["kOs",RL.k + " (juta)"]], lb);
+  $("#rExp").onclick = () => exportCSV("produktivitas-" + RL.seg.toLowerCase().replace(/\W+/g, "-") + "-" + (isCo ? "carry-over-" + yr + "-" + String(coEnd).padStart(2, "0") : ym), [["rm","RM"],["kc","KC"],["jg","JG"],["tDisb","Target disb (juta)"],["os","Realisasi (juta)"],["pen","Pencapaian"],["tDeb","Target deb"],["deb","Deb"],["sDeb","Deb " + RL.s.toLowerCase()],["sOs",RL.s + " (juta)"],["kDeb","Deb " + RL.k.toLowerCase()],["kOs",RL.k + " (juta)"]], lb);
 
   // per KC
   const kcRows = uniq(rows.map(x => x.kc)).map(kc => { const a = rows.filter(x => x.kc === kc), t = a.filter(x => x.tDisb > 0), tt = sum(t, "tDisb"), o = sum(a, "os");
@@ -947,7 +1041,9 @@ function viewRM(v) {
   mkChart("cRmJen", { type: "bar", data: { labels: sk.map(x => x[0]), datasets: [{ label: "Disbursement", data: sk.map(x => x[1]), backgroundColor: sk.map(x => x[3]), borderRadius: 4, maxBarThickness: 34 }] },
     options: baseOpts({ indexAxis: "y", interaction: { mode: "nearest", intersect: true }, plugins: { ...baseOpts().plugins, legend: { display: false }, tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => ` ${rpJ(c.parsed.x)} · ${nf0.format(sk[c.dataIndex][2])} deb · ${pct(os ? sk[c.dataIndex][1] / os : 0, 1)}` } } },
       scales: { x: { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x / 1000) + " M" } }, y: { ...baseOpts().scales.x, ticks: { ...baseOpts().scales.x.ticks, color: ink2, font: { size: 12 } } } } }) });
+  renderRMDaily({ P, txIn, ym, isCur, day });
   renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
+  renderRMAppx({ P, txIn, ym, isCur, day, inScope, yr });
   const allYm = uniq(P.months.map(x => x.ym)).sort().filter(m => m <= (P.asof || "9").slice(0, 7)).slice(-18);
   const mAgg = allYm.map(m => { const a = P.months.filter(x => x.ym === m && inScope(x)); return { s: sum(a, "sOs"), k: sum(a, "kOs"), t: sum(a.filter(x => x.tDisb > 0), "tDisb") }; });
   mkChart("cRmMon", { type: "bar", data: { labels: allYm.map(ymS), datasets: [
@@ -960,7 +1056,7 @@ function viewRM(v) {
 // perbandingan: bulan berjalan s.d. tanggal yang sama vs 3 bulan sebelumnya, dan tahun lalu vs tahun ini
 function renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }) {
   const el = $("#rCmp"); if (!el) return;
-  const mode = RS.cmp === "yoy" ? "yoy" : "mtd", grp = RS.cmpG === "rm" ? "rm" : "kc", y1 = String(+yr - 1);
+  const mode = "yoy", grp = RS.cmpG === "rm" ? "rm" : "kc", y1 = String(+yr - 1);
   const addM = (m, k) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); };
   const nDays = m => new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
   const D = isCur ? day : nDays(ym);
@@ -970,14 +1066,10 @@ function renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }) {
   const pc = (a, b) => b ? (a / b - 1) : null, dl = v => v == null ? "–" : `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + pct(Math.abs(v), 1)}</span>`;
   const dJ = v => `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + nf1.format(Math.abs(v))}</span>`;
   const yo = mode === "yoy";
-  el.innerHTML = `<div class="panel-h"><h2>Perbandingan disbursement</h2><div class="seg" role="tablist" aria-label="Jenis perbandingan">
-      <button type="button" role="tab" aria-selected="${!yo}" data-cmp="mtd">Bulan berjalan vs 3 bulan lalu</button><button type="button" role="tab" aria-selected="${yo}" data-cmp="yoy">${y1} vs ${yr}</button></div></div>
+  el.innerHTML = `<div class="panel-h"><h2>Perbandingan disbursement ${y1} vs ${yr}</h2></div>
     <p class="note" style="margin:0">${yo ? `Disbursement per bulan ${y1} dibanding ${yr} dan kumulatif (YtD). ${isCur ? `${BULAN[+ym.slice(5, 7) - 1]} ${yr} baru s.d. ${tglS(P.asof)}, sedangkan ${BULAN[+ym.slice(5, 7) - 1]} ${y1} sebulan penuh (data harian ${y1} tidak tersedia), jadi selisih bulan ini belum sebanding.` : ""}` : `Disbursement s.d. tanggal ${D} di ${ymS(ym)} dibanding tanggal yang sama di 3 bulan sebelumnya. Rp juta.`}</p>
     <div class="chart tall"><canvas id="cCmp"></canvas></div>
-    <div id="tCmp"></div>
-    <div class="panel-h" style="margin-top:6px"><h3 style="font-size:14px">${yo ? `YtD Jan s.d. ${BULAN[(isCur && +ym.slice(5, 7) > 1 ? +ym.slice(5, 7) - 1 : +ym.slice(5, 7)) - 1]}${isCur ? " (bulan penuh)" : ""}: ${y1} vs ${yr}` : `Per ${grp === "rm" ? "RM" : "cabang"} · s.d. tanggal ${D}`}</h3>
-      <div class="seg" role="tablist" aria-label="Kelompokkan"><button type="button" role="tab" aria-selected="${grp === "kc"}" data-g="kc">Per cabang</button><button type="button" role="tab" aria-selected="${grp === "rm"}" data-g="rm">Per RM</button></div></div>
-    <div id="tCmpG"></div>`;
+    <div id="tCmp"></div>`;
   el.querySelectorAll("[data-cmp]").forEach(b => b.onclick = () => { RS.cmp = b.dataset.cmp; saveRS(); renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }); });
   el.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { RS.cmpG = b.dataset.g; saveRS(); renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }); });
   if (!yo) {
@@ -1003,7 +1095,7 @@ function renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }) {
       { state: { key: "m", dir: -1 }, foot: { m: "Rata-rata 3 bulan", os: nf1.format(avg3), vs: `${dJ(cur - avg3)}<br><small>${dl(pc(cur, avg3))}</small>` } });
     const keys = uniq(cut.flat().map(gOf)).filter(Boolean);
     const gr = keys.map(k => { const o = { k }; ms.forEach((m, i) => o["m" + i] = sum(cut[i].filter(t => gOf(t) === k), "pl")); o.avg = (o.m0 + o.m1 + o.m2) / 3; o.d = o.m3 - o.avg; o.dp = pc(o.m3, o.avg); return o; });
-    table($("#tCmpG"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" }, ...ms.map((m, i) => ({ key: "m" + i, label: ymS(m), r: 1, fmt: x => i === 3 ? `<b>${nf1.format(x)}</b>` : (x ? nf1.format(x) : `<span class="note">–</span>`) })),
+    if ($("#tCmpG")) table($("#tCmpG"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" }, ...ms.map((m, i) => ({ key: "m" + i, label: ymS(m), r: 1, fmt: x => i === 3 ? `<b>${nf1.format(x)}</b>` : (x ? nf1.format(x) : `<span class="note">–</span>`) })),
       { key: "avg", label: "Rata 3 bln", r: 1, fmt: x => nf1.format(x) }, { key: "d", label: "Δ vs rata", r: 1, fmt: (x, r) => `${dJ(x)}<br><small>${dl(r.dp)}</small>` }], gr,
       { sortKey: "m3", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", ...Object.fromEntries(ms.map((m, i) => ["m" + i, nf1.format(sum(gr, "m" + i))])), avg: nf1.format(sum(gr, "avg")), d: dJ(sum(gr, "m3") - sum(gr, "avg")) } });
   } else {
@@ -1027,7 +1119,7 @@ function renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day }) {
     const yRows = P.months.filter(x => inScope(x) && (x.ym.startsWith(y1 + "-") || x.ym.startsWith(yr + "-")) && upto.includes(x.ym.slice(5)));
     const gr = uniq(yRows.map(gKey)).filter(Boolean).map(k => { const a = yRows.filter(x => gKey(x) === k);
       const o = { k, a: sum(a.filter(x => x.ym.startsWith(y1)), "os"), b: sum(a.filter(x => x.ym.startsWith(yr)), "os"), ad: sum(a.filter(x => x.ym.startsWith(y1)), "deb"), bd: sum(a.filter(x => x.ym.startsWith(yr)), "deb") }; o.d = o.b - o.a; o.dp = pc(o.b, o.a); return o; });
-    table($("#tCmpG"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" },
+    if ($("#tCmpG")) table($("#tCmpG"), [{ key: "k", label: grp === "rm" ? "RM" : "Kantor cabang" },
       { key: "a", label: `YtD ${y1}`, r: 1, fmt: (x, r) => `${nf1.format(x)}<br><small class="note">${r.ad} deb</small>` },
       { key: "b", label: `YtD ${yr}`, r: 1, fmt: (x, r) => `<b>${nf1.format(x)}</b><br><small class="note">${r.bd} deb</small>` },
       { key: "d", label: "Selisih", r: 1, fmt: x => dJ(x) }, { key: "dp", label: "Growth", r: 1, sortVal: r => r.dp ?? -9, fmt: x => dl(x) }], gr,
@@ -1111,14 +1203,17 @@ function renderRMPer(inScope) {
       ${tile({ label: "Gap terhadap target", value: `<span class="delta ${dCls(coO - coT)}" style="font-size:inherit">${(coO - coT >= 0 ? "+" : "−") + nf1.format(Math.abs(coO - coT))}</span>`, sub: "Rp juta" })}
       ${tile({ label: isKc ? "Ratas cabang per bulan" : "Ratas per bulan", value: rpJ(coO / elapsed), sub: `${elapsed} bulan aktif${inCo.some(r => r.future) ? ` · perlu ${rpJ(Math.max(0, coT - coO) / inCo.filter(r => r.future).length)}/bln s.d. ${BULAN[endM - 1]}` : ""}` })}
     </div>
+    <details class="rm-more" ${RS.perOpen ? "open" : ""}><summary>Rincian per bulan ${yr}${isKc ? " & RM di cabang" : ""} <small class="note">grafik & tabel Jan–Des, carry over ${coLbl}</small></summary>
     <div class="chart"><canvas id="cRmPer"></canvas></div>
     <div id="tRmPer"></div>
     ${isKc ? `<h3 style="font-size:14px;margin-top:4px">RM di ${esc(RS.selKc)} · carry over ${coLbl}</h3><div id="tKcRm"></div>` : ""}
+    </details>
     <p class="note" style="margin:0">${RL.note} Kuadran: K1 ≥105%, K2 100–105%, K3 50–100%, K4 &lt;50%.</p>`;
   if ($("#pRmSel")) $("#pRmSel").onchange = e => { RS.sel = e.target.value; RS.selYr = null; saveRS(); renderRMPer(); };
   if ($("#pKcSel")) $("#pKcSel").onchange = e => { RS.selKc = e.target.value; RS.selYr = null; saveRS(); renderRMPer(); };
   $("#pRmYr").onchange = e => { RS.selYr = e.target.value; saveRS(); renderRMPer(); };
-  $("#pRmCo").onchange = e => { RS.co = e.target.value; saveRS(); renderRMPer(); };
+  $("#pRmCo").onchange = e => { RS.co = e.target.value; saveRS(); if (RS.rkm === "co") render(); else renderRMPer(); };
+  { const dt = el.querySelector("details.rm-more"); if (dt) dt.ontoggle = () => { RS.perOpen = dt.open; if (dt.open && charts.cRmPer) charts.cRmPer.resize(); }; }
   // kartu hologram: kilau mengikuti arah kursor / sentuhan (miring halus)
   const hc = el.querySelector(".rmc.holo");
   if (hc && !reduceMotion) {
@@ -1130,6 +1225,7 @@ function renderRMPer(inScope) {
   // klik kuadran di kartu: urutkan & loncat ke tabel rinciannya
   el.querySelectorAll("[data-kgo]").forEach(b => b.onclick = () => {
     if (isKc) { RS.kcSort = { key: b.dataset.kgo, dir: 1 }; saveRS(); renderRMPer(); }
+    const dt = el.querySelector("details.rm-more"); if (dt && !dt.open) dt.open = true;
     const tg = $(isKc ? "#tKcRm" : "#tRmPer"); if (!tg) return;
     tg.scrollIntoView({ behavior: "smooth", block: "start" }); tg.classList.remove("flash"); void tg.offsetWidth; tg.classList.add("flash");
   });
@@ -1157,6 +1253,127 @@ function renderRMPer(inScope) {
       scales: { x: { ...baseOpts().scales.x, stacked: true }, y: { ...baseOpts().scales.y, stacked: true, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x) + " Jt" } } } }) });
 }
 
+/* ================= Produktivitas: laporan disburse realisasi harian (format laporan harian) ================= */
+// grafik kumulatif harian 3 bulan terakhir, perbandingan per cabang s.d. tanggal yang sama bulan lalu + pencapaian RKA (OS keragaan),
+// dan total realisasi bulan berjalan per jenis produk
+const RD_PAL = ["#f2b705", "#22a854", "#1f6fd1"];
+const rdR = x => Math.round(Math.round(x * 100) / 100);   // bulatkan ke juta tanpa galat pecahan (mis. 0,3 + 0,2)
+// OS keragaan vs RKA per kanca (produk sesuai segmen) pada posisi keragaan terakhir s.d. tanggal t
+function rkaByKc(seg, t) {
+  const K = DB.ker, p = { R: "ritel", M: "mikro", K: "kpr" }[seg]; if (!K || !K.P[p] || !K.rka || !K.rka.P || !K.rka.P[p] || !K.rka.P[p].os) return null;
+  const ds = K.dates.filter(d => d <= t), d = ds[ds.length - 1] || K.dates[K.dates.length - 1], di = K.dates.indexOf(d), mi = K.rka.months.indexOf(d.slice(0, 7));
+  if (mi < 0) return null;
+  const out = new Map(); K.kcU.forEach((c, i) => { const u = KC_BY.get(String(c)); if (!u) return; const os = K.P[p].os[di]?.[i], rk = K.rka.P[p].os[mi]?.[i]; if (rk) out.set(u.nama, { os: os || 0, rka: rk }); });
+  return { d, m: out };
+}
+function renderRMDaily({ P, txIn, ym, isCur, day }) {
+  const el = $("#rDay"); if (!el) return;
+  const addM = (m, k) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); };
+  const nDays = m => new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
+  const ms = [addM(ym, -2), addM(ym, -1), ym], D = isCur ? day : nDays(ym);
+  if (!P.tx.some(t => t.d.startsWith(ym))) { el.innerHTML = `<div class="panel-h"><h2>Disburse realisasi harian ${esc(RL.seg)}</h2></div><div class="empty">Belum ada data pencairan harian ${ymS(ym)}.</div>`; return; }
+  const mL = (m, d) => `${d} ${BULAN[+m.slice(5, 7) - 1]}'${m.slice(2, 4)}`;
+  const tx = ms.map(m => txIn(m)), cut = tx.map(a => a.filter(t => +t.d.slice(8) <= D));
+  const kcMap = new Map(P.months.map(x => [x.ym + "|" + nmKey(x.rm), x.kc])), kcOf = t => kcMap.get(t.d.slice(0, 7) + "|" + nmKey(t.rm)) || t.kc || "Lainnya";
+  const asofT = isCur ? P.asof : ym + "-" + String(D).padStart(2, "0"), RK = rkaByKc(SEG.rm, asofT);
+  // perbandingan per cabang
+  const kcs = uniq([...cut[1], ...cut[2]].map(kcOf)).filter(Boolean);
+  const rows = kcs.map(kc => { const a = sum(cut[1].filter(t => kcOf(t) === kc), "pl"), b = sum(cut[2].filter(t => kcOf(t) === kc), "pl"), r = RK && RK.m.get(kc);
+    return { kc, a, b, d: b - a, dp: a ? b / a - 1 : null, gap: r ? r.os - r.rka : null, prk: r ? r.os / r.rka : null }; })
+    .sort((x, y) => (y.prk ?? -1) - (x.prk ?? -1) || y.b - x.b);
+  const tA = sum(rows, "a"), tB = sum(rows, "b"), rkR = rows.filter(r => r.prk != null), tGap = rkR.length ? sum(rkR, "gap") : null;
+  const tPrk = rkR.length ? (() => { let o = 0, k = 0; rkR.forEach(r => { const x = RK.m.get(r.kc); o += x.os; k += x.rka; }); return k ? o / k : null; })() : null;
+  const n = x => x == null ? "–" : rdR(x) === 0 ? "–" : x < 0 ? `<span class="neg">(${nf0.format(Math.abs(rdR(x)))})</span>` : nf0.format(rdR(x));
+  const pc = x => x == null ? "–" : x < 0 ? `(${pct(Math.abs(x), 1)})` : "+" + pct(x, 1);
+  const mCls = x => x == null ? "" : x <= -.5 ? "c-r" : x < 0 ? "c-y" : x >= .5 ? "c-g" : "c-lg";
+  const rCls = x => x == null ? "" : x >= 1 ? "c-g" : x >= .95 ? "c-y" : "c-r";
+  // total realisasi bulan berjalan per jenis
+  const KPRG = SEG.rm === "K";
+  const cats = KPRG ? [["KPR", ["Tier 1", "Tier 2", "Tier 3"]], ["KPRS", ["KPRS"]], ["Secondary / Take Over / Top Up", ["Secondary / TO / Top Up"]]]
+    : [["", uniq(tx[2].map(t => t.jenis)).filter(Boolean)]];
+  if (KPRG && tx[2].some(t => t.jenis === "Lainnya")) cats.push(["Lainnya", ["Lainnya"]]);
+  const leaves = cats.flatMap(c => c[1]);
+  const tot = (a, j) => { const b = j ? a.filter(t => t.jenis === j) : a; return { deb: sum(b, "deb"), os: sum(b, "pl") }; };
+  const scope = RS.kc !== "ALL" ? RS.kc : RS.area !== "ALL" ? areaS(RS.area) : "RO Medan";
+  const prRow = (lbl, a, b, cls) => { const x = tot(b), y = tot(a), d = x.os - y.os;
+    return `<tr${cls ? ` class="${cls}"` : ""}><td><b>${esc(lbl)}</b></td>${leaves.map(j => { const z = tot(b, j); return `<td class="r">${n(z.deb)}</td><td class="r">${n(z.os)}</td>`; }).join("")}
+      <td class="r">${n(x.deb)}</td><td class="r">${n(x.os)}</td><td class="r">${n(y.deb)}</td><td class="r">${n(y.os)}</td><td class="r">${n(d)}</td><td class="r ${mCls(y.os ? d / y.os : null)}">${pc(y.os ? d / y.os : null)}</td></tr>`; };
+  el.innerHTML = `<div class="panel-h"><h2>Disburse realisasi harian ${esc(RL.seg)} – (s.d. ${mL(ym, D)})</h2><span class="sub">Rp juta · ${esc(scope)}</span></div>
+    <div class="rd-grid">
+      <div><h3 class="rd-h">Tren realisasi ${esc(RL.seg)} 3 bulan terakhir</h3>
+        <div class="rd-box">${ms.map((m, i) => `<span style="--c:${RD_PAL[i]}"><b>${mL(m, Math.min(D, nDays(m)))}</b><i>${nf0.format(rdR(sum(cut[i], "pl")))}</i></span>`).join("")}</div>
+        <div class="chart tall"><canvas id="cRDay"></canvas></div></div>
+      <div><div class="table-wrap"><table class="kt rd"><thead>
+        <tr><th colspan="${RK ? 8 : 6}" class="nv">PERBANDINGAN DISBURSEMENT PER CABANG</th></tr>
+        <tr><th rowspan="2">NO</th><th rowspan="2">Kantor Cabang</th><th colspan="2">Disb Akumulasi</th><th colspan="2">MoM</th>${RK ? `<th colspan="2">Penc RKA</th>` : ""}</tr>
+        <tr><th>Disb s.d ${mL(ms[1], Math.min(D, nDays(ms[1])))}</th><th>Disb s.d ${mL(ym, D)}</th><th>Rp</th><th>%</th>${RK ? "<th>GAP OS</th><th>%RKA</th>" : ""}</tr></thead>
+        <tbody>${rows.map((r, i) => `<tr><td class="c">${i + 1}</td><td>${esc(r.kc)}</td><td class="r">${n(r.a)}</td><td class="r">${n(r.b)}</td><td class="r">${n(r.d)}</td><td class="r ${mCls(r.dp)}"><b>${pc(r.dp)}</b></td>${RK ? `<td class="r">${n(r.gap)}</td><td class="r ${rCls(r.prk)}">${r.prk == null ? "–" : pct(r.prk, 2)}</td>` : ""}</tr>`).join("")}</tbody>
+        <tfoot><tr class="knv"><td colspan="2">GRAND TOTAL</td><td class="r">${n(tA)}</td><td class="r">${n(tB)}</td><td class="r">${n(tB - tA)}</td><td class="r">${pc(tA ? tB / tA - 1 : null)}</td>${RK ? `<td class="r">${n(tGap)}</td><td class="r">${tPrk == null ? "–" : pct(tPrk, 2)}</td>` : ""}</tr></tfoot></table></div>
+        ${RK ? `<p class="note" style="margin:6px 0 0">Penc RKA = OS ${esc(RL.seg)} keragaan posisi ${tglS(RK.d)} terhadap RKA OS ${BULAN[+RK.d.slice(5, 7) - 1]} ${RK.d.slice(0, 4)}.</p>` : `<p class="note" style="margin:6px 0 0">Pencapaian RKA tampil bila data keragaan & RKA tersedia.</p>`}</div>
+    </div>
+    <div class="table-wrap" style="margin-top:14px"><table class="kt rd2"><thead>
+      <tr><th rowspan="${KPRG ? 4 : 3}">Kantor Cabang</th><th colspan="${leaves.length * 2}" class="big">Total Realisasi ${BULAN[+ym.slice(5, 7) - 1]}'${ym.slice(2, 4)}</th>
+        <th colspan="2" rowspan="${KPRG ? 3 : 2}">Disb s.d ${mL(ym, D)}</th><th colspan="2" rowspan="${KPRG ? 3 : 2}" class="yl">Disb s.d ${mL(ms[1], Math.min(D, nDays(ms[1])))}</th><th colspan="2" rowspan="${KPRG ? 3 : 2}" class="gr">MoM Disb ${mL(ms[1], Math.min(D, nDays(ms[1])))} thd Disb ${BULAN[+ym.slice(5, 7) - 1]}'${ym.slice(2, 4)}</th></tr>
+      ${KPRG ? `<tr>${cats.map(c => `<th colspan="${c[1].length * 2}" ${c[1].length === 1 ? 'rowspan="2"' : ""} class="lt">${esc(c[0])}</th>`).join("")}</tr>
+      <tr>${cats.filter(c => c[1].length > 1).map(c => c[1].map(j => `<th colspan="2" class="lt">${esc(j)}</th>`).join("")).join("")}</tr>`
+      : `<tr>${leaves.map(j => `<th colspan="2" class="lt">${esc(j)}</th>`).join("")}</tr>`}
+      <tr>${leaves.map(() => '<th class="lt">DEB</th><th class="lt">OS</th>').join("")}<th>DEB</th><th>OS</th><th class="yl">DEB</th><th class="yl">OS</th><th class="gr">OS</th><th class="gr">%</th></tr></thead>
+      <tbody>${prRow(scope, cut[1], cut[2], "ktl")}</tbody></table></div>`;
+  const maxD = Math.max(...ms.map(nDays));
+  mkChart("cRDay", { type: "line", data: { labels: Array.from({ length: maxD }, (_, i) => i + 1), datasets: ms.map((m, i) => {
+    const last = m === ym ? D : nDays(m), out = []; let c = 0;
+    for (let d = 1; d <= last; d++) { c += sum(tx[i].filter(t => +t.d.slice(8) === d), "pl"); out.push(Math.round(c)); }
+    return { label: BULAN_L[+m.slice(5, 7) - 1] + " " + m.slice(0, 4), data: out, borderColor: RD_PAL[i], backgroundColor: RD_PAL[i], borderWidth: m === ym ? 3 : 2, tension: .15,
+      pointRadius: out.map((_, k) => k === out.length - 1 || k === D - 1 ? 4 : 0) }; }) },
+    options: baseOpts({ layout: { padding: { top: 18, right: 26 } }, plugins: { ...baseOpts().plugins, tooltip: { ...baseOpts().plugins.tooltip, callbacks: { title: c => "s.d. tanggal " + c[0].label, label: c => ` ${c.dataset.label}: ${nf0.format(c.parsed.y)} jt` } } },
+      scales: { x: { ...baseOpts().scales.x, title: { display: true, text: "Tanggal" }, ticks: { ...baseOpts().scales.x.ticks, maxRotation: 0, autoSkip: true, autoSkipPadding: 2, color: c => c.index === D - 1 ? cssv("--ink") : cssv("--muted") } },
+        y: { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x) } } } }) });
+}
+
+// lampiran (paling bawah, tertutup secara bawaan; dibuka lewat menu "Buka lampiran" atau klik judulnya):
+// 1 = disbursement per cabang / RM s.d. tanggal yang sama, 3 bulan lalu + bulan berjalan; 2 = YtD tahun lalu vs tahun ini per cabang / RM
+const APX_OPEN = new Set();
+function renderRMAppx(A) {
+  const { P, txIn, ym, isCur, day, inScope, yr } = A, el = $("#rApx"); if (!el) return;
+  const addM = (m, k) => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 1 + k, 1); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"); };
+  const nDays = m => new Date(+m.slice(0, 4), +m.slice(5, 7), 0).getDate();
+  const ms = [addM(ym, -3), addM(ym, -2), addM(ym, -1), ym], D = isCur ? day : nDays(ym), grp = RS.apxG === "rm" ? "rm" : "kc", gL = grp === "rm" ? RL.who : "cabang";
+  const y1 = String(+yr - 1), curM = +ym.slice(5, 7), fullM = isCur && curM > 1 ? curM - 1 : curM;
+  const L = [["1", `Disbursement per ${gL} s.d. tanggal ${D} · ${ymS(ms[0])}–${ymS(ym)}`, `Disbursement s.d. tanggal ${D} di ${ymS(ym)} dibanding tanggal yang sama di 3 bulan sebelumnya · Rp juta.`],
+    ["2", `YtD Jan s.d. ${BULAN[fullM - 1]}${isCur ? " (bulan penuh)" : ""} per ${gL} · ${y1} vs ${yr}`, `Disbursement Jan s.d. ${BULAN[fullM - 1]} ${y1} dibanding periode yang sama ${yr}${isCur ? " (bulan berjalan belum dihitung)" : ""} · Rp juta.`]];
+  el.innerHTML = `<div class="panel-h"><h2>Lampiran</h2><div class="toolbar">
+      <select class="ctl" id="apxSel" aria-label="Buka lampiran"><option value="">Buka lampiran…</option>${L.map(l => `<option value="${l[0]}">Lampiran ${l[0]} · ${esc(l[1])}</option>`).join("")}<option value="all">Buka semua lampiran</option><option value="none">Tutup semua lampiran</option></select>
+      <div class="seg" role="tablist" aria-label="Kelompokkan"><button type="button" role="tab" aria-selected="${grp === "kc"}" data-ag="kc">Per cabang</button><button type="button" role="tab" aria-selected="${grp === "rm"}" data-ag="rm">Per ${RL.who}</button></div></div></div>
+    ${L.map(l => `<details class="apx" data-apx="${l[0]}" ${APX_OPEN.has(l[0]) ? "open" : ""}><summary><b>Lampiran ${l[0]}</b> · ${esc(l[1])}</summary><p class="note" style="margin:0 0 8px">${esc(l[2])}</p><div id="tApx${l[0]}"></div></details>`).join("")}`;
+  el.querySelectorAll("[data-ag]").forEach(b => b.onclick = () => { RS.apxG = b.dataset.ag; saveRS(); renderRMAppx(A); });
+  el.querySelectorAll("details.apx").forEach(d => d.ontoggle = () => { d.open ? APX_OPEN.add(d.dataset.apx) : APX_OPEN.delete(d.dataset.apx); });
+  $("#apxSel").onchange = e => { const v = e.target.value; e.target.value = "";
+    el.querySelectorAll("details.apx").forEach(d => d.open = v === "all" || d.dataset.apx === v);
+    const t = v === "all" || v === "none" ? el : el.querySelector(`details[data-apx="${v}"]`); if (t && v !== "none") t.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  const pc = (a, b) => b ? (a / b - 1) : null, dl = v => v == null ? "–" : `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + pct(Math.abs(v), 1)}</span>`;
+  const dJ = v => `<span class="delta ${dCls(v)}">${(v >= 0 ? "+" : "−") + nf1.format(Math.abs(v))}</span>`, kLbl = grp === "rm" ? RL.who : "Kantor cabang";
+  // lampiran 1
+  if (!ms.some(m => P.tx.some(t => t.d.startsWith(m)))) $("#tApx1").innerHTML = '<div class="empty">Belum ada data pencairan harian untuk bulan-bulan ini.</div>';
+  else {
+    const kcMap = new Map(P.months.map(x => [x.ym + "|" + nmKey(x.rm), x.kc]));
+    const gOf = t => grp === "rm" ? t.rm : (kcMap.get(t.d.slice(0, 7) + "|" + nmKey(t.rm)) || t.kc);
+    const cut = ms.map(m => txIn(m).filter(t => +t.d.slice(8) <= D));
+    const gr = uniq(cut.flat().map(gOf)).filter(Boolean).map(k => { const o = { k }; ms.forEach((m, i) => o["m" + i] = sum(cut[i].filter(t => gOf(t) === k), "pl")); o.avg = (o.m0 + o.m1 + o.m2) / 3; o.d = o.m3 - o.avg; o.dp = pc(o.m3, o.avg); return o; });
+    table($("#tApx1"), [{ key: "k", label: kLbl }, ...ms.map((m, i) => ({ key: "m" + i, label: ymS(m), r: 1, fmt: x => i === 3 ? `<b>${nf1.format(x)}</b>` : (x ? nf1.format(x) : `<span class="note">–</span>`) })),
+      { key: "avg", label: "Rata 3 bln", r: 1, fmt: x => nf1.format(x) }, { key: "d", label: "Δ vs rata", r: 1, fmt: (x, r) => `${dJ(x)}<br><small>${dl(r.dp)}</small>` }], gr,
+      { sortKey: "m3", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", ...Object.fromEntries(ms.map((m, i) => ["m" + i, nf1.format(sum(gr, "m" + i))])), avg: nf1.format(sum(gr, "avg")), d: dJ(sum(gr, "m3") - sum(gr, "avg")) } });
+  }
+  // lampiran 2
+  const upto = Array.from({ length: fullM }, (_, i) => String(i + 1).padStart(2, "0")), gKey = x => grp === "rm" ? x.rm : x.kc;
+  const yRows = P.months.filter(x => inScope(x) && (x.ym.startsWith(y1 + "-") || x.ym.startsWith(yr + "-")) && upto.includes(x.ym.slice(5)));
+  const g2 = uniq(yRows.map(gKey)).filter(Boolean).map(k => { const a = yRows.filter(x => gKey(x) === k);
+    const o = { k, a: sum(a.filter(x => x.ym.startsWith(y1)), "os"), b: sum(a.filter(x => x.ym.startsWith(yr)), "os"), ad: sum(a.filter(x => x.ym.startsWith(y1)), "deb"), bd: sum(a.filter(x => x.ym.startsWith(yr)), "deb") }; o.d = o.b - o.a; o.dp = pc(o.b, o.a); return o; });
+  table($("#tApx2"), [{ key: "k", label: kLbl },
+    { key: "a", label: `YtD ${y1}`, r: 1, fmt: (x, r) => `${nf1.format(x)}<br><small class="note">${r.ad} deb</small>` },
+    { key: "b", label: `YtD ${yr}`, r: 1, fmt: (x, r) => `<b>${nf1.format(x)}</b><br><small class="note">${r.bd} deb</small>` },
+    { key: "d", label: "Selisih", r: 1, fmt: x => dJ(x) }, { key: "dp", label: "Growth", r: 1, sortVal: r => r.dp ?? -9, fmt: x => dl(x) }], g2,
+    { sortKey: "b", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", a: nf1.format(sum(g2, "a")), b: `<b>${nf1.format(sum(g2, "b"))}</b>`, d: dJ(sum(g2, "b") - sum(g2, "a")), dp: dl(pc(sum(g2, "b"), sum(g2, "a"))) } });
+}
 /* ================= Produktivitas Nett RM Briguna Ritel: tabel format laporan (produk × baru/suplesi, target JG, kuadran) ================= */
 // months[].pd = { KA: Karya, PP: Pra-Purna, PU: Purna } → [Deb Baru, OS Baru, Deb Suplesi, OS Suplesi] (dari Apps Script, Rp juta)
 const NETT_PROD = [["KA", "Karya", "ka"], ["PP", "Pra-Purna", "pp"], ["PU", "Purna", "pu"]];
@@ -1205,8 +1422,9 @@ function renderRmNett({ P, inScope, ym, isCur }) {
 /* ================= VIEW: Pipeline Brispot (dari file Pipeline BRISPOT) ================= */
 // DB.pipe = { asof, items[{kc,debitur,rm,pic,plafon,pengajuan,pencairan,putusan,tglPutusan,tatPrakarsa,tatClf,tatUker,tatTotal,status,tahap,akad,batal,proses,developer,jenis}], onhand[], rencana{dates[],rows[{kc,rm,v[]}]} }
 const PTAHAP = ["On Hand", "Prakarsa", "Rekomendasi", "Penilaian Agunan", "Analis", "Menunggu Putusan", "Putus & Siap Cair", "Verifikasi Pencairan"];
-const PS = Object.assign({ area: "ALL", kc: "ALL", rm: "ALL", jenis: "ALL", proses: "ALL", tahap: "ALL", usia: "ALL", q: "", batal: false, akad: [] }, lsGet(STORE + "-pipe") || {});
-if (!Array.isArray(PS.akad)) PS.akad = [];
+const PS = Object.assign({ area: "ALL", kc: "ALL", rm: "ALL", jenis: "ALL", proses: "ALL", tahap: "ALL", usia: "ALL", q: "", batal: false, akad: [], prosesM: [], jenisM: [] }, lsGet(STORE + "-pipe") || {});
+["akad", "prosesM", "jenisM"].forEach(k => { if (!Array.isArray(PS[k])) PS[k] = []; });
+PS.proses = "ALL"; PS.batal = false;
 const savePS = () => lsSet(STORE + "-pipe", { ...PS, q: "" });
 const tahapOf = s => { s = String(s || "").toLowerCase();
   return /verifikasi pencairan/.test(s) ? 7 : /diputus|siap cair/.test(s) ? 6 : /menunggu.*putusan/.test(s) ? 5 : /analis/.test(s) ? 4 : /agunan|penilaian/.test(s) ? 3 : /rekomendasi/.test(s) ? 2 : /prakarsa/.test(s) ? 1 : 1; };
@@ -1305,9 +1523,9 @@ function viewPipeline(v) {
       <div class="toolbar">
         <input class="ctl" id="pq" type="search" placeholder="Cari debitur / RM / developer" value="${esc(PS.q)}">
         <select class="ctl" id="pT"><option value="ALL">Semua tahap</option>${PTAHAP.map((t, i) => `<option value="${i}" ${PS.tahap === String(i) ? "selected" : ""}>${t}</option>`).join("")}</select>
-        <select class="ctl" id="pP"><option value="ALL">HOT/WARM/COLD</option>${["HOT", "WARM", "COLD"].map(p => `<option ${PS.proses === p ? "selected" : ""}>${p}</option>`).join("")}</select>
+        <div id="pPr"></div>
+        <div id="pJn"></div>
         <div id="pAk"></div>
-        <label class="check"><input type="checkbox" id="pB" ${PS.batal ? "checked" : ""}> Tampilkan batal</label>
       </div>
       <div id="pAkS" class="ak-sum" hidden></div>
       <div id="pList"></div>
@@ -1352,7 +1570,7 @@ function viewPipeline(v) {
   // daftar
   const tstate = { key: "tahap", dir: -1 };
   const draw = () => {
-    const all = pipeFilter(base), rows = PS.akad.length ? all.filter(x => x.akad && PS.akad.includes(x.akad)) : all;
+    const all = pipeFilter(base, { noProses: true, withBatal: true }).filter(x => prosesIn(x) && jenisIn(x)), rows = PS.akad.length ? all.filter(x => x.akad && PS.akad.includes(x.akad)) : all;
     pipeAkadSum($("#pAkS"), rows);
     table($("#pList"), [
       { key: "debitur", label: "Debitur", fmt: (x, r) => `<b>${esc(x)}</b>${r.batal ? " " + chip("BATAL", "crit") : ""}<br><small class="note">${esc(r.developer && r.developer !== "-" ? r.developer : "")}</small>` },
@@ -1369,13 +1587,15 @@ function viewPipeline(v) {
   // pilihan jadwal akad: tanggal dari pipeline aktif dalam saringan area/KC/RM/jenis
   const akD = uniq(aktif.filter(x => x.akad).map(x => x.akad)).sort();
   PS.akad = PS.akad.filter(d => akD.includes(d));
-  akadPicker($("#pAk"), akD.map(d => [d, aktif.filter(x => x.akad === d).length]), () => { savePS(); draw(); });
+  msPicker($("#pAk"), "akad", akD.map(d => [d, tglS(d), aktif.filter(x => x.akad === d).length]), "Semua jadwal akad", d => tglS(d).replace(/ \d{4}$/, ""), () => { savePS(); draw(); });
+  const lst = pipeFilter(base, { noProses: true, withBatal: true });
+  PS.prosesM = PS.prosesM.filter(p => ["HOT", "WARM", "COLD", "BATAL"].includes(p)); PS.jenisM = PS.jenisM.filter(j => PL.j.includes(j));
+  msPicker($("#pPr"), "prosesM", ["HOT", "WARM", "COLD", "BATAL"].map(p => [p, chip(p, p === "BATAL" ? "crit" : prosesCls(p)), lst.filter(x => p === "BATAL" ? x.batal : !x.batal && x.proses === p).length]), "HOT/WARM/COLD/BATAL", p => p, () => { savePS(); draw(); });
+  msPicker($("#pJn"), "jenisM", PL.j.map(j => [j, j, lst.filter(x => !x.batal && x.jenis === j).length]), PL.j.join(" & "), j => j, () => { savePS(); draw(); });
   draw();
   $("#pq").oninput = e => { PS.q = e.target.value; draw(); };
   $("#pT").onchange = e => { PS.tahap = e.target.value; savePS(); draw(); };
-  $("#pP").onchange = e => { PS.proses = e.target.value; savePS(); draw(); };
 
-  $("#pB").onchange = e => { PS.batal = e.target.checked; savePS(); draw(); };
 }
 
 /* ================= Brispot Briguna: Warm / Hot Leads per RM, KC, Mantri, Unit (laporan 4 sheet template) ================= */
@@ -1593,16 +1813,22 @@ function pipeKcRekap(el, aktif) {
     ${kcs.length ? `<tfoot><tr class="knv"><td>GRAND TOTAL</td>${cells(aktif)}</tr>${areas.length > 1 ? areas.map(ar => `<tr class="knv"><td>${esc(ar.replace(/\s*\/\s*/, "/"))}</td>${cells(aktif.filter(x => x.area === ar))}</tr>`).join("") : ""}</tfoot>` : ""}</table></div>`;
 }
 
-// pilihan jadwal akad (bisa lebih dari satu tanggal)
-function akadPicker(el, dates, onChange) {
-  const lbl = () => !PS.akad.length ? "Semua jadwal akad" : PS.akad.length <= 2 ? PS.akad.map(d => tglS(d).replace(/ \d{4}$/, "")).join(", ") : PS.akad.length + " tanggal akad";
-  el.innerHTML = `<details class="ms"><summary class="ctl">${lbl()}</summary><div class="ms-pop">
-    ${dates.length ? dates.map(([d, n]) => `<label class="check"><input type="checkbox" value="${d}" ${PS.akad.includes(d) ? "checked" : ""}> ${tglS(d)} <small class="note">${n} deb</small></label>`).join("") : '<span class="note">Belum ada jadwal akad.</span>'}
+// pilihan ceklis (bisa lebih dari satu): PS[key] = nilai terpilih; kosong = semua. opts = [[nilai, label, jumlah deb]]
+function msPicker(el, key, opts, allLbl, short, onChange) {
+  const lbl = () => { const v = PS[key]; return !v.length ? allLbl : v.length <= 2 ? v.map(x => short(x)).join(", ") : v.length + " dipilih"; };
+  el.innerHTML = `<details class="ms"><summary class="ctl">${esc(lbl())}</summary><div class="ms-pop">
+    ${opts.length ? opts.map(([v, l, n]) => `<label class="check"><input type="checkbox" value="${esc(v)}" ${PS[key].includes(v) ? "checked" : ""}> ${l}${n != null ? ` <small class="note">${nf0.format(n)} deb</small>` : ""}</label>`).join("") : '<span class="note">Belum ada pilihan.</span>'}
     <div class="toolbar"><button class="btn" type="button" data-ms="all">Pilih semua</button><button class="btn" type="button" data-ms="clr">Hapus pilihan</button></div></div></details>`;
-  const set = v => { PS.akad = v; el.querySelector("summary").textContent = lbl(); onChange(); };
-  el.querySelectorAll("input").forEach(i => i.onchange = () => set([...el.querySelectorAll("input:checked")].map(x => x.value).sort()));
-  el.querySelectorAll("[data-ms]").forEach(b => b.onclick = () => { const on = b.dataset.ms === "all"; el.querySelectorAll("input").forEach(i => i.checked = on); set(on ? dates.map(x => x[0]) : []); });
+  const set = v => { PS[key] = v; el.querySelector("summary").textContent = lbl(); onChange(); };
+  const order = opts.map(o => o[0]);
+  el.querySelectorAll("input").forEach(i => i.onchange = () => set([...el.querySelectorAll("input:checked")].map(x => x.value).sort((a, b) => order.indexOf(a) - order.indexOf(b))));
+  el.querySelectorAll("[data-ms]").forEach(b => b.onclick = () => { const on = b.dataset.ms === "all"; el.querySelectorAll("input").forEach(i => i.checked = on); set(on ? [...order] : []); });
 }
+// saringan Proses (HOT/WARM/COLD/BATAL) dan Jenis di daftar pipeline. Tanpa pilihan: semua berkas aktif (batal tidak ikut);
+// BATAL dicentang: berkas batal ikut tampil (hanya batal bila tidak ada HOT/WARM/COLD yang dicentang)
+const prosesIn = x => { const v = PS.prosesM, hwc = v.filter(p => p !== "BATAL");
+  return !v.length ? !x.batal : x.batal ? v.includes("BATAL") : hwc.includes(x.proses); };
+const jenisIn = x => !PS.jenisM.length || PS.jenisM.includes(x.jenis);
 document.addEventListener("click", e => document.querySelectorAll("details.ms[open]").forEach(d => { if (!d.contains(e.target)) d.open = false; }));
 
 // ringkasan debitur pada jadwal akad terpilih
@@ -2492,13 +2718,13 @@ function dataCards() {
   const bSt = () => { const x = M.brs_B; return x ? `posisi <b>${tglS(x.asof)}</b>${x.jam ? " pukul <b>" + esc(x.jam) + "</b>" : ""} · ${nf0.format(x.n)} RM &amp; mantri · diunggah ${updS(x.updated)}` : "belum ada data"; };
   const card = (k, ico, title, st, note, body) => `<section class="dcard" data-k="${k}"><div class="dc-h">${ico}<div><h3>${title}</h3><p class="dc-st">${st}</p></div></div><p class="note">${note}</p>${body}<p class="note dc-prog" id="pr_${k}" hidden></p></section>`;
   const file = (k, accept = ".xlsx,.xlsm,.xls,.csv", multi = false, lbl = "Upload") => `<label class="btn" for="f_${k}">${ICO_UP}${lbl}</label><input type="file" id="f_${k}" data-up="${k}" accept="${accept}" ${multi ? "multiple" : ""} hidden>`;
-  const lwBody = s => `<div class="toolbar"><select class="ctl" id="m_lw${s}" style="flex:1 1 180px"><option value="cur">Posisi terkini</option><option value="prev">Bulan lalu (pembanding DG/UG)</option></select>${file("lw" + s)}</div><div id="i_lw${s}"></div>`;
+  const lwBody = s => `<div class="toolbar"><select class="ctl" id="m_lw${s}" style="flex:1 1 180px"><option value="cur">Posisi terkini</option><option value="prev">Bulan lalu (pembanding DG/UG)</option></select>${file("lw" + s, undefined, true)}</div><p class="note" style="margin:6px 0 0">Bisa pilih 2 file sekaligus (posisi terkini &amp; bulan lalu): yang tanggalnya lebih baru otomatis jadi posisi terkini.</p><div id="i_lw${s}"></div>`;
   return `<p class="note" style="margin:0">Data keragaan, RKA, disburse, list RM/mantri, dan produktivitas KPR dibaca langsung dari Google Sheets lewat <b>Sync</b>. File di bawah diolah di browser lalu disimpan ke Google Sheets / Drive milik admin, dan langsung tampil untuk semua pengguna sesuai perannya.</p>
     <div class="dgrid">
       ${card("sync", dIco('<path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/>'), "Google Sheets",
         `Keragaan s.d. <b>${K ? tglS(K.dates[K.dates.length - 1]) : "–"}</b>${K && K.rka ? " · RKA " + blnS(K.rka.months[0]) + "–" + blnS(K.rka.months[K.rka.months.length - 1]) : ""}<br>Ritel: ${rmSt("R")}<br>Mikro: ${rmSt("M")}<br>KPR: ${rmSt("K")}<br>Cache server: ${updS(M.updated)}`,
         "Sheet: keragaan, RKA, disburse ritel 2025/2026, disburse mikro, list RM ritel, list mantri mikro, produktivitas KPR (Database History & Database Monthly), RM & KC card.",
-        `<button class="btn primary" type="button" id="btnSyncF">${'<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/></svg>'}Sync sekarang</button>`)}
+        `<button class="btn primary" type="button" id="btnSyncF">${'<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/></svg>'}Sync sekarang</button>${syncResHtml()}`)}
       ${card("lwB", dIco('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h3M8 16h6"/>'), "LW321 Briguna", lwSt("B"),
         "LW321 Briguna Ritel + Mikro (semua sheet dibaca, rekening ganda dibuang, produk non-Briguna diabaikan). Posisi terkini yang lebih baru sebulan otomatis menggeser yang lama menjadi pembanding bulan lalu.", lwBody("B"))}
       ${card("lwK", dIco('<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>'), "LW321 KPR", lwSt("K"),
@@ -2522,7 +2748,7 @@ function bindDataCards(root) {
   const b = root.querySelector("#btnSyncF"); if (b) b.onclick = () => doSync(true, b);
   root.querySelectorAll("input[type=file][data-up]").forEach(inp => inp.addEventListener("change", e => {
     const k = inp.dataset.up, files = [...e.target.files]; if (!files.length) return;
-    (k === "brsB" ? upBrs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files[0], k.slice(-1), inp) : upPart(files[0], k, inp));
+    (k === "brsB" ? upBrs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
   }));
 }
 function openData() { if (!isAdmin()) return; const b = $("#dataBody"); b.innerHTML = dataCards(); bindDataCards(b); $("#dlgData").showModal(); }
@@ -2530,24 +2756,51 @@ const progOf = k => { const p = document.querySelector("#pr_" + k); if (p) p.hid
 const okCard = k => { const c = document.querySelector(`.dcard[data-k="${k}"]`); if (c) { c.classList.add("ok"); setTimeout(() => c.classList.remove("ok"), 2500); } };
 async function readWB(f) { if (typeof XLSX === "undefined") throw new Error("Pustaka Excel gagal dimuat. Periksa koneksi internet."); return XLSX.read(await f.arrayBuffer(), { cellDates: false }); }
 function refreshDataUI() { const b = $("#dataBody"); if ($("#dlgData").open) { b.innerHTML = dataCards(); bindDataCards(b); } if (curView() === "admin") renderAdminTab(); }
-async function upLW(f, set, inp) {
-  const pg = progOf("lw" + set), info = $("#i_lw" + set), mode = $("#m_lw" + set).value;
+// LW321: 1 file (posisi mengikuti pilihan, dijaga urutan tanggalnya) atau 2 file sekaligus (yang lebih baru = posisi terkini, yang lebih lama = bulan lalu)
+async function upLW(files, set, inp) {
+  const pg = progOf("lw" + set), info = $("#i_lw" + set);
   try {
-    pg.set("Membaca " + f.name + "…"); await new Promise(r => setTimeout(r, 40));
-    const wb = await readWB(f); pg.set("Mengolah…"); await new Promise(r => setTimeout(r, 20));
-    const P = parseLWUpload(wb, set), segN = {}; P.rows.forEach(r => segN[r[19]] = (segN[r[19]] || 0) + 1);
+    if (files.length > 2) throw new Error("Pilih paling banyak 2 file: posisi terkini dan bulan lalu.");
+    const L = [];
+    for (const f of files) {
+      pg.set("Membaca " + f.name + "…"); await new Promise(r => setTimeout(r, 40));
+      const wb = await readWB(f); pg.set("Mengolah " + f.name + "…"); await new Promise(r => setTimeout(r, 20));
+      L.push({ f, P: parseLWUpload(wb, set) });
+    }
     pg.done();
-    info.innerHTML = `<div class="ds"><b>${nf0.format(P.rows.length)} rekening</b> · posisi <b>${tglS(P.asof)}</b> · ${Object.entries(segN).map(([k, n]) => esc(prodLbl(k)) + " " + nf0.format(n)).join(" · ")}${P.dropped ? ` · <span class="note">${nf0.format(P.dropped)} baris produk lain diabaikan</span>` : ""}<br>sheet: ${esc(P.sheets.join(", "))} · disimpan sebagai <b>${mode === "cur" ? "posisi terkini" : "bulan lalu"}</b></div>
+    let warn = "";
+    if (L.length === 2) {
+      L.sort((a, b) => b.P.asof.localeCompare(a.P.asof));
+      if (!L[0].P.asof || L[0].P.asof === L[1].P.asof) throw new Error(`Kedua file berposisi sama (${tglS(L[0].P.asof)}). Pilih file posisi terkini dan file bulan lalu.`);
+      L[0].mode = "cur"; L[1].mode = "prev";
+    } else {
+      // jaga urutan posisi: file lebih lama dari posisi terkini disimpan sebagai bulan lalu, dan sebaliknya
+      // posisi tersimpan di meta berupa nomor hari (lihat nS) → ubah ke yyyy-mm-dd agar bisa dibandingkan
+      const P = L[0].P, cm = ((DB.meta || {}).lw || {})[set] || {}, cur = { asof: typeof cm.asof === "number" ? nIso(cm.asof) : cm.asof ? dateX(cm.asof) : "" }; let mode = $("#m_lw" + set).value;
+      if (cur.asof && P.asof && mode === "cur" && P.asof < cur.asof) { mode = "prev"; warn = `File ini posisi <b>${tglS(P.asof)}</b>, lebih lama dari posisi terkini <b>${tglS(cur.asof)}</b>, jadi disimpan sebagai <b>bulan lalu</b>.`; }
+      else if (cur.asof && P.asof && mode === "prev" && P.asof >= cur.asof) { mode = "cur"; warn = `File ini posisi <b>${tglS(P.asof)}</b>, tidak lebih lama dari posisi terkini <b>${tglS(cur.asof)}</b>, jadi disimpan sebagai <b>posisi terkini</b>.`; }
+      if (warn) $("#m_lw" + set).value = mode;
+      L[0].mode = mode;
+    }
+    const mLbl = m => m === "cur" ? "posisi terkini" : "bulan lalu";
+    const desc = ({ f, P, mode }) => { const segN = {}; P.rows.forEach(r => segN[r[19]] = (segN[r[19]] || 0) + 1);
+      return `<div class="ds"><b>${esc(f.name)}</b><br><b>${nf0.format(P.rows.length)} rekening</b> · posisi <b>${tglS(P.asof)}</b> · ${Object.entries(segN).map(([k, n]) => esc(prodLbl(k)) + " " + nf0.format(n)).join(" · ")}${P.dropped ? ` · <span class="note">${nf0.format(P.dropped)} baris produk lain diabaikan</span>` : ""}<br>sheet: ${esc(P.sheets.join(", "))} · disimpan sebagai <b>${mLbl(mode)}</b></div>`; };
+    info.innerHTML = `${warn ? `<div class="banner"><span>${warn}</span></div>` : ""}${L.map(desc).join("")}
       <div class="toolbar"><button class="btn primary" type="button" id="go_lw${set}">Kirim ke database</button><button class="btn" type="button" id="no_lw${set}">Batal</button></div>`;
     $("#no_lw" + set).onclick = () => { info.innerHTML = ""; };
     $("#go_lw" + set).onclick = async ev => {
-      ev.currentTarget.disabled = true; const N = window.APP_CONFIG.UPLOAD_CHUNK || 4000, total = Math.ceil(P.rows.length / N);
+      ev.currentTarget.disabled = true; const N = window.APP_CONFIG.UPLOAD_CHUNK || 4000, done = [];
       try {
-        for (let i = 0; i < total; i++) { pg.set(`Mengirim ${i + 1} / ${total}…`); await Auth.call("lwUpload", { set, mode, seq: i, total, asof: P.asof, rows: P.rows.slice(i * N, (i + 1) * N) }); }
+        // posisi terkini dikirim lebih dulu, lalu bulan lalu
+        for (const [k, { P, mode }] of L.entries()) {
+          const total = Math.ceil(P.rows.length / N);
+          for (let i = 0; i < total; i++) { pg.set(`${L.length > 1 ? `File ${k + 1}/${L.length} · ` : ""}Mengirim ${i + 1} / ${total}…`); await Auth.call("lwUpload", { set, mode, seq: i, total, asof: P.asof, rows: P.rows.slice(i * N, (i + 1) * N) }); }
+          done.push(`${nf0.format(P.rows.length)} rekening posisi ${tglS(P.asof)} sebagai ${mLbl(mode)}`);
+        }
         pg.set("Memuat ulang data…"); await loadParts(["meta", "gerak", "lw_" + set]);
-        render(); refreshDataUI(); const inf = $("#i_lw" + set); if (inf) inf.innerHTML = `<div class="ds">Upload selesai: ${nf0.format(P.rows.length)} rekening tersimpan sebagai ${mode === "cur" ? "posisi terkini" : "bulan lalu"}.</div>`;
+        render(); refreshDataUI(); const inf = $("#i_lw" + set); if (inf) inf.innerHTML = `<div class="ds">Upload selesai: ${done.join("; ")}.</div>`;
         okCard("lw" + set); toast("LW321 " + LWL[set].seg + " tersimpan.");
-      } catch (er) { const inf = $("#i_lw" + set) || info; inf.innerHTML = `<div class="banner"><span>Upload gagal: ${esc(er.message)}. Ulangi dari awal.</span></div>`; }
+      } catch (er) { const inf = $("#i_lw" + set) || info; inf.innerHTML = `<div class="banner"><span>Upload gagal: ${esc(er.message)}.${done.length ? " Sudah tersimpan: " + esc(done.join("; ")) + "." : ""} Ulangi dari awal.</span></div>`; }
       pg.done();
     };
   } catch (er) { pg.done(); toast(er.message); }
@@ -2612,11 +2865,25 @@ async function upFoto(files, kind, inp) {
   if (miss.length) setTimeout(() => toast(`Nama ${kind === "kc" ? "KC" : "RM"} tidak ditemukan untuk: ${miss.slice(0, 5).join(", ")}${miss.length > 5 ? ", dll." : ""}. Samakan nama file.`), 900);
   pg.done(); if (inp) inp.value = "";
 }
+// hasil sync terakhir (sesi ini): ditampilkan di kartu Google Sheets dan sebagai notifikasi
+let SYNC_RES = null;
+const syncJam = t => new Date(t).toLocaleString("id-ID", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+function syncResHtml() {
+  if (!SYNC_RES) return "";
+  const R = SYNC_RES, cls = R.state === "ok" ? "ok" : R.state === "run" ? "run" : R.state === "skip" ? "skip" : "err";
+  return `<div class="sync-res ${cls}" role="status">${R.state === "run" ? '<span class="spin" aria-hidden="true"></span>' : R.state === "ok" ? "✓ " : R.state === "skip" ? "ℹ " : "✕ "}${R.msg}</div>`;
+}
 async function doSync(force, btn) {
   if (btn) btn.disabled = true; const st = $("#syncSt"); if (st) st.textContent = "sinkronisasi…";
-  try { const j = await Auth.call("sync", { force: !!force && isAdmin() }); await loadAll(true); toast(j.skipped ? "Data sudah terbaru (sync terakhir < 2 menit lalu)." : "Data diperbarui dari Google Sheets."); refreshDataUI(); }
-  catch (er) { toast(er.message); }
-  if (btn) btn.disabled = false; syncLabel();
+  SYNC_RES = { state: "run", msg: "Sinkronisasi berjalan… server membaca ulang semua sheet (bisa 3–6 menit). Jangan tutup atau refresh halaman." }; refreshDataUI();
+  try {
+    const j = await Auth.call("sync", { force: !!force && isAdmin() }); await loadAll(true);
+    const upd = j.updated || (DB.meta && DB.meta.updated) || new Date().toISOString();
+    SYNC_RES = j.skipped ? { state: "skip", msg: `Data sudah terbaru (sync terakhir kurang dari 2 menit lalu) · update terakhir <b>${syncJam(upd)}</b>` }
+      : { state: "ok", msg: `Data berhasil di-sync · update terbaru <b>${syncJam(upd)}</b>` };
+    toast(j.skipped ? "Data sudah terbaru · update terakhir " + syncJam(upd) : "✓ Data berhasil di-sync · update terbaru " + syncJam(upd));
+  } catch (er) { SYNC_RES = { state: "err", msg: "Sync belum selesai: " + esc(er.message) + " Server mungkin masih memproses; tunggu beberapa menit lalu refresh halaman sebelum mencoba lagi." }; toast("Sync gagal: " + er.message); }
+  refreshDataUI(); if (btn && btn.isConnected) btn.disabled = false; syncLabel();
 }
 
 /* ---------- VIEW: Admin ---------- */
@@ -2758,7 +3025,7 @@ const Exp = (() => {
   async function pdfNew(orientation, title) {
     await lib("pdf"); const { jsPDF } = window.jspdf, [dan, bri] = await Promise.all([logo("dan"), logo("bri")]);
     const doc = new jsPDF({ orientation, unit: "pt", format: "a4" }), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), m = 28;
-    const pos = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }), full = title + " - Posisi " + pos;
+    const pos = new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }), full = /\bs\.d\.|posisi/i.test(title) ? title : title + " - Posisi " + pos;
     const head = () => {
       const cy = 30; let x = m, xr = W - m;
       if (dan) { const h = 22, w = h * dan.r; doc.addImage(dan.src, "PNG", x, cy - h / 2, w, h); x += w + 12; doc.setDrawColor(205); doc.setLineWidth(.8); doc.line(x, cy - 12, x, cy + 12); x += 12; }
@@ -2778,6 +3045,55 @@ const Exp = (() => {
     head();
     return { doc, W, H, m, top: 70, bot: H - 30, head, finish };
   }
+  // tata letak untuk pembagian halaman (dalam piksel kanvas, relatif ke atas elemen akar):
+  // keep = unit yang harus utuh dalam satu halaman (tabel, grafik, deret kotak, judul + isi berikutnya), dengan rentang kepala tabel (h0–h1);
+  // cuts = titik potong yang diperbolehkan (bawah baris tabel, panel, unit)
+  const KEEP = ".table-wrap, .chart, .grid.tiles, .rd-box, .rmc, .funnel, .kpis, .lb-row, .ds, .banner";
+  function layoutOf(root, pr) {
+    const t = root.getBoundingClientRect().top, Y = v => Math.round((v - t) * pr), keep = [], cuts = new Set();
+    const vis = e => e.getClientRects().length && !SKIP(e);
+    root.querySelectorAll(KEEP).forEach(e => { if (!vis(e)) return; const r = e.getBoundingClientRect(), th = e.querySelector("thead"), hr = th && th.getBoundingClientRect();
+      // pre = awal panel tempat tabel berada (judul, saringan) agar tidak tertinggal sendirian di halaman sebelumnya
+      const sec = e.closest("section.panel"), pre = sec && root.contains(sec) ? Y(sec.getBoundingClientRect().top) : null;
+      keep.push({ a: Y(r.top), b: Y(r.bottom), h0: hr ? Y(hr.top) : null, h1: hr ? Y(hr.bottom) : null, pre: pre != null && pre < Y(r.top) ? pre : null }); });
+    // judul (panel-h / h3) tidak boleh tertinggal sendirian di bawah halaman: satukan dengan unit sesudahnya
+    root.querySelectorAll(".panel-h, h3, .note").forEach(e => { const n = e.nextElementSibling; if (!vis(e) || !n || !vis(n)) return;
+      keep.push({ a: Y(e.getBoundingClientRect().top), b: Y(n.getBoundingClientRect().bottom), glue: 1 }); });
+    root.querySelectorAll("tr, section, .panel-h, .grid > *, .rd-grid > *, " + KEEP).forEach(e => { if (vis(e)) { const r = e.getBoundingClientRect(); cuts.add(Y(r.bottom)); cuts.add(Y(r.top)); } });
+    return { keep, cuts: [...cuts].sort((a, b) => a - b) };
+  }
+  // susun satu kanvas ke halaman PDF tanpa memotong unit: unit yang tidak muat di sisa halaman pindah ke halaman baru;
+  // unit sedikit lebih tinggi dari satu halaman diperkecil agar muat; hanya tabel yang jauh lebih panjang dari satu halaman
+  // dipotong di batas baris, dengan kepala tabel diulang di halaman lanjutan
+  const FIT = .7;
+  function place(P, cv, L, k) {
+    const { doc, m, top, bot } = P, gap = 10;
+    const draw = (sy, h, kk) => { const c = document.createElement("canvas"); c.width = cv.width; c.height = Math.max(1, Math.round(h));
+      c.getContext("2d").drawImage(cv, 0, sy, cv.width, h, 0, 0, cv.width, h);
+      doc.addImage(c.toDataURL("image/jpeg", .92), "JPEG", m, P.y, cv.width * kk, h * kk); P.y += h * kk; };
+    const pageH = (bot - top) / k, keep = L.keep.filter(r => r.b - r.a <= pageH / FIT);
+    // tabel yang jauh lebih panjang dari satu halaman: boleh dipotong di batas baris, tetapi kepala tabel + 3 baris pertama tidak dipisah
+    const bigT = L.keep.filter(r => r.h1 != null && r.b - r.a > pageH / FIT);
+    const inside = c => keep.some(r => r.a + 2 < c && c < r.b - 2) || bigT.some(r => (r.pre != null && r.a - r.pre < pageH * .3 ? r.pre : r.a) + 2 < c && c < r.h1 + 3 * (r.h1 - r.h0));
+    const cont = c => bigT.find(r => c > r.h1 && c < r.b - 2) || null;
+    let sy = 0, hdr = null;
+    while (sy < cv.height - 2) {
+      let avail = (bot - P.y) / k;
+      // kepala tabel diulang di halaman lanjutan
+      if (hdr && sy > hdr.h1 && sy < hdr.b && P.y === top) { draw(hdr.h0, hdr.h1 - hdr.h0, k); avail = (bot - P.y) / k; }
+      const rest = cv.height - sy;
+      if (rest * .85 <= avail) { draw(sy, rest, Math.min(k, avail * k / rest)); P.y += gap; return; }
+      const safe = L.cuts.filter(c => c > sy + 4 && c <= sy + avail && !inside(c)).pop();
+      if (safe) { draw(sy, safe - sy, k); sy = safe; hdr = cont(sy); P.next(); continue; }
+      if (P.y > top) { P.next(); continue; }
+      // di awal halaman dan tidak ada titik potong aman: unit pertama lebih tinggi dari satu halaman
+      const u = keep.filter(r => r.a <= sy + 4 && r.b > sy + avail).sort((x, y) => y.b - x.b)[0];
+      if (u) { const h = u.b - sy, kk = Math.min(k, (bot - P.y) / h); draw(sy, h, kk); sy = u.b; P.next(); continue; }
+      // tidak ada batas baris yang pas (baris sangat tinggi): potong pada batas halaman
+      const c = L.cuts.filter(x => x > sy + avail * .3 && x <= sy + avail).pop() || Math.floor(sy + avail);
+      draw(sy, c - sy, k); sy = c; hdr = cont(sy); P.next();
+    }
+  }
   async function run(sec, kind) {
     const title = titleOf(sec), name = fname(ctxOf() + "-" + title) + "-" + iso(new Date());
     if (kind === "csv" || kind === "xlsx") {
@@ -2789,56 +3105,40 @@ const Exp = (() => {
     }
     toast("Menyiapkan " + (kind === "pdf" ? "PDF" : "gambar") + "…");
     try {
-      const cv = await snap(sec);
+      // unduh satu bagian: judul bagian sudah ada di kop, jadi tidak digambar ulang
+      let L = null; sec.classList.add("xp-one");
+      const cv = await snap(sec, true, pr => { L = layoutOf(sec, pr); }).finally(() => sec.classList.remove("xp-one"));
       if (kind === "png") { const b = await new Promise(r => cv.toBlob(r, "image/png")); saveFile(name + ".png", b); return; }
-      const { doc, W, m, top, bot, head, finish } = await pdfNew(cv.width > cv.height * 1.1 ? "landscape" : "portrait", ctxOf() + " · " + title);
-      const iw = W - m * 2, scale = iw / cv.width, pageH = (bot - top) / scale;
-      for (let y = 0, p = 0; y < cv.height; y += pageH, p++) {
-        if (p) { doc.addPage(); head(); }
-        const h = Math.min(pageH, cv.height - y), part = document.createElement("canvas"); part.width = cv.width; part.height = Math.ceil(h);
-        part.getContext("2d").drawImage(cv, 0, y, cv.width, h, 0, 0, cv.width, h);
-        doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, top, iw, h * scale);
-      }
-      saveFile(name + ".pdf", finish());
+      const P = await pdfNew(cv.width > cv.height * 1.1 ? "landscape" : "portrait", ctxOf() + " · " + title);
+      P.y = P.top; P.next = () => { P.doc.addPage(); P.head(); P.y = P.top; };
+      place(P, cv, L, (P.W - P.m * 2) / cv.width);
+      saveFile(name + ".pdf", P.finish());
     } catch (er) { toast(er.message || "Gagal membuat file."); }
   }
-  // cetak satu menu utuh ke PDF (A4 mendatar): tiap blok di layar digambar terpisah lalu disusun per halaman,
-  // blok hanya dipotong bila lebih tinggi dari satu halaman. Tabel dicetak sebanyak baris yang sedang tampil.
+  // cetak satu menu utuh ke PDF (A4 mendatar): tiap blok di layar digambar terpisah lalu disusun per halaman tanpa memotong
+  // tabel/grafik (lihat place). Tabel dicetak sebanyak baris yang sedang tampil.
   async function page() {
     const v = $("#view"), title = ctxOf();
     const vis = e => !SKIP(e) && e.getClientRects().length && e.offsetHeight > 0;
     const top0 = [...v.children].filter(vis); if (!top0.length) { toast("Tidak ada isi untuk dicetak."); return; }
     toast("Menyiapkan PDF " + title + "…");
     try {
-      const { doc, W, m, top, bot, head, finish } = await pdfNew("landscape", title), iw = W - m * 2, gap = 10;
-      const bw = Math.max(...top0.map(e => e.offsetWidth)), pagePx = (bot - top) * bw / iw;
+      const P = await pdfNew("landscape", title), iw = P.W - P.m * 2;
+      P.y = P.top; P.next = () => { P.doc.addPage(); P.head(); P.y = P.top; };
+      const bw = Math.max(...top0.map(e => e.offsetWidth)), pagePx = (P.bot - P.top) * bw / iw;
       // blok pembungkus (grid) yang terlalu tinggi dipecah menjadi isinya agar potongan halaman jatuh di antara panel
       const blocks = [], walk = el => [...el.children].filter(vis).forEach(c => {
         const kids = [...c.children].filter(vis);
         if (c.offsetHeight > pagePx && kids.length > 1 && !c.matches("section, table, canvas, .panel")) walk(c); else blocks.push(c);
       });
       walk(v);
-      let y = top;
-      const next = () => { doc.addPage(); head(); y = top; };
       for (const b of blocks) {
-        // batas potong yang rapi (bawah baris tabel / panel), dalam piksel kanvas
-        let cuts = [];
-        const cv = await snap(b, false, pr => { const t = b.getBoundingClientRect().top;
-          cuts = [...b.querySelectorAll("tr, section, .panel-h, .grid > *")].map(e => Math.round((e.getBoundingClientRect().bottom - t) * pr)).sort((a, c) => a - c); });
-        const pr = cv._pr || 1, k = Math.min(iw / bw, iw * pr / cv.width) / pr; // pt per piksel kanvas
-        // sisa yang hanya sedikit melebihi ruang diperkecil (maks. 15%) agar tidak pindah halaman / menyisakan potongan kecil
-        const draw = (sy, h, kk) => { const part = document.createElement("canvas"); part.width = cv.width; part.height = h;
-          part.getContext("2d").drawImage(cv, 0, sy, cv.width, h, 0, 0, cv.width, h);
-          doc.addImage(part.toDataURL("image/jpeg", .92), "JPEG", m, y, cv.width * kk, h * kk); y += h * kk + gap; };
-        if (y > top && cv.height * k * .85 > bot - y) next();
-        for (let sy = 0; sy < cv.height;) {
-          const rest = cv.height - sy; if (rest * k * .85 <= bot - y) { draw(sy, rest, Math.min(k, (bot - y) / rest)); break; }
-          const room = Math.floor((bot - y) / k), cut = sy + room < cv.height ? cuts.filter(c => c > sy + room * .5 && c <= sy + room).pop() : null;
-          const h = cut ? cut - sy : room;
-          draw(sy, h, k); sy += h; next();
-        }
+        let L = null;
+        const cv = await snap(b, false, pr => { L = layoutOf(b, pr); L.keep.push({ a: 0, b: Math.round(b.scrollHeight * pr) }); });
+        const pr = cv._pr || 1;
+        place(P, cv, L, Math.min(iw / bw, iw * pr / cv.width) / pr);
       }
-      saveFile(fname(title) + "-" + iso(new Date()) + ".pdf", finish());
+      saveFile(fname(title) + "-" + iso(new Date()) + ".pdf", P.finish());
     } catch (er) { toast(er.message || "Gagal membuat PDF."); }
   }
   let pop = null;
@@ -2922,7 +3222,7 @@ $("#btnUser").onclick = () => { const m = $("#userMenu"); m.hidden = !m.hidden; 
 document.addEventListener("click", e => { if (!e.target.closest(".umenu")) $("#userMenu").hidden = true; });
 $("#umOut").onclick = () => Auth.logout("manual");
 $("#umPw").onclick = openPw;
-function syncLabel() { const M = DB.meta; const s = $("#syncSt"); if (s) s.textContent = M && M.updated ? "data " + new Date(M.updated).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""; }
+function syncLabel() { const M = DB.meta; const s = $("#syncSt"); if (s) s.textContent = M && M.updated ? "update " + new Date(M.updated).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""; }
 // perpindahan layar yang halus: View Transitions bila didukung browser, selain itu animasi masuk CSS
 let lastView = null;
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -2931,15 +3231,16 @@ function navTo() {
   const k = curView(), changed = k !== lastView, prev = lastView; lastView = k;
   if (changed && prev !== null) uiSound(k === "beranda" ? "home" : "nav");
   if (!changed || prev === null || reduceMotion) { render(); if (changed) window.scrollTo(0, 0); return; }
-  const kind = k === "beranda" || prev === "beranda" ? "zoom" : "slide";
+  // beranda → menu: zoom in; menu → beranda: zoom out; antar menu: naik (menu di bawahnya) atau turun (menu di atasnya)
+  const order = Object.keys(VIEWS), kind = prev === "beranda" ? "zin" : k === "beranda" ? "zout" : order.indexOf(k) > order.indexOf(prev) ? "up" : "down";
   if (document.startViewTransition) {
     document.documentElement.dataset.vt = kind;
     const vt = document.startViewTransition(() => { render(); window.scrollTo(0, 0); });
     vt.finished.finally(() => { delete document.documentElement.dataset.vt; });
   } else {
     render(); window.scrollTo(0, 0);
-    const el = k === "beranda" ? $("#landing") : $("#view"); el.classList.remove("v-enter", "v-zoom"); void el.offsetWidth;
-    el.classList.add(kind === "zoom" ? "v-zoom" : "v-enter"); setTimeout(() => el.classList.remove("v-enter", "v-zoom"), 600);
+    const el = k === "beranda" ? $("#landing") : $("#view"), cls = ["v-zin", "v-zout", "v-up", "v-down"]; el.classList.remove(...cls); void el.offsetWidth;
+    el.classList.add("v-" + kind); setTimeout(() => el.classList.remove(...cls), 700);
   }
 }
 window.addEventListener("hashchange", navTo);

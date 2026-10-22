@@ -10,6 +10,8 @@ window.APP_CONFIG = Object.freeze({
   IDLE_MINUTES: 30,
   // batas waktu satu request ke Apps Script (detik)
   TIMEOUT_SEC: 120,
+  // batas waktu Sync (detik): server membangun ulang semua data, bisa sampai ±6 menit
+  SYNC_TIMEOUT_SEC: 420,
   // ukuran potongan upload LW321 (baris per request)
   UPLOAD_CHUNK: 4000,
   // nilai awal Simulasi Briguna

@@ -232,6 +232,54 @@ rm = rep(rm, '''  renderRMPer(inScope);
   if (SEG.rm === "R") renderRmNett({ P, inScope, ym, isCur });
 ''')
 
+# tema grafik (src/parts/charts.js): palet seragam + label angka
+chart = rep(chart, '  charts[id] = new Chart(el, cfg);', '  charts[id] = new Chart(el, chartTheme(cfg));')
+chart = rep(chart, 'family: cssv("--f-num")', 'family: cssv("--f-body")', 2)
+
+# laporan disburse realisasi harian (src/parts/rm_rep.js) di atas bagian perbandingan
+rm = rep(rm, '''    <section class="panel" id="rCmp"></section>''', '''    <section class="panel" id="rDay"></section>
+    <section class="panel" id="rCmp"></section>''')
+rm = rep(rm, '''  renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
+  const allYm''', '''  renderRMDaily({ P, txIn, ym, isCur, day });
+  renderRMCmp({ P, inScope, txIn, ym, yr, isCur, day });
+  renderRMAppx({ P, txIn, ym, isCur, day, inScope, yr });
+  const allYm''')
+# perbandingan: hanya tahun lalu vs tahun ini (bulan berjalan vs 3 bulan lalu sudah ada di laporan harian; per cabang/RM jadi lampiran)
+rm = rep(rm, 'const mode = RS.cmp === "yoy" ? "yoy" : "mtd", grp', 'const mode = "yoy", grp')
+# tabel YtD per cabang / RM dipindah ke Lampiran 2
+i0 = rm.index('    <div class="panel-h" style="margin-top:6px"><h3 style="font-size:14px">${yo ?'); i1 = rm.index('<div id="tCmpG"></div>', i0) + len('<div id="tCmpG"></div>')
+rm = rm[:i0].rstrip() + rm[i1:]
+rm = rep(rm, 'table($("#tCmpG"), [{ key: "k"', 'if ($("#tCmpG")) table($("#tCmpG"), [{ key: "k"', 2)
+rm = rep(rm, '''<h2>Perbandingan disbursement</h2><div class="seg" role="tablist" aria-label="Jenis perbandingan">
+      <button type="button" role="tab" aria-selected="${!yo}" data-cmp="mtd">Bulan berjalan vs 3 bulan lalu</button><button type="button" role="tab" aria-selected="${yo}" data-cmp="yoy">${y1} vs ${yr}</button></div></div>''', '''<h2>Perbandingan disbursement ${y1} vs ${yr}</h2></div>''')
+rm = rep(rm, '''<span class="sub">per bulan</span></div><div id="rHq"></div></section>`;''', '''<span class="sub">per bulan</span></div><div id="rHq"></div></section>
+    <section class="panel" id="rApx" data-nosec></section>`;''')
+# peringkat RM: bulan berjalan atau carry over (Jan s.d. batas carry over yang sama dengan Pencapaian per RM)
+rm = rep(rm, 'pm: "rm", selYr: null, co: "berjalan" }', 'pm: "rm", selYr: null, co: "berjalan", rkm: "m", apxG: "kc" }')
+rm = rep(rm, '''<div class="toolbar"><span class="sub">garis = 100% target · klik nama untuk lihat pencapaiannya</span>''', '''<div class="toolbar"><div class="seg" role="tablist" aria-label="Dasar peringkat"><button type="button" role="tab" aria-selected="${RS.rkm !== "co"}" data-rkm="m">Bulan berjalan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div><span class="sub" id="rLbS">garis = 100% target · klik nama untuk lihat pencapaiannya</span>''')
+rm = rep(rm, '''  const lb = [...rows].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);''', '''  const coEnd = (RS.co === "des" ? 12 : +RS.co) || (yr < (P.asof || "9").slice(0, 4) ? 12 : +(P.asof || "").slice(5, 7) || 12), isCo = RS.rkm === "co";
+  const coMs = Array.from({ length: coEnd }, (_, i) => yr + "-" + String(i + 1).padStart(2, "0"));
+  const coRows = () => uniq(P.months.filter(x => coMs.includes(x.ym) && inScope(x) && (x.tDisb > 0 || x.os > 0)).map(x => nmKey(x.rm))).map(k => {
+    const a = P.months.filter(x => coMs.includes(x.ym) && inScope(x) && nmKey(x.rm) === k), l = a[a.length - 1];
+    const o = { rm: l.rm, kc: l.kc, jg: l.jg, tDisb: sum(a, "tDisb"), tDeb: sum(a, "tDeb"), os: sum(a, "os"), deb: sum(a, "deb"), sDeb: sum(a, "sDeb"), sOs: sum(a, "sOs"), kDeb: sum(a, "kDeb"), kOs: sum(a, "kOs") };
+    o.pen = o.tDisb ? o.os / o.tDisb : null; return o; });
+  const lb = [...(isCo ? coRows() : rows)].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);
+  $("#rLbS").textContent = (isCo ? `carry over Jan s.d. ${BULAN[coEnd - 1]} ${yr} · ` : `${ymS(ym)} · `) + "garis = 100% target · klik nama untuk lihat pencapaiannya";
+  v.querySelectorAll("[data-rkm]").forEach(b => b.onclick = () => { if (RS.rkm === b.dataset.rkm) return; RS.rkm = b.dataset.rkm; saveRS(); render(); });''')
+rm = rep(rm, '''.replace(/\\W+/g, "-") + "-" + ym,''', '''.replace(/\\W+/g, "-") + "-" + (isCo ? "carry-over-" + yr + "-" + String(coEnd).padStart(2, "0") : ym),''')
+# pencapaian per RM / cabang: rincian bulanan (grafik & tabel Jan s.d. Des, RM di cabang) disembunyikan, dibuka bila perlu
+rm = rep(rm, '''    <div class="chart"><canvas id="cRmPer"></canvas></div>
+    <div id="tRmPer"></div>''', '''    <details class="rm-more" ${RS.perOpen ? "open" : ""}><summary>Rincian per bulan ${yr}${isKc ? " & RM di cabang" : ""} <small class="note">grafik & tabel Jan–Des, carry over ${coLbl}</small></summary>
+    <div class="chart"><canvas id="cRmPer"></canvas></div>
+    <div id="tRmPer"></div>''')
+rm = rep(rm, '''<div id="tKcRm"></div>` : ""}''', '''<div id="tKcRm"></div>` : ""}
+    </details>''')
+rm = rep(rm, '''    const tg = $(isKc ? "#tKcRm" : "#tRmPer"); if (!tg) return;''', '''    const dt = el.querySelector("details.rm-more"); if (dt && !dt.open) dt.open = true;
+    const tg = $(isKc ? "#tKcRm" : "#tRmPer"); if (!tg) return;''')
+rm = rep(rm, '''  $("#pRmCo").onchange = e => { RS.co = e.target.value; saveRS(); renderRMPer(); };''', '''  $("#pRmCo").onchange = e => { RS.co = e.target.value; saveRS(); if (RS.rkm === "co") render(); else renderRMPer(); };
+  { const dt = el.querySelector("details.rm-more"); if (dt) dt.ontoggle = () => { RS.perOpen = dt.open; if (dt.open && charts.cRmPer) charts.cRmPer.resize(); }; }''')
+
+
 # ---------- pipeline ----------
 pipe = cut('/* ================= VIEW: Pipeline Brispot', '// gabungkan data baru ke riwayat')
 pipe = rep(pipe, 'let PIPE_LOADING = /^https?:/.test(location.protocol);\n', '')
@@ -266,28 +314,38 @@ pipe = rep(pipe, '''background:var(--s1);margin-right:5px"></i>Subsidi</span>'''
 pipe = rep(pipe, '''background:var(--s2);margin-right:5px"></i>Komersil</span>''', '''background:var(--s2);margin-right:5px"></i>${PL.j[1]}</span>''')
 pipe = rep(pipe, '''datasets: ["Subsidi", "Komersil"].map((j, k) =>''', '''datasets: PL.j.map((j, k) =>''')
 # tabel format laporan (src/parts/pipe_rep.js): rencana realisasi per minggu, rekap per KC per tahap, ringkasan jadwal akad
-pipe = rep(pipe, 'tahap: "ALL", usia: "ALL", q: "", batal: false }, lsGet(STORE + "-pipe") || {});', 'tahap: "ALL", usia: "ALL", q: "", batal: false, akad: [] }, lsGet(STORE + "-pipe") || {});\nif (!Array.isArray(PS.akad)) PS.akad = [];')
+pipe = rep(pipe, 'tahap: "ALL", usia: "ALL", q: "", batal: false }, lsGet(STORE + "-pipe") || {});', 'tahap: "ALL", usia: "ALL", q: "", batal: false, akad: [], prosesM: [], jenisM: [] }, lsGet(STORE + "-pipe") || {});\n["akad", "prosesM", "jenisM"].forEach(k => { if (!Array.isArray(PS[k])) PS[k] = []; });\nPS.proses = "ALL"; PS.batal = false;')
 i0 = pipe.index('  // rencana realisasi RM\n'); i2 = pipe.index('  // per RM\n')
 pipe = pipe[:i0] + '  if ($("#pRen")) pipeRencana($("#pRen"), P.rencana);\n\n  pipeKcRekap($("#pKc"), aktif);\n\n' + pipe[i2:]
 pipe = rep(pipe, '<h2>Rekap per kantor cabang</h2><span class="sub">debitur / plafon (Rp juta)</span>', '<h2>Rekap per kantor cabang</h2><span class="sub">debitur / plafon (Rp juta) per tahap</span>')
-pipe = rep(pipe, '''        <label class="check"><input type="checkbox" id="pB" ${PS.batal ? "checked" : ""}> Tampilkan batal</label>
-      </div>
-      <div id="pList"></div>''', '''        <div id="pAk"></div>
+pipe = rep(pipe, '''        <select class="ctl" id="pP"><option value="ALL">HOT/WARM/COLD</option>${["HOT", "WARM", "COLD"].map(p => `<option ${PS.proses === p ? "selected" : ""}>${p}</option>`).join("")}</select>
         <label class="check"><input type="checkbox" id="pB" ${PS.batal ? "checked" : ""}> Tampilkan batal</label>
+      </div>
+      <div id="pList"></div>''', '''        <div id="pPr"></div>
+        <div id="pJn"></div>
+        <div id="pAk"></div>
       </div>
       <div id="pAkS" class="ak-sum" hidden></div>
       <div id="pList"></div>''')
 pipe = rep(pipe, '''    const rows = pipeFilter(base);
-    table($("#pList"),''', '''    const all = pipeFilter(base), rows = PS.akad.length ? all.filter(x => x.akad && PS.akad.includes(x.akad)) : all;
+    table($("#pList"),''', '''    const all = pipeFilter(base, { noProses: true, withBatal: true }).filter(x => prosesIn(x) && jenisIn(x)), rows = PS.akad.length ? all.filter(x => x.akad && PS.akad.includes(x.akad)) : all;
     pipeAkadSum($("#pAkS"), rows);
     table($("#pList"),''')
 pipe = rep(pipe, '''  draw();
   $("#pq").oninput''', '''  // pilihan jadwal akad: tanggal dari pipeline aktif dalam saringan area/KC/RM/jenis
   const akD = uniq(aktif.filter(x => x.akad).map(x => x.akad)).sort();
   PS.akad = PS.akad.filter(d => akD.includes(d));
-  akadPicker($("#pAk"), akD.map(d => [d, aktif.filter(x => x.akad === d).length]), () => { savePS(); draw(); });
+  msPicker($("#pAk"), "akad", akD.map(d => [d, tglS(d), aktif.filter(x => x.akad === d).length]), "Semua jadwal akad", d => tglS(d).replace(/ \\d{4}$/, ""), () => { savePS(); draw(); });
+  const lst = pipeFilter(base, { noProses: true, withBatal: true });
+  PS.prosesM = PS.prosesM.filter(p => ["HOT", "WARM", "COLD", "BATAL"].includes(p)); PS.jenisM = PS.jenisM.filter(j => PL.j.includes(j));
+  msPicker($("#pPr"), "prosesM", ["HOT", "WARM", "COLD", "BATAL"].map(p => [p, chip(p, p === "BATAL" ? "crit" : prosesCls(p)), lst.filter(x => p === "BATAL" ? x.batal : !x.batal && x.proses === p).length]), "HOT/WARM/COLD/BATAL", p => p, () => { savePS(); draw(); });
+  msPicker($("#pJn"), "jenisM", PL.j.map(j => [j, j, lst.filter(x => !x.batal && x.jenis === j).length]), PL.j.join(" & "), j => j, () => { savePS(); draw(); });
   draw();
   $("#pq").oninput''')
+pipe = rep(pipe, '''  $("#pP").onchange = e => { PS.proses = e.target.value; savePS(); draw(); };
+''', '')
+pipe = rep(pipe, '''  $("#pB").onchange = e => { PS.batal = e.target.checked; savePS(); draw(); };
+''', '')
 pipe = rep(pipe, '''exportCSV("pipeline-brispot-" + asof,''', '''exportCSV("pipeline-brispot-" + (SEG.pipe === "K" ? "kpr" : "briguna") + "-" + asof,''')
 
 # laporan Brispot Briguna (Warm/Hot Leads, parts/brispot_brs.js): wadah dipasang di bawah panel segmen, hanya untuk Briguna
@@ -327,8 +385,10 @@ start = '''
   window.__appReady = true;
 })();
 '''
-js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_nett.js') + pipe + P('brispot_brs.js') + P('pipe_rep.js') + pimp + sim \
+js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + P('charts.js') + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + P('rm_nett.js') + pipe + P('brispot_brs.js') + P('pipe_rep.js') + pimp + sim \
      + P('sim_brg.js') + P('nominatif.js') + P('admin.js') + P('export.js') + P('router.js') + zoom + P('boot.js') + start + intro
+# bagian bertanda data-nosec (mis. Lampiran, yang sudah punya buka-tutup per lampiran) tidak diberi tombol minimize
+js = rep(js, '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h"));''', '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h") && !x.hasAttribute("data-nosec"));''')
 open(os.path.join(ROOT, 'js', 'app.js'), 'w', encoding='utf8').write(js)
 css = open(os.path.join(HERE, 'kpr.css'), encoding='utf8').read() + '\n' + P('extra.css')
 open(os.path.join(ROOT, 'css', 'app.css'), 'w', encoding='utf8').write(css)

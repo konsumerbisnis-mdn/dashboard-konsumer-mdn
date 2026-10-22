@@ -203,8 +203,13 @@ async function adUsers(el) {
   table($("#uTbl"), [{ key: "username", label: "Username", fmt: x => `<b>${esc(x)}</b>` }, { key: "nama", label: "Nama" }, { key: "role", label: "Peran", fmt: x => chip(esc(Auth.ROLE_LABEL[x] || x), x === "admin" ? "crit" : x === "rm" ? "good" : "neutral") },
     { key: "rm_name", label: "Nama RM (data)", fmt: x => esc(x || "–") }, { key: "pn", label: "PN", fmt: x => esc(x || "–") }, { key: "active", label: "Status", fmt: x => x ? chip("aktif", "good") : chip("nonaktif", "neutral") },
     { key: "last_login", label: "Login terakhir", fmt: x => x ? new Date(x).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "–" },
-    { key: "_e", label: "", nosort: 1, fmt: (x, r) => `<button class="linkish" data-u="${esc(r.username)}">Ubah</button>` }], users,
-    { sortKey: "username", sortDir: 1, after: t => t.querySelectorAll("[data-u]").forEach(b => b.onclick = () => form(users.find(u => u.username === b.dataset.u))) });
+    { key: "_e", label: "", nosort: 1, fmt: (x, r) => `<button class="linkish" data-u="${esc(r.username)}">Ubah</button>${r.username === (Auth.user || {}).username ? "" : ` <button class="linkish bad" data-del="${esc(r.username)}">Hapus</button>`}` }], users,
+    { sortKey: "username", sortDir: 1, after: t => { t.querySelectorAll("[data-u]").forEach(b => b.onclick = () => form(users.find(u => u.username === b.dataset.u)));
+      t.querySelectorAll("[data-del]").forEach(b => b.onclick = () => hapus(users.find(u => u.username === b.dataset.del))); } });
+  const hapus = async u => {
+    if (!u || !confirm(`Hapus user "${u.username}" (${Auth.ROLE_LABEL[u.role] || u.role})? User ini tidak bisa login lagi dan tindakan ini tidak bisa dibatalkan.`)) return;
+    try { await Auth.call("userDelete", { username: u.username }); toast("User " + u.username + " dihapus."); adUsers(el); } catch (er) { toast(er.message); }
+  };
   const form = u => {
     $("#dlgTitle").textContent = u ? "Ubah user " + u.username : "Tambah user";
     $("#dlgBody").innerHTML = `<form id="uForm" class="form" novalidate>

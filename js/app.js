@@ -975,7 +975,7 @@ function viewRM(v) {
       ${tile({ label: RL.who + " capai target", value: `${capai} <small style="font-size:14px;color:var(--muted)">/ ${tgtRows.length}</small>`, sub: chip(pct(tgtRows.length ? capai / tgtRows.length : 0, 0) + " RM", capai / (tgtRows.length || 1) >= .5 ? "good" : capai / (tgtRows.length || 1) >= .25 ? "warn" : "crit") })}
       ${tile({ label: "Sebaran kuadran", value: `<span style="white-space:nowrap;letter-spacing:-.02em">${kc4.join("<small style=\"opacity:.45;margin:0 .18em\">·</small>")}</span>`, sub: [1, 2, 3, 4].map(k => kq(k)).join(" ") })}
     </div>
-    ${SEG.rm === "R" ? '<section class="panel" id="rNett"></section>' : ""}
+    ${SEG.rm !== "K" ? '<section class="panel" id="rNett"></section>' : ""}
     <section class="panel" id="rPer"></section>
     <section class="panel" id="rDay"></section>
     <section class="panel" id="rCmp"></section>
@@ -1014,7 +1014,7 @@ function viewRM(v) {
   $("#rLb").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => openRM(b.dataset.rm));
   if (!RS.sel || !P.months.some(x => nmKey(x.rm) === nmKey(RS.sel) && inScope(x))) RS.sel = lb.length ? lb[0].rm : null;
   renderRMPer(inScope);
-  if (SEG.rm === "R") renderRmNett({ P, inScope, ym, isCur });
+  if (SEG.rm !== "K") renderRmNett({ P, inScope, ym, isCur });
   $("#rExp").onclick = () => exportCSV("produktivitas-" + RL.seg.toLowerCase().replace(/\W+/g, "-") + "-" + (isCo ? "carry-over-" + yr + "-" + String(coEnd).padStart(2, "0") : ym), [["rm","RM"],["kc","KC"],["jg","JG"],["tDisb","Target disb (juta)"],["os","Realisasi (juta)"],["pen","Pencapaian"],["tDeb","Target deb"],["deb","Deb"],["sDeb","Deb " + RL.s.toLowerCase()],["sOs",RL.s + " (juta)"],["kDeb","Deb " + RL.k.toLowerCase()],["kOs",RL.k + " (juta)"]], lb);
 
   // per KC
@@ -1374,50 +1374,82 @@ function renderRMAppx(A) {
     { key: "d", label: "Selisih", r: 1, fmt: x => dJ(x) }, { key: "dp", label: "Growth", r: 1, sortVal: r => r.dp ?? -9, fmt: x => dl(x) }], g2,
     { sortKey: "b", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", a: nf1.format(sum(g2, "a")), b: `<b>${nf1.format(sum(g2, "b"))}</b>`, d: dJ(sum(g2, "b") - sum(g2, "a")), dp: dl(pc(sum(g2, "b"), sum(g2, "a"))) } });
 }
-/* ================= Produktivitas Nett RM Briguna Ritel: tabel format laporan (produk × baru/suplesi, target JG, kuadran) ================= */
-// months[].pd = { KA: Karya, PP: Pra-Purna, PU: Purna } → [Deb Baru, OS Baru, Deb Suplesi, OS Suplesi] (dari Apps Script, Rp juta)
+/* ================= Produktivitas Nett RM / Mantri Briguna: tabel format laporan (produk × baru/suplesi, target JG, kuadran) + rentang tanggal ================= */
+// Dihitung di browser dari tx[{d, rm, kc, pl, deb, jenis (Baru/Suplesi), pr (KA Karya · PP Pra-Purna · PU Purna)}] (Apps Script, Rp juta)
+// sehingga rentang tanggal bebas bisa dipilih. Target JG = jumlah target bulanan dari bulan yang disentuh rentang.
 const NETT_PROD = [["KA", "Karya", "ka"], ["PP", "Pra-Purna", "pp"], ["PU", "Purna", "pu"]];
-const nettPeriode = (ym, isCur, asof) => {
-  const y = ym.slice(0, 4), m = +ym.slice(5, 7) - 1, last = isCur ? +asof.slice(8) : new Date(+y, m + 1, 0).getDate();
-  return `1 ${BULAN[m]} sd ${last} ${BULAN_L[m]} ${y}`;
+const nettDate = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ""); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; };
+const nettIso = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+const nettAdd = (iso, n) => { const d = nettDate(iso); d.setDate(d.getDate() + n); return nettIso(d); };
+const nettPeriode = (from, to) => {
+  const a = nettDate(from), b = nettDate(to); if (!a || !b) return "";
+  if (a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth()) return `${a.getDate()} ${BULAN[a.getMonth()]} sd ${b.getDate()} ${BULAN_L[b.getMonth()]} ${b.getFullYear()}`;
+  return `${a.getDate()} ${BULAN[a.getMonth()]} ${a.getFullYear()} sd ${b.getDate()} ${BULAN_L[b.getMonth()]} ${b.getFullYear()}`;
 };
-function renderRmNett({ P, inScope, ym, isCur }) {
-  const el = $("#rNett"); if (!el) return;
+function nettMonths(from, to) {   // daftar bulan (yyyy-mm) yang disentuh rentang
+  const out = []; let y = +from.slice(0, 4), m = +from.slice(5, 7);
+  while (y < +to.slice(0, 4) || (y === +to.slice(0, 4) && m <= +to.slice(5, 7))) { out.push(y + "-" + String(m).padStart(2, "0")); if (++m > 12) { m = 1; y++; } }
+  return out;
+}
+function renderRmNett(ctx) {
+  const { P, inScope, ym, isCur } = ctx, el = $("#rNett"); if (!el) return;
+  const isM = SEG.rm === "M", who = isM ? "Mantri" : "RM", prodN = isM ? "MIKRO" : "RITEL";
   const nz = x => x ? nf0.format(Math.round(x)) : "–";
   const gapF = x => x == null ? "–" : x < 0 ? `<span class="ng">(${nf0.format(Math.round(-x))})</span>` : nf0.format(Math.round(x));
-  const src = P.months.filter(x => x.ym === ym && inScope(x));
-  const rows = src.map(x => { const pd = x.pd || {}, g = k => pd[k] || [0, 0, 0, 0], hasT = x.tDisb > 0, pen = hasT ? x.os / x.tDisb : null;
-    return { x, g, area: x.area, hasT, pen, gap: hasT ? x.os - x.tDisb : null }; })
-    .sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.x.os - a.x.os || a.x.rm.localeCompare(b.x.rm));
-  const periode = nettPeriode(ym, isCur, P.asof);
-  const hasPd = src.some(x => x.pd);
-  const head = `<div class="panel-h"><h2>Produktivitas Nett RM Briguna Ritel</h2><span class="sub">${periode} · Rp juta</span></div>`;
-  if (!rows.length) { el.innerHTML = head + `<div class="empty">Tidak ada RM pada filter ini.</div>`; return; }
-  const cell = r => `<td class="r">${nz(r.deb)}</td><td class="r">${nz(r.os)}</td>`;
-  const sumPd = (rs, k, i) => rs.reduce((a, r) => a + r.g(k)[i], 0);
-  const prodCells = (rs, one) => NETT_PROD.map(([k]) => [0, 1, 2, 3].map(i => `<td class="r">${nz(one ? one.g(k)[i] : sumPd(rs, k, i))}</td>`).join("")).join("");
-  const tot = rs => { const tg = rs.filter(r => r.hasT), os = sum(rs.map(r => r.x), "os"), t = sum(tg.map(r => r.x), "tDisb");
-    return { deb: sum(rs.map(r => r.x), "deb"), os, t, gap: tg.reduce((a, r) => a + r.gap, 0), pen: t ? os / t : null }; };
+  // ---------- rentang tanggal ----------
+  if (!P._nd) { let lo = "9999", hi = "0"; P.tx.forEach(t => { if (t.d < lo) lo = t.d; if (t.d > hi) hi = t.d; }); P._nd = [lo, hi]; }
+  const [dMin, dMax] = P._nd, mEnd = isCur ? P.asof : nettIso(new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0));
+  if (RS.nYm !== ym) { RS.nFrom = RS.nTo = null; RS.nYm = ym; }
+  let from = RS.nFrom || ym + "-01", to = RS.nTo || mEnd; if (from > to) [from, to] = [to, from];
+  const periode = nettPeriode(from, to), months = nettMonths(from, to), custom = !!(RS.nFrom || RS.nTo);
+  // ---------- baris per RM / mantri ----------
+  const key = r => /^pn\s*\d/i.test(r) ? "pn" + String(r).replace(/\D/g, "") : nmKey(r), meta = new Map();   // nama belum ada di list: dibedakan lewat PN-nya
+  months.forEach(m => P.months.filter(x => x.ym === m && inScope(x)).forEach(x => { const k = key(x.rm), o = meta.get(k) || { rm: x.rm, kc: x.kc, jg: x.jg, area: x.area, t: 0, hasT: false };
+    o.rm = x.rm; o.kc = x.kc; o.jg = x.jg || o.jg; o.area = x.area || o.area; if (x.tDisb > 0) { o.t += x.tDisb; o.hasT = true; } meta.set(k, o); }));
+  const tx = P.tx.filter(t => t.d >= from && t.d <= to), hasPr = P.tx.some(t => t.pr), all = RS.area === "ALL" && RS.kc === "ALL", agg = new Map();
+  tx.forEach(t => { const k = key(t.rm); if (!meta.has(k)) { if (!all) return; meta.set(k, { rm: t.rm, kc: t.kc, jg: "", area: kcArea(t.kc), t: 0, hasT: false }); }
+    const o = agg.get(k) || { deb: 0, os: 0, p: {} }; o.deb += t.deb; o.os += t.pl;
+    if (t.pr) { const a = o.p[t.pr] || (o.p[t.pr] = [0, 0, 0, 0]), i = t.jenis === "Suplesi" ? 2 : 0; a[i] += t.deb; a[i + 1] += t.pl; } agg.set(k, o); });
+  const rows = [...meta.entries()].map(([k, m]) => { const a = agg.get(k) || { deb: 0, os: 0, p: {} }, pen = m.hasT ? a.os / m.t : null;
+    return { ...m, deb: a.deb, os: a.os, g: pr => a.p[pr] || [0, 0, 0, 0], pen, gap: m.hasT ? a.os - m.t : null }; })
+    .sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os || a.rm.localeCompare(b.rm));
+  // ---------- kepala + kalender ----------
+  const head = `<div class="panel-h"><h2>Produktivitas Nett ${who} Briguna ${isM ? "Mikro" : "Ritel"}</h2><div class="toolbar nrange">
+      <label>Dari <input class="ctl" type="date" id="nFrom" value="${from}" min="${dMin}" max="${dMax}"></label><label>Sampai <input class="ctl" type="date" id="nTo" value="${to}" min="${dMin}" max="${dMax}"></label>
+      <button class="btn" type="button" data-np="mon">Bulan terpilih</button><button class="btn" type="button" data-np="7">7 hari</button><button class="btn" type="button" data-np="30">30 hari</button>
+      <span class="sub">${periode} · Rp juta${custom ? " · rentang khusus" : ""}</span></div></div>`;
+  const bind = () => {
+    const set = (f, t) => { RS.nFrom = f; RS.nTo = t; saveRS(); renderRmNett(ctx); Exp.decorate(el.parentElement); };
+    $("#nFrom").onchange = e => set(e.target.value || null, RS.nTo || to); $("#nTo").onchange = e => set(RS.nFrom || from, e.target.value || null);
+    el.querySelectorAll("[data-np]").forEach(b => b.onclick = () => { const k = b.dataset.np, end = dMax < to ? to : dMax;
+      if (k === "mon") set(null, null); else { const f = nettAdd(end, 1 - +k); set(f < dMin ? dMin : f, end); } });
+  };
+  if (!rows.length) { el.innerHTML = head + `<div class="empty">Tidak ada ${who} pada filter ini.</div>`; bind(); return; }
+  // ---------- tabel ----------
+  const sumP = (rs, k, i) => rs.reduce((a, r) => a + r.g(k)[i], 0);
+  const prodCells = (rs, one) => NETT_PROD.map(([k]) => [0, 1, 2, 3].map(i => `<td class="r">${nz(one ? one.g(k)[i] : sumP(rs, k, i))}</td>`).join("")).join("");
+  const tot = rs => { const tg = rs.filter(r => r.hasT), os = sum(rs, "os"), t = sum(tg, "t");
+    return { deb: sum(rs, "deb"), os, t, gap: tg.reduce((a, r) => a + r.gap, 0), pen: t ? os / t : null }; };
   const pctCell = (pen, cls) => pen == null ? `<td class="r">–</td>` : `<td class="r np ${cls}">${pct(pen, 2)}</td>`;
   const kuadCell = pen => { const k = kuadOf(pen); return k ? `<td class="nk">Kuadran ${k}</td>` : `<td class="nk">–</td>`; };
   const sumLine = (label, rs, cls) => { const t = tot(rs); return `<tr class="${cls}"><td colspan="4"><b>${esc(label)}</b></td>${prodCells(rs)}<td class="r">${nz(t.deb)}</td><td class="r">${nz(t.os)}</td>
     <td class="r">${nz(t.t)}</td><td class="r">${t.t ? gapF(t.gap) : "–"}</td>${pctCell(t.pen, "k" + (kuadOf(t.pen) || 0))}<td class="nk"></td></tr>`; };
-  const areas = uniq(rows.map(r => r.area)).filter(Boolean).sort();
-  const aLbl = a => String(a).split("/")[0].trim().toUpperCase();
-  el.innerHTML = head + (hasPd ? "" : `<p class="note" style="margin:0"><b>Rincian produk (Karya / Pra-Purna / Purna) belum tersedia dari server.</b> Pasang Apps Script versi terbaru, lalu admin menekan <b>Sync produktivitas</b> di Admin → Kelola data.</p>`) + `
+  const areas = uniq(rows.map(r => r.area)).filter(Boolean).sort(), aLbl = a => String(a).split("/")[0].trim().toUpperCase();
+  el.innerHTML = head + (hasPr ? "" : `<p class="note" style="margin:0"><b>Rincian produk (Karya / Pra-Purna / Purna) belum tersedia dari server.</b> Pasang Apps Script versi terbaru, lalu admin menekan <b>Sync menu ini</b>.</p>`) + `
     <div class="table-wrap"><table class="kt nett"><thead>
-      <tr><th rowspan="4">No</th><th rowspan="4">Kanca</th><th rowspan="4">Nama RM</th><th rowspan="4">JG RM</th>
-        <th colspan="12" class="nt">PRODUKTIVITAS NETT RM BRIGUNA RITEL - ${periode}</th>
+      <tr><th rowspan="4">No</th><th rowspan="4">Kanca</th><th rowspan="4">Nama ${who}</th><th rowspan="4">JG</th>
+        <th colspan="12" class="nt">PRODUKTIVITAS NETT ${who.toUpperCase()} BRIGUNA ${prodN} - ${periode}</th>
         <th colspan="2" rowspan="3" class="nt">TOTAL NETT DISBURSE<br>${periode}</th><th colspan="2" rowspan="2" class="nt">TARGET<br>${periode}</th><th rowspan="4" class="nt">Pencapaian<br>Target JG</th><th rowspan="4" class="nt">Kuadran</th></tr>
       <tr>${NETT_PROD.map(([, l, c]) => `<th colspan="4" class="np-${c}">${l}</th>`).join("")}</tr>
       <tr>${NETT_PROD.map(([, , c]) => ["Baru", "Suplesi"].map(j => `<th colspan="2" class="np-${c} s">${j}</th>`).join("")).join("")}
         <th rowspan="2" class="nt">Target JG</th><th rowspan="2" class="nt">GAP Target JG</th></tr>
       <tr>${NETT_PROD.map(([, , c]) => ["Deb", "OS", "Deb", "OS"].map(h => `<th class="np-${c} s">${h}</th>`).join("")).join("")}<th class="nt">Deb</th><th class="nt">Os</th></tr></thead>
-    <tbody>${rows.map((r, i) => `<tr><td class="r">${i + 1}</td><td>${esc(r.x.kc)}</td><td>${esc(r.x.rm)}</td><td class="c">${esc(r.x.jg || "")}</td>${prodCells(null, r)}
-      <td class="r tb">${nz(r.x.deb)}</td><td class="r tb">${nz(r.x.os)}</td><td class="r">${r.hasT ? nz(r.x.tDisb) : "–"}</td><td class="r tg">${gapF(r.gap)}</td>
-      ${pctCell(r.pen ?? (r.x.os ? null : 0), "k" + (kuadOf(r.pen) || 4))}${kuadCell(r.pen)}</tr>`).join("")}</tbody>
+    <tbody>${rows.map((r, i) => `<tr><td class="r">${i + 1}</td><td>${esc(r.kc)}</td><td>${esc(r.rm)}</td><td class="c">${esc(r.jg || "")}</td>${prodCells(null, r)}
+      <td class="r tb">${nz(r.deb)}</td><td class="r tb">${nz(r.os)}</td><td class="r">${r.hasT ? nz(r.t) : "–"}</td><td class="r tg">${gapF(r.gap)}</td>
+      ${pctCell(r.pen ?? (r.os ? null : 0), "k" + (kuadOf(r.pen) || 4))}${kuadCell(r.pen)}</tr>`).join("")}</tbody>
     <tfoot>${sumLine("Grand Total", rows, "knv")}${areas.length > 1 ? areas.map(a => sumLine(aLbl(a), rows.filter(r => r.area === a), "knv a")).join("") : ""}</tfoot></table></div>
-    <p class="note" style="margin:0">Net disburse = Delta Suplesi (Rp juta) · Karya = Kretap, Purna = Kresun, Pra-Purna = Umum · GAP = realisasi − Target JG · kuadran: K1 ≥105%, K2 100–105%, K3 50–100%, K4 &lt;50%.</p>`;
+    <p class="note" style="margin:0">Net disburse = Delta Suplesi (Rp juta) · Karya = Kretap, Purna = Kresun, Pra-Purna = Umum · Target JG = jumlah target bulanan pada bulan yang tersentuh rentang${months.length > 1 || custom ? " (rentang yang tidak penuh sebulan dibandingkan dengan target sebulan)" : ""} · GAP = realisasi − Target JG · kuadran: K1 ≥105%, K2 100–105%, K3 50–100%, K4 &lt;50%.</p>`;
+  bind();
 }
 /* ================= VIEW: Pipeline Brispot (dari file Pipeline BRISPOT) ================= */
 // DB.pipe = { asof, items[{kc,debitur,rm,pic,plafon,pengajuan,pencairan,putusan,tglPutusan,tatPrakarsa,tatClf,tatUker,tatTotal,status,tahap,akad,batal,proses,developer,jenis}], onhand[], rencana{dates[],rows[{kc,rm,v[]}]} }
@@ -2900,6 +2932,26 @@ async function doSyncRmk(btn) {
   refreshDataUI(); if (btn && btn.isConnected) btn.disabled = false;
 }
 
+// sync per menu (admin): tiap menu hanya membangun ulang datanya sendiri lewat action syncParts, tanpa menunggu sync penuh
+const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG" };
+const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"] };
+const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : [];
+function updateSyncPart(k) {
+  const b = $("#btnSyncPart"); if (!b) return; const p = syncPartsOf(k); b.hidden = !(isAdmin() && p.length); b.dataset.p = p.join(",");
+  const sp = b.querySelector("span"); if (sp) sp.textContent = "Sync " + (p.length ? SP_LBL[p[0]] : "menu ini"); b.title = "Sync hanya " + (p.length ? SP_LBL[p[0]] : "data menu ini") + " (admin)";
+}
+async function doSyncPart(btn) {
+  const parts = (btn.dataset.p || "").split(",").filter(Boolean); if (!parts.length) return;
+  const name = parts.map(p => SP_LBL[p]).join(" + "), sp = btn.querySelector("span"), old = sp.textContent;
+  btn.disabled = true; sp.textContent = "Menyinkronkan…";
+  try {
+    const j = await Auth.call("syncParts", { parts }); await loadParts(["meta", ...parts.flatMap(p => SP_LOAD[p])], null, true);
+    const st = j.stats || {}, ms = parts.reduce((a, p) => a + (st["ms_" + p] || 0), 0);
+    toast(`✓ ${name} diperbarui${ms ? " · " + Math.round(ms / 1000) + " dtk" : ""}`); render();
+  } catch (er) { toast("Sync " + name + " gagal: " + er.message); }
+  btn.disabled = false; sp.textContent = old;
+}
+
 /* ---------- VIEW: Admin ---------- */
 const AD = { tab: lsGet(STORE + "-adtab") || "data" };
 function viewAdmin(v) {
@@ -3207,7 +3259,7 @@ function render() {
   $("#landing").hidden = !home; $("#app").hidden = home; document.body.classList.toggle("at-home", home); document.body.classList.toggle("qv-open", !!LQV.key);
   const v = home ? $("#landing") : $("#view");
   document.querySelectorAll(".nav a").forEach(a => a.dataset.v === k ? a.setAttribute("aria-current", "page") : a.removeAttribute("aria-current"));
-  $("#pageTitle").textContent = title; $("#eyebrow").textContent = eb; $("#btnPdf").hidden = home || k === "admin";
+  $("#pageTitle").textContent = title; $("#eyebrow").textContent = eb; $("#btnPdf").hidden = home || k === "admin"; updateSyncPart(k);
   { const tt = document.querySelector(".topbar .ttl"); if (tt && tt.dataset.v !== title) { tt.dataset.v = title; tt.classList.remove("tb-in"); void tt.offsetWidth; tt.classList.add("tb-in"); } }
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; });
   try { fn(v); } catch (er) { console.error(er); v.innerHTML = `<section class="panel"><div class="empty"><p style="font-weight:700;margin:0 0 6px">Bagian ini belum bisa ditampilkan</p>${esc(er.message || er)}</div></section>`; }
@@ -3229,6 +3281,7 @@ document.querySelectorAll("dialog").forEach(d => {
 });
 $("#btnData").onclick = () => { if (curView() === "admin") { AD.tab = "data"; renderAdminTab(); } else openData(); };
 $("#btnSync").onclick = e => doSync(isAdmin(), e.currentTarget);
+$("#btnSyncPart").onclick = e => doSyncPart(e.currentTarget);
 $("#btnPdf").onclick = () => Exp.page();
 $("#btnTheme").onclick = () => {
   const root = document.documentElement, dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
@@ -3237,8 +3290,11 @@ $("#btnTheme").onclick = () => {
 const th = lsGet(STORE + "-theme"); if (th) document.documentElement.dataset.theme = th;
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);
 new MutationObserver(() => render()).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
-$("#btnUser").onclick = () => { const m = $("#userMenu"); m.hidden = !m.hidden; $("#btnUser").setAttribute("aria-expanded", String(!m.hidden)); };
-document.addEventListener("click", e => { if (!e.target.closest(".umenu")) $("#userMenu").hidden = true; });
+// banner atas memotong isinya (overflow hidden), jadi menu profil memakai posisi fixed yang dihitung dari tombolnya
+const placeUserMenu = () => { const m = $("#userMenu"), r = $("#btnUser").getBoundingClientRect(); if (m.parentElement !== document.body) document.body.appendChild(m); m.style.top = Math.round(r.bottom + 6) + "px"; m.style.right = Math.max(8, Math.round(innerWidth - r.right)) + "px"; };
+$("#btnUser").onclick = () => { const m = $("#userMenu"); m.hidden = !m.hidden; if (!m.hidden) placeUserMenu(); $("#btnUser").setAttribute("aria-expanded", String(!m.hidden)); };
+addEventListener("resize", () => { if (!$("#userMenu").hidden) placeUserMenu(); });
+document.addEventListener("click", e => { if (!e.target.closest(".umenu, #userMenu")) $("#userMenu").hidden = true; });
 $("#umOut").onclick = () => Auth.logout("manual");
 $("#umPw").onclick = openPw;
 function syncLabel() { const M = DB.meta; const s = $("#syncSt"); if (s) s.textContent = M && M.updated ? "update " + new Date(M.updated).toLocaleString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""; }
@@ -3255,7 +3311,8 @@ function navTo() {
   if (document.startViewTransition) {
     document.documentElement.dataset.vt = kind;
     const vt = document.startViewTransition(() => { render(); window.scrollTo(0, 0); });
-    vt.finished.finally(() => { delete document.documentElement.dataset.vt; });
+    // perpindahan yang dilewati (pindah menu cepat-cepat) menolak janji transisinya: tangkap supaya tidak muncul sebagai galat
+    vt.ready.catch(() => {}); vt.updateCallbackDone.catch(() => {}); vt.finished.catch(() => {}).finally(() => { delete document.documentElement.dataset.vt; });
   } else {
     render(); window.scrollTo(0, 0);
     const el = k === "beranda" ? $("#landing") : $("#view"), cls = ["v-zin", "v-zout", "v-up", "v-down"]; el.classList.remove(...cls); void el.offsetWidth;

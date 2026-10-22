@@ -224,12 +224,12 @@ rm = rep(rm, '''    { key: "sub", label: "Subsidi", r: 1, fmt: (x, r) => cell(x,
 rm = rep(rm, '''{ key: "sub", label: "Subsidi", r: 1, fmt: x => nf1.format(x) }, { key: "kom", label: "Komersil", r: 1, fmt: x => nf1.format(x) }''', '''{ key: "sub", label: RL.s, r: 1, fmt: x => nf1.format(x) }, { key: "kom", label: RL.k, r: 1, fmt: x => nf1.format(x) }''')
 rm = rep(rm, '''  const ds = [["Subsidi", "sub", cssv("--s1")], ["Komersil", "kom", cssv("--s2")]].map(''', '''  const ds = [[RL.s, "sub", cssv("--s1")], [RL.k, "kom", cssv("--s2")]].map(''')
 rm = rep(rm, '''<span class="note" style="font-weight:700">Nama RM</span>''', '''<span class="note" style="font-weight:700">Nama ${RL.who}</span>''')
-# tabel Produktivitas Nett RM Briguna Ritel (parts/rm_nett.js), hanya untuk segmen Ritel
-rm = rep(rm, '''    <section class="panel" id="rPer"></section>''', '''    ${SEG.rm === "R" ? '<section class="panel" id="rNett"></section>' : ""}
+# tabel Produktivitas Nett RM / Mantri Briguna (parts/rm_nett.js), untuk segmen Ritel dan Mikro
+rm = rep(rm, '''    <section class="panel" id="rPer"></section>''', '''    ${SEG.rm !== "K" ? '<section class="panel" id="rNett"></section>' : ""}
     <section class="panel" id="rPer"></section>''')
 rm = rep(rm, '''  renderRMPer(inScope);
 ''', '''  renderRMPer(inScope);
-  if (SEG.rm === "R") renderRmNett({ P, inScope, ym, isCur });
+  if (SEG.rm !== "K") renderRmNett({ P, inScope, ym, isCur });
 ''')
 
 # tema grafik (src/parts/charts.js): palet seragam + label angka

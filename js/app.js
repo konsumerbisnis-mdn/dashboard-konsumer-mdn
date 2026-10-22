@@ -1405,13 +1405,14 @@ function renderRmNett(ctx) {
   // ---------- baris per RM / mantri ----------
   const key = r => /^pn\s*\d/i.test(r) ? "pn" + String(r).replace(/\D/g, "") : nmKey(r), meta = new Map();   // nama belum ada di list: dibedakan lewat PN-nya
   months.forEach(m => P.months.filter(x => x.ym === m && inScope(x)).forEach(x => { const k = key(x.rm), o = meta.get(k) || { rm: x.rm, kc: x.kc, jg: x.jg, area: x.area, t: 0, hasT: false };
-    o.rm = x.rm; o.kc = x.kc; o.jg = x.jg || o.jg; o.area = x.area || o.area; if (x.tDisb > 0) { o.t += x.tDisb; o.hasT = true; } meta.set(k, o); }));
-  const tx = P.tx.filter(t => t.d >= from && t.d <= to), hasPr = P.tx.some(t => t.pr), all = RS.area === "ALL" && RS.kc === "ALL", agg = new Map();
+    o.rm = x.rm; o.kc = x.kc; o.jg = x.jg || o.jg; o.area = x.area || o.area; if (x.tDisb > 0) { o.t += x.tDisb; o.hasT = true; }
+    if (x.pd) { o.pd = o.pd || {}; for (const pr in x.pd) { const a = o.pd[pr] || (o.pd[pr] = [0, 0, 0, 0]); x.pd[pr].forEach((v, i) => a[i] += v); } } meta.set(k, o); }));
+  const tx = P.tx.filter(t => t.d >= from && t.d <= to), hasPr = P.tx.some(t => t.pr), usePd = !hasPr && !custom && P.months.some(x => x.pd), all = RS.area === "ALL" && RS.kc === "ALL", agg = new Map();
   tx.forEach(t => { const k = key(t.rm); if (!meta.has(k)) { if (!all) return; meta.set(k, { rm: t.rm, kc: t.kc, jg: "", area: kcArea(t.kc), t: 0, hasT: false }); }
     const o = agg.get(k) || { deb: 0, os: 0, p: {} }; o.deb += t.deb; o.os += t.pl;
     if (t.pr) { const a = o.p[t.pr] || (o.p[t.pr] = [0, 0, 0, 0]), i = t.jenis === "Suplesi" ? 2 : 0; a[i] += t.deb; a[i + 1] += t.pl; } agg.set(k, o); });
   const rows = [...meta.entries()].map(([k, m]) => { const a = agg.get(k) || { deb: 0, os: 0, p: {} }, pen = m.hasT ? a.os / m.t : null;
-    return { ...m, deb: a.deb, os: a.os, g: pr => a.p[pr] || [0, 0, 0, 0], pen, gap: m.hasT ? a.os - m.t : null }; })
+    return { ...m, deb: a.deb, os: a.os, g: pr => (hasPr ? a.p[pr] : usePd ? m.pd && m.pd[pr] : null) || [0, 0, 0, 0], pen, gap: m.hasT ? a.os - m.t : null }; })
     .sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os || a.rm.localeCompare(b.rm));
   // ---------- kepala + kalender ----------
   const head = `<div class="panel-h"><h2>Produktivitas Nett ${who} Briguna ${isM ? "Mikro" : "Ritel"}</h2><div class="toolbar nrange">
@@ -1435,7 +1436,7 @@ function renderRmNett(ctx) {
   const sumLine = (label, rs, cls) => { const t = tot(rs); return `<tr class="${cls}"><td colspan="4"><b>${esc(label)}</b></td>${prodCells(rs)}<td class="r">${nz(t.deb)}</td><td class="r">${nz(t.os)}</td>
     <td class="r">${nz(t.t)}</td><td class="r">${t.t ? gapF(t.gap) : "–"}</td>${pctCell(t.pen, "k" + (kuadOf(t.pen) || 0))}<td class="nk"></td></tr>`; };
   const areas = uniq(rows.map(r => r.area)).filter(Boolean).sort(), aLbl = a => String(a).split("/")[0].trim().toUpperCase();
-  el.innerHTML = head + (hasPr ? "" : `<p class="note" style="margin:0"><b>Rincian produk (Karya / Pra-Purna / Purna) belum tersedia dari server.</b> Pasang Apps Script versi terbaru, lalu admin menekan <b>Sync menu ini</b>.</p>`) + `
+  el.innerHTML = head + (hasPr ? "" : `<p class="note" style="margin:0"><b>Rincian produk (Karya / Pra-Purna / Purna) ${usePd ? "memakai data lama server (hanya per bulan penuh)" : "belum tersedia dari server"}.</b> Pasang Apps Script versi terbaru, lalu admin menekan <b>Sync produktivitas</b>${isM ? " (Mikro baru ada rinciannya setelah itu)" : ""}.${custom && !usePd ? " Rentang khusus butuh versi terbaru." : ""}</p>`) + `
     <div class="table-wrap"><table class="kt nett"><thead>
       <tr><th rowspan="4">No</th><th rowspan="4">Kanca</th><th rowspan="4">Nama ${who}</th><th rowspan="4">JG</th>
         <th colspan="12" class="nt">PRODUKTIVITAS NETT ${who.toUpperCase()} BRIGUNA ${prodN} - ${periode}</th>

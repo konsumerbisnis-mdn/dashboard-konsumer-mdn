@@ -39,6 +39,8 @@ Data mentah yang dikirim **belum punya** 3 kolom berikut. Ketiganya diisi oleh C
 
 Catatan penting: `PN_AO` pada data disburse historis **tidak reliable** (satu RM bisa punya 2–3 PN, satu PN dipakai beberapa nama RM), sementara master `database RM` bersih (PN unik per bulan). Karena itu urutannya: lookup PN dulu → kalau gagal/ambigu, baru fallback ke LW321. **Untuk analisis pencapaian RM, gunakan kolom `Nama RM - RO`** (+ Kantor Cabang), bukan PN.
 
+- **Produk Ritel *(update 22 Okt'26)*:** `PRODUK` **Kretap = Briguna Karya**, **Kresun = Briguna Purna**, **Umum = Briguna Pra-Purna** (terverifikasi: total September 2026 per produk × Baru/Suplesi sama dengan tabel Produktivitas Nett RM). Disburse 2025 memakai kolom `DESCRIPTION` (BRIGUNA KARYA / PURNA / PRA-PURNA). Dipakai tabel *Produktivitas Nett RM Briguna Ritel* di website ([17](17_dashboard_konsumer_web.md)).
+
 ### 15.6 `database RM` — master RM & target
 - Header ada di **baris 2** (baris 1 judul).
 - `Target` = target **OS NET** per RM per bulan, satuan Rp Juta.

@@ -8,6 +8,7 @@ function applyPart(p, o) {
   else if (p === "gerak") DB.gerak = o || {};
   else if (p === "foto") DB.foto = o && o.rm ? o : { rm: {}, kc: {} };
   else if (p === "rate") DB.rate = o && o.rows ? o : null;
+  else if (p === "brs_B") DB.brs = o && o.rm ? o : null;
 }
 async function loadParts(parts, onEach) {
   await Promise.all(parts.map(async p => { const j = await Auth.call("data", { part: p }); applyPart(p, await Auth.Crypt.gunzip(j.gz)); if (onEach) onEach(p); }));
@@ -19,7 +20,7 @@ async function loadParts(parts, onEach) {
 const bootMsg = (t, q) => { const b = $("#boot"); b.hidden = !t; if (t) { $("#bootMsg").textContent = t; $("#bootBar").style.width = Math.round((q || 0) * 100) + "%"; } };
 let LOAD_SEQ = 0;
 async function loadAll(silent) {
-  const seq = ++LOAD_SEQ, core = ["ker", "rmk_R", "rmk_M", "rmk_K", "gerak", "foto", "rate", "pipe_B", "pipe_K"];
+  const seq = ++LOAD_SEQ, core = ["ker", "rmk_R", "rmk_M", "rmk_K", "gerak", "foto", "rate", "pipe_B", "pipe_K", "brs_B"];
   LOADING.core = LOADING.lw = true; KER_LOADING = RM_LOADING = PIPE_LOADING = RATE_LOADING = true;
   let n = 0; const tot = core.length + 1;
   if (!silent) bootMsg("Menyiapkan data…", .05);
@@ -60,7 +61,7 @@ $("#loginForm").addEventListener("submit", async e => {
 });
 $("#lgEye").onclick = () => { const i = $("#lgPass"); i.type = i.type === "password" ? "text" : "password"; $("#lgEye").setAttribute("aria-label", i.type === "password" ? "Tampilkan password" : "Sembunyikan password"); };
 function resetData() {
-  ++LOAD_SEQ; Object.assign(DB, { meta: null, ker: null, rmk: null, pipe: null, lw: null, rate: null, rmkSets: {}, pipeSets: {}, lwSets: {}, gerak: {}, foto: { rm: {}, kc: {} } });
+  ++LOAD_SEQ; Object.assign(DB, { meta: null, ker: null, rmk: null, pipe: null, lw: null, rate: null, brs: null, rmkSets: {}, pipeSets: {}, lwSets: {}, gerak: {}, foto: { rm: {}, kc: {} } });
   LWR = []; LWK = new Map(); LWCIF = new Map(); LWPK = new Map(); LWPCIF = new Map(); KV = null;
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; }); $("#view").innerHTML = ""; $("#landing").innerHTML = "";
   document.querySelectorAll("dialog[open]").forEach(d => d.close());

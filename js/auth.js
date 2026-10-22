@@ -66,7 +66,7 @@
     if (!/^https:\/\/script\.google\.com\//.test(CFG.API_URL) && !/^https?:\/\/(localhost|127\.0\.0\.1)/.test(CFG.API_URL))
       throw new ApiError("API_URL di js/config.js belum diisi dengan URL Web App Apps Script.", "config");
     // sync membangun ulang seluruh cache di server (bisa 5–6 menit), jadi ditunggu lebih lama dari request biasa
-    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), (action === "sync" ? (CFG.SYNC_TIMEOUT_SEC || 420) : CFG.TIMEOUT_SEC) * 1000);
+    const ctl = new AbortController(), to = setTimeout(() => ctl.abort(), (/^sync/.test(action) ? (CFG.SYNC_TIMEOUT_SEC || 420) : CFG.TIMEOUT_SEC) * 1000);
     let res;
     try {
       // text/plain agar tidak memicu preflight CORS (Apps Script tidak menjawab OPTIONS)

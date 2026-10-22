@@ -28,7 +28,7 @@ function renderRmNett({ P, inScope, ym, isCur }) {
     <td class="r">${nz(t.t)}</td><td class="r">${t.t ? gapF(t.gap) : "–"}</td>${pctCell(t.pen, "k" + (kuadOf(t.pen) || 0))}<td class="nk"></td></tr>`; };
   const areas = uniq(rows.map(r => r.area)).filter(Boolean).sort();
   const aLbl = a => String(a).split("/")[0].trim().toUpperCase();
-  el.innerHTML = head + (hasPd ? "" : `<p class="note" style="margin:0"><b>Rincian produk (Karya / Pra-Purna / Purna) belum tersedia dari server.</b> Pasang Apps Script versi terbaru lalu tekan Sync.</p>`) + `
+  el.innerHTML = head + (hasPd ? "" : `<p class="note" style="margin:0"><b>Rincian produk (Karya / Pra-Purna / Purna) belum tersedia dari server.</b> Pasang Apps Script versi terbaru, lalu admin menekan <b>Sync produktivitas</b> di Admin → Kelola data.</p>`) + `
     <div class="table-wrap"><table class="kt nett"><thead>
       <tr><th rowspan="4">No</th><th rowspan="4">Kanca</th><th rowspan="4">Nama RM</th><th rowspan="4">JG RM</th>
         <th colspan="12" class="nt">PRODUKTIVITAS NETT RM BRIGUNA RITEL - ${periode}</th>

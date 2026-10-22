@@ -16,7 +16,7 @@ function dataCards() {
       ${card("sync", dIco('<path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/>'), "Google Sheets",
         `Keragaan s.d. <b>${K ? tglS(K.dates[K.dates.length - 1]) : "–"}</b>${K && K.rka ? " · RKA " + blnS(K.rka.months[0]) + "–" + blnS(K.rka.months[K.rka.months.length - 1]) : ""}<br>Ritel: ${rmSt("R")}<br>Mikro: ${rmSt("M")}<br>KPR: ${rmSt("K")}<br>Cache server: ${updS(M.updated)}`,
         "Sheet: keragaan, RKA, disburse ritel 2025/2026, disburse mikro, list RM ritel, list mantri mikro, produktivitas KPR (Database History & Database Monthly), RM & KC card.",
-        `<button class="btn primary" type="button" id="btnSyncF">${'<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/></svg>'}Sync sekarang</button>${syncResHtml()}`)}
+        `<button class="btn primary" type="button" id="btnSyncF">${'<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/></svg>'}Sync sekarang</button> <button class="btn" type="button" id="btnSyncR" title="Bangun ulang hanya produktivitas Briguna Ritel & Mikro (cepat)">Sync produktivitas</button>${syncResHtml()}`)}
       ${card("lwB", dIco('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h3M8 16h6"/>'), "LW321 Briguna", lwSt("B"),
         "LW321 Briguna Ritel + Mikro (semua sheet dibaca, rekening ganda dibuang, produk non-Briguna diabaikan). Posisi terkini yang lebih baru sebulan otomatis menggeser yang lama menjadi pembanding bulan lalu.", lwBody("B"))}
       ${card("lwK", dIco('<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>'), "LW321 KPR", lwSt("K"),
@@ -38,6 +38,7 @@ function dataCards() {
 }
 function bindDataCards(root) {
   const b = root.querySelector("#btnSyncF"); if (b) b.onclick = () => doSync(true, b);
+  const br = root.querySelector("#btnSyncR"); if (br) br.onclick = () => doSyncRmk(br);
   root.querySelectorAll("input[type=file][data-up]").forEach(inp => inp.addEventListener("change", e => {
     const k = inp.dataset.up, files = [...e.target.files]; if (!files.length) return;
     (k === "brsB" ? upBrs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
@@ -176,6 +177,19 @@ async function doSync(force, btn) {
     toast(j.skipped ? "Data sudah terbaru · update terakhir " + syncJam(upd) : "✓ Data berhasil di-sync · update terbaru " + syncJam(upd));
   } catch (er) { SYNC_RES = { state: "err", msg: "Sync belum selesai: " + esc(er.message) + " Server mungkin masih memproses; tunggu beberapa menit lalu refresh halaman sebelum mencoba lagi." }; toast("Sync gagal: " + er.message); }
   refreshDataUI(); if (btn && btn.isConnected) btn.disabled = false; syncLabel();
+}
+
+// sync cepat: hanya produktivitas Briguna Ritel & Mikro (rincian produk Karya / Pra-Purna / Purna), tanpa membangun ulang semua data
+async function doSyncRmk(btn) {
+  if (btn) btn.disabled = true;
+  SYNC_RES = { state: "run", msg: "Membangun ulang produktivitas Briguna Ritel & Mikro… biasanya kurang dari 1–2 menit." }; refreshDataUI();
+  try {
+    const j = await Auth.call("syncParts", { parts: ["rmk"] }); await loadParts(["meta", "rmk_R", "rmk_M"], null, true);
+    const upd = j.updated || new Date().toISOString(), st = j.stats || {};
+    SYNC_RES = { state: "ok", msg: `Produktivitas Ritel & Mikro diperbarui · <b>${syncJam(upd)}</b>${st.ms ? " · " + Math.round(st.ms / 1000) + " dtk" : ""}` };
+    toast("✓ Produktivitas Ritel & Mikro diperbarui"); render();
+  } catch (er) { SYNC_RES = { state: "err", msg: "Sync produktivitas gagal: " + esc(er.message) }; toast("Sync produktivitas gagal: " + er.message); }
+  refreshDataUI(); if (btn && btn.isConnected) btn.disabled = false;
 }
 
 /* ---------- VIEW: Admin ---------- */

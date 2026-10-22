@@ -35,6 +35,9 @@ tbl = rep(tbl, '''function exportCSV(name, cols, rows) {
     saveFile(name + ".xlsx", new Blob([XLSX.write(wb, { bookType: "xlsx", type: "array" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" })); return; }
 ''')
 
+# laporan Brispot Warm/Hot (id brs*) tampil terbuka walau section Pipeline lain awalnya diminimize
+tbl = rep(tbl, 'function secIsMin(view, sec) { const k = secKey(view, sec); return k in SEC_MIN ? SEC_MIN[k] : !!SEC_DEFAULT_MIN[view]; }',
+          'function secIsMin(view, sec) { const k = secKey(view, sec); return k in SEC_MIN ? SEC_MIN[k] : !!SEC_DEFAULT_MIN[view] && !/^brs/.test(sec.id || ""); }')
 comp = cut('/* ================= komponen kecil ================= */', '/* ================= VIEW: Beranda ================= */')
 comp = rep(comp, '''  pipeline: '<svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>',''', '''  pipeline: '<svg viewBox="0 0 24 24"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>',
   nominatif: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h3M8 16h6M15 13h1"/></svg>',
@@ -221,6 +224,13 @@ rm = rep(rm, '''    { key: "sub", label: "Subsidi", r: 1, fmt: (x, r) => cell(x,
 rm = rep(rm, '''{ key: "sub", label: "Subsidi", r: 1, fmt: x => nf1.format(x) }, { key: "kom", label: "Komersil", r: 1, fmt: x => nf1.format(x) }''', '''{ key: "sub", label: RL.s, r: 1, fmt: x => nf1.format(x) }, { key: "kom", label: RL.k, r: 1, fmt: x => nf1.format(x) }''')
 rm = rep(rm, '''  const ds = [["Subsidi", "sub", cssv("--s1")], ["Komersil", "kom", cssv("--s2")]].map(''', '''  const ds = [[RL.s, "sub", cssv("--s1")], [RL.k, "kom", cssv("--s2")]].map(''')
 rm = rep(rm, '''<span class="note" style="font-weight:700">Nama RM</span>''', '''<span class="note" style="font-weight:700">Nama ${RL.who}</span>''')
+# tabel Produktivitas Nett RM Briguna Ritel (parts/rm_nett.js), hanya untuk segmen Ritel
+rm = rep(rm, '''    <section class="panel" id="rPer"></section>''', '''    ${SEG.rm === "R" ? '<section class="panel" id="rNett"></section>' : ""}
+    <section class="panel" id="rPer"></section>''')
+rm = rep(rm, '''  renderRMPer(inScope);
+''', '''  renderRMPer(inScope);
+  if (SEG.rm === "R") renderRmNett({ P, inScope, ym, isCur });
+''')
 
 # tema grafik (src/parts/charts.js): palet seragam + label angka
 chart = rep(chart, '  charts[id] = new Chart(el, cfg);', '  charts[id] = new Chart(el, chartTheme(cfg));')
@@ -338,6 +348,17 @@ pipe = rep(pipe, '''  $("#pB").onchange = e => { PS.batal = e.target.checked; sa
 ''', '')
 pipe = rep(pipe, '''exportCSV("pipeline-brispot-" + asof,''', '''exportCSV("pipeline-brispot-" + (SEG.pipe === "K" ? "kpr" : "briguna") + "-" + asof,''')
 
+# laporan Brispot Briguna (Warm/Hot Leads, parts/brispot_brs.js): wadah dipasang di bawah panel segmen, hanya untuk Briguna
+pipe = rep(pipe, """    bindSeg(); return;
+  }
+  const P = DB.pipe, base""", """    brsMount(v); bindSeg(); return;
+  }
+  const P = DB.pipe, base""")
+pipe = rep(pipe, """  const go = () => { savePS(); render(); };
+  bindSeg();
+""", """  const go = () => { savePS(); render(); };
+  brsMount(v); bindSeg();
+""")
 pimp = cut('/* ---------- impor file Pipeline BRISPOT ---------- */', '/* ================= VIEW: Simulasi KPR')
 pimp = rep(pimp, 'function parsePipeline(wb) {', 'function parsePipeline(wb, set = "K") {\n  const brgJ = (...v) => /mikro|\\bunit\\b/i.test(v.filter(x => x != null).map(String).join(" ")) ? "Mikro" : "Ritel";')
 pimp = rep(pimp, '''      jenis: /flpp|subsidi/i.test(deb) || (plafon > 0 && plafon <= 185) ? "Subsidi" : "Komersil" };''',
@@ -364,7 +385,7 @@ start = '''
   window.__appReady = true;
 })();
 '''
-js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + P('charts.js') + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + pipe + P('pipe_rep.js') + pimp + sim \
+js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + P('charts.js') + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + P('rm_nett.js') + pipe + P('brispot_brs.js') + P('pipe_rep.js') + pimp + sim \
      + P('sim_brg.js') + P('nominatif.js') + P('admin.js') + P('export.js') + P('router.js') + zoom + P('boot.js') + start + intro
 # bagian bertanda data-nosec (mis. Lampiran, yang sudah punya buka-tutup per lampiran) tidak diberi tombol minimize
 js = rep(js, '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h"));''', '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h") && !x.hasAttribute("data-nosec"));''')

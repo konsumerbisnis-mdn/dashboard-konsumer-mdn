@@ -232,3 +232,45 @@ body{font-variant-numeric:tabular-nums}
 .sync-res .spin{width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sySpin .8s linear infinite;flex:none}
 @keyframes sySpin{to{transform:rotate(360deg)}}
 :root[data-theme="dark"] .sync-res.ok{color:#7ee2b8}:root[data-theme="dark"] .sync-res.run{color:#9cc2f7}:root[data-theme="dark"] .sync-res.err{color:#ff9d9d}
+
+/* ---------- tabel Produktivitas Nett RM Briguna Ritel ---------- */
+.kt.nett{font-size:12px;min-width:1500px}
+.kt.nett thead th{background:#12407a;color:#fff;white-space:nowrap}
+.kt.nett thead th.nt{background:#1b5cae}
+.kt.nett thead th.np-ka{background:#2a6bb8}
+.kt.nett thead th.np-pp{background:#9cc3ee;color:#0b2a55}
+.kt.nett thead th.np-pu{background:#2a6bb8}
+.kt.nett thead th.s{font-weight:600}
+.kt.nett td.r{text-align:right;font-family:var(--f-num);white-space:nowrap}
+.kt.nett td.tb{background:color-mix(in srgb,#9cc3ee 38%,var(--surface))!important;font-weight:700}
+
+.kt.nett .ng{color:#c4162a}
+.kt.nett td.np{font-weight:800;color:#fff}
+.kt.nett td.np.k1{background:#1f6fe0!important}
+.kt.nett td.np.k2{background:#18a957!important}
+.kt.nett td.np.k3{background:#ffe600!important;color:#1a1a1a}
+.kt.nett td.np.k4,.kt.nett td.np.k0{background:#ee1c25!important}
+.kt.nett td.nk{text-align:center;white-space:nowrap}
+.kt.nett tfoot tr.knv td{background:#12407a;color:#fff;font-weight:700}
+.kt.nett tfoot tr.knv.a td{background:#0b2a6b}
+.kt.nett tfoot td.np{color:#fff}
+.kt.nett tfoot td.np.k3{color:#1a1a1a}
+.kt.nett tfoot .ng{color:#ffb4bd}
+
+/* ---------- tabel Brispot Briguna: Warm / Hot Leads ---------- */
+.kt.brs{font-size:12px;min-width:1700px}
+.kt.brs thead th{background:#12407a;color:#fff;white-space:nowrap}
+.kt.brs thead th.g0{background:#1b5cae}
+.kt.brs thead th.gw{background:#b9770e}
+.kt.brs thead th.gh{background:#c2410c}
+.kt.brs thead th.gh.t{background:#9a3412}
+.kt.brs thead th.gc{background:#15803d}
+.kt.brs td.r{text-align:right;font-family:var(--f-num);white-space:nowrap}
+.kt.brs td.bw{background:color-mix(in srgb,#f0b93e 22%,var(--surface))!important}
+.kt.brs td.bh{background:color-mix(in srgb,#ef7a3c 22%,var(--surface))!important;font-weight:700}
+.kt.brs td.bc{background:color-mix(in srgb,#2fb36a 22%,var(--surface))!important}
+.kt.brs .ng{color:#c4162a}
+.kt.brs tfoot tr.knv td{background:#12407a;color:#fff;font-weight:700}
+.kt.brs tfoot .ng{color:#ffb4bd}
+.brs-wa{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 12px;border:1px dashed var(--line);border-radius:10px;font-size:13px}
+.kt.nett td.tg{background:rgba(245,185,164,.22)!important}

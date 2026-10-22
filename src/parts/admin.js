@@ -7,6 +7,7 @@ function dataCards() {
   const rmSt = s => { const P = R[s]; return P && P.months && P.months.length ? `<b>${uniq(P.months.filter(x => x.tDisb > 0).map(x => x.rm)).length}</b> ${RML[s].who.toLowerCase()} bertarget · s.d. <b>${tglS(P.asof)}</b>` : "belum ada data"; };
   const lwSt = s => { const x = lw[s]; return x ? `<b>${nf0.format(x.n)} rekening</b>, posisi <b>${nS(x.asof)}</b>${x.prev ? " · pembanding " + nS(x.prev) : " · <span class='bad'>belum ada bulan lalu</span>"}` : "belum ada data"; };
   const pSt = s => { const x = M["pipe_" + s]; return x ? `<b>${nf0.format(x.n)} berkas</b> + ${nf0.format(x.oh)} on hand, posisi <b>${tglS(x.asof)}</b> · diunggah ${updS(x.updated)}` : "belum ada data"; };
+  const bSt = () => { const x = M.brs_B; return x ? `posisi <b>${tglS(x.asof)}</b>${x.jam ? " pukul <b>" + esc(x.jam) + "</b>" : ""} · ${nf0.format(x.n)} RM &amp; mantri · diunggah ${updS(x.updated)}` : "belum ada data"; };
   const card = (k, ico, title, st, note, body) => `<section class="dcard" data-k="${k}"><div class="dc-h">${ico}<div><h3>${title}</h3><p class="dc-st">${st}</p></div></div><p class="note">${note}</p>${body}<p class="note dc-prog" id="pr_${k}" hidden></p></section>`;
   const file = (k, accept = ".xlsx,.xlsm,.xls,.csv", multi = false, lbl = "Upload") => `<label class="btn" for="f_${k}">${ICO_UP}${lbl}</label><input type="file" id="f_${k}" data-up="${k}" accept="${accept}" ${multi ? "multiple" : ""} hidden>`;
   const lwBody = s => `<div class="toolbar"><select class="ctl" id="m_lw${s}" style="flex:1 1 180px"><option value="cur">Posisi terkini</option><option value="prev">Bulan lalu (pembanding DG/UG)</option></select>${file("lw" + s, undefined, true)}</div><p class="note" style="margin:6px 0 0">Bisa pilih 2 file sekaligus (posisi terkini &amp; bulan lalu): yang tanggalnya lebih baru otomatis jadi posisi terkini.</p><div id="i_lw${s}"></div>`;
@@ -22,6 +23,8 @@ function dataCards() {
         "LW321 KPR (deskripsi KPR / Kredit Pemilikan Rumah). Subsidi bila FLPP/Sejahtera atau plafon ≤ Rp185 juta.", lwBody("K"))}
       ${card("pipeB", dIco('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'), "Pipeline Brispot Briguna", pSt("B"),
         "File Pipeline BRISPOT Briguna (sheet Pipeline, OnHand, Ref_Batal, Rencana Realisasi RM). Jenis Ritel/Mikro dari kolom produk/segmen bila ada. Menggantikan data sebelumnya.", file("pipeB"))}
+      ${card("brsB", dIco('<path d="M4 6h16M4 12h10M4 18h7"/><path d="M16 16l2.2 2.2L22 14"/>'), "Brispot Briguna · Warm / Hot Leads", bSt(),
+        "File <b>Brispot Briguna</b> per jam (sheet Nominatif, Rule, RM BGRITEL, Mantri BGMIKRO, KC BGRITEL, Unit BGMIKRO). Dihitung otomatis menjadi tabel Warm / Hot Leads &amp; Pencairan Sukses per RM, KC, Mantri dan Unit di menu Pipeline Brispot. Menggantikan data sebelumnya.", file("brsB"))}
       ${card("pipeK", dIco('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'), "Pipeline Brispot KPR", pSt("K"),
         "File Pipeline BRISPOT KPR (sheet Pipeline, OnHand, Ref_Batal, Rencana Realisasi RM). Menggantikan data sebelumnya.", file("pipeK"))}
       ${card("rate", dIco('<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h4"/>'), "Tabel suku bunga KPR",
@@ -37,7 +40,7 @@ function bindDataCards(root) {
   const b = root.querySelector("#btnSyncF"); if (b) b.onclick = () => doSync(true, b);
   root.querySelectorAll("input[type=file][data-up]").forEach(inp => inp.addEventListener("change", e => {
     const k = inp.dataset.up, files = [...e.target.files]; if (!files.length) return;
-    (k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
+    (k === "brsB" ? upBrs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
   }));
 }
 function openData() { if (!isAdmin()) return; const b = $("#dataBody"); b.innerHTML = dataCards(); bindDataCards(b); $("#dlgData").showModal(); }
@@ -94,6 +97,24 @@ async function upLW(files, set, inp) {
     };
   } catch (er) { pg.done(); toast(er.message); }
   if (inp) inp.value = "";
+}
+// Brispot Briguna: file diolah di browser (parseBrispot) menjadi tabel RM / KC / Mantri / Unit, lalu disimpan sebagai bagian data "brs_B"
+async function upBrs(f, inp) {
+  const pg = progOf("brsB");
+  try {
+    pg.set("Membaca " + f.name + "…"); await new Promise(r => setTimeout(r, 40));
+    const wb = await readWB(f); pg.set("Mengolah…"); await new Promise(r => setTimeout(r, 20));
+    const data = parseBrispot(wb, f.name);
+    if (!data) throw new Error("File ini bukan Brispot Briguna (butuh sheet Nominatif, RM BGRITEL dan Mantri BGMIKRO).");
+    if (!data.asof) throw new Error("Tanggal posisi tidak terbaca. Pastikan nama file memuat tanggal & jam, mis. \"Brispot Briguna - (21 Okt 26 (14.16) Temp.xlsx\".");
+    pg.set("Mengirim ke server…");
+    await Auth.call("partUpload", { name: "brs_B", data });
+    await loadParts(["meta", "brs_B"]);
+    okCard("brsB"); const w = data.warn || {};
+    toast(`Brispot Briguna posisi ${tglS(data.asof)}${data.jam ? " " + data.jam : ""}: ${data.rm.length} RM, ${data.mantri.length} mantri · tersimpan.${w.tidakCocok ? " " + w.tidakCocok + " lead tanpa RM/mantri cocok." : ""}`);
+    render(); refreshDataUI();
+  } catch (er) { toast(er.message); }
+  pg.done(); if (inp) inp.value = "";
 }
 async function upPart(f, k, inp) {
   const pg = progOf(k);

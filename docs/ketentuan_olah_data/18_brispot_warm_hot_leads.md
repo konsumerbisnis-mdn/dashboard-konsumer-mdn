@@ -44,6 +44,13 @@ Setiap sheet berisi 2 tabel:
 - **Tabel atas** — urutan master LIST (KC/Unit = agregasi dari sheet RM/Mantri).
 - **Tabel bawah ("SORT BY", versi kirim)** — diurutkan: Pencairan Sukses Net ↓, lalu Total Hot Plaf ↓, lalu Warm Plaf ↓; dilengkapi "Pukul : HH:MM" dan teks WA: *"Berikut disampaikan Brispot Briguna Ritel/Mikro per RM/KC/Mantri/Unit posisi dd mmmm yyyy Brispot (Update HH:MM WIB)."* — jam diambil dari nama file tarikan.
 
+## Tampilan di website *(update 22 Okt'26)*
+- Admin → Kelola data → kartu **Brispot Briguna · Warm / Hot Leads**: upload file Brispot (xlsx). File diolah di browser (`parseBrispot`, `src/parts/brispot_brs.js`) mengikuti aturan di atas, lalu hasil agregat (per RM, KC, Mantri, Unit — **tanpa nama debitur**) disimpan sebagai bagian data `brs_B` di Apps Script. Upload baru menggantikan yang lama.
+- Daftar RM/Mantri, urutan KC/Unit, Guidance, D/H, dan Rencana Realisasi diambil dari sheet template di file itu (RM BGRITEL, Mantri BGMIKRO, KC BGRITEL, Unit BGMIKRO). Tanggal posisi & jam dari nama file (`... (21 Okt 26 (14.16) ...` → 21 Oktober 2026, 14:16).
+- Tampil di menu **Pipeline Brispot** (segmen Briguna), 4 tab: RM Briguna Ritel · KC Briguna Ritel · Mantri Briguna Mikro · Unit Briguna Mikro. Tiap tab memuat tabel urutan master dan tabel urut kirim (SORT BY) + teks WA yang bisa disalin. Semua peran (Admin, RM, Guest) bisa melihat; tombol Unduh tersedia (Excel, CSV, PDF, PNG).
+- Uji dengan file 21 Okt'26 14.16: angka sama dengan template — Ritel Rencana 37 deb / Rp7.060 jt, Cair 3 deb / Plaf Rp850 jt / Net Rp740 jt; Mikro Rencana 30 / Rp4.710 jt, Warm 138 / Rp26.379 jt, Hot 21 / Rp4.860 jt, Cair 1 / Net Rp116 jt. Beda dengan template hanya karena ejaan nama Hotdinar (Warm Ritel 192 vs 185).
+- Catatan koreksi: angka "cair hari ini 4 / Net Rp1.040 jt" pada Riwayat di bawah tidak bisa direproduksi dari file yang sama; yang sesuai template adalah 3 deb / Net Rp740 jt (Ritel).
+
 ## Validasi
 - Total Warm/Hot = hitungan REFNO aktif di Nominatif setelah dedup NIK.
 - Per sel dibandingkan dengan nilai template; beda hanya pada kasus ejaan nama (21 Okt'26: Hotdinar / KC Tarutung).

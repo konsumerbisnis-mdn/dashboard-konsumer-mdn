@@ -204,7 +204,7 @@ const DATA_LBL = { id: "dataLbl", afterDatasetsDraw(ch) {
 const SEC_DEFAULT_MIN = { pipeline: true };
 const SEC_MIN = lsGet(STORE + "-min") || {};
 const secKey = (view, sec) => view + ":" + (sec.id || (sec.querySelector(":scope > .panel-h h2") || {}).textContent || "").trim();
-function secIsMin(view, sec) { const k = secKey(view, sec); return k in SEC_MIN ? SEC_MIN[k] : !!SEC_DEFAULT_MIN[view]; }
+function secIsMin(view, sec) { const k = secKey(view, sec); return k in SEC_MIN ? SEC_MIN[k] : !!SEC_DEFAULT_MIN[view] && !/^brs/.test(sec.id || ""); }
 function secApply(view, sec) {
   const min = secIsMin(view, sec), h = sec.querySelector(":scope > .panel-h");
   sec.classList.toggle("min", min); if (h) { h.setAttribute("aria-expanded", String(!min)); h.setAttribute("role", "button"); h.tabIndex = 0; }
@@ -975,6 +975,7 @@ function viewRM(v) {
       ${tile({ label: RL.who + " capai target", value: `${capai} <small style="font-size:14px;color:var(--muted)">/ ${tgtRows.length}</small>`, sub: chip(pct(tgtRows.length ? capai / tgtRows.length : 0, 0) + " RM", capai / (tgtRows.length || 1) >= .5 ? "good" : capai / (tgtRows.length || 1) >= .25 ? "warn" : "crit") })}
       ${tile({ label: "Sebaran kuadran", value: `<span style="white-space:nowrap;letter-spacing:-.02em">${kc4.join("<small style=\"opacity:.45;margin:0 .18em\">·</small>")}</span>`, sub: [1, 2, 3, 4].map(k => kq(k)).join(" ") })}
     </div>
+    ${SEG.rm === "R" ? '<section class="panel" id="rNett"></section>' : ""}
     <section class="panel" id="rPer"></section>
     <section class="panel" id="rDay"></section>
     <section class="panel" id="rCmp"></section>
@@ -1013,6 +1014,7 @@ function viewRM(v) {
   $("#rLb").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => openRM(b.dataset.rm));
   if (!RS.sel || !P.months.some(x => nmKey(x.rm) === nmKey(RS.sel) && inScope(x))) RS.sel = lb.length ? lb[0].rm : null;
   renderRMPer(inScope);
+  if (SEG.rm === "R") renderRmNett({ P, inScope, ym, isCur });
   $("#rExp").onclick = () => exportCSV("produktivitas-" + RL.seg.toLowerCase().replace(/\W+/g, "-") + "-" + (isCo ? "carry-over-" + yr + "-" + String(coEnd).padStart(2, "0") : ym), [["rm","RM"],["kc","KC"],["jg","JG"],["tDisb","Target disb (juta)"],["os","Realisasi (juta)"],["pen","Pencapaian"],["tDeb","Target deb"],["deb","Deb"],["sDeb","Deb " + RL.s.toLowerCase()],["sOs",RL.s + " (juta)"],["kDeb","Deb " + RL.k.toLowerCase()],["kOs",RL.k + " (juta)"]], lb);
 
   // per KC
@@ -1372,6 +1374,51 @@ function renderRMAppx(A) {
     { key: "d", label: "Selisih", r: 1, fmt: x => dJ(x) }, { key: "dp", label: "Growth", r: 1, sortVal: r => r.dp ?? -9, fmt: x => dl(x) }], g2,
     { sortKey: "b", page: grp === "rm" ? 15 : undefined, foot: { k: "Total", a: nf1.format(sum(g2, "a")), b: `<b>${nf1.format(sum(g2, "b"))}</b>`, d: dJ(sum(g2, "b") - sum(g2, "a")), dp: dl(pc(sum(g2, "b"), sum(g2, "a"))) } });
 }
+/* ================= Produktivitas Nett RM Briguna Ritel: tabel format laporan (produk × baru/suplesi, target JG, kuadran) ================= */
+// months[].pd = { KA: Karya, PP: Pra-Purna, PU: Purna } → [Deb Baru, OS Baru, Deb Suplesi, OS Suplesi] (dari Apps Script, Rp juta)
+const NETT_PROD = [["KA", "Karya", "ka"], ["PP", "Pra-Purna", "pp"], ["PU", "Purna", "pu"]];
+const nettPeriode = (ym, isCur, asof) => {
+  const y = ym.slice(0, 4), m = +ym.slice(5, 7) - 1, last = isCur ? +asof.slice(8) : new Date(+y, m + 1, 0).getDate();
+  return `1 ${BULAN[m]} sd ${last} ${BULAN_L[m]} ${y}`;
+};
+function renderRmNett({ P, inScope, ym, isCur }) {
+  const el = $("#rNett"); if (!el) return;
+  const nz = x => x ? nf0.format(Math.round(x)) : "–";
+  const gapF = x => x == null ? "–" : x < 0 ? `<span class="ng">(${nf0.format(Math.round(-x))})</span>` : nf0.format(Math.round(x));
+  const src = P.months.filter(x => x.ym === ym && inScope(x));
+  const rows = src.map(x => { const pd = x.pd || {}, g = k => pd[k] || [0, 0, 0, 0], hasT = x.tDisb > 0, pen = hasT ? x.os / x.tDisb : null;
+    return { x, g, area: x.area, hasT, pen, gap: hasT ? x.os - x.tDisb : null }; })
+    .sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.x.os - a.x.os || a.x.rm.localeCompare(b.x.rm));
+  const periode = nettPeriode(ym, isCur, P.asof);
+  const hasPd = src.some(x => x.pd);
+  const head = `<div class="panel-h"><h2>Produktivitas Nett RM Briguna Ritel</h2><span class="sub">${periode} · Rp juta</span></div>`;
+  if (!rows.length) { el.innerHTML = head + `<div class="empty">Tidak ada RM pada filter ini.</div>`; return; }
+  const cell = r => `<td class="r">${nz(r.deb)}</td><td class="r">${nz(r.os)}</td>`;
+  const sumPd = (rs, k, i) => rs.reduce((a, r) => a + r.g(k)[i], 0);
+  const prodCells = (rs, one) => NETT_PROD.map(([k]) => [0, 1, 2, 3].map(i => `<td class="r">${nz(one ? one.g(k)[i] : sumPd(rs, k, i))}</td>`).join("")).join("");
+  const tot = rs => { const tg = rs.filter(r => r.hasT), os = sum(rs.map(r => r.x), "os"), t = sum(tg.map(r => r.x), "tDisb");
+    return { deb: sum(rs.map(r => r.x), "deb"), os, t, gap: tg.reduce((a, r) => a + r.gap, 0), pen: t ? os / t : null }; };
+  const pctCell = (pen, cls) => pen == null ? `<td class="r">–</td>` : `<td class="r np ${cls}">${pct(pen, 2)}</td>`;
+  const kuadCell = pen => { const k = kuadOf(pen); return k ? `<td class="nk">Kuadran ${k}</td>` : `<td class="nk">–</td>`; };
+  const sumLine = (label, rs, cls) => { const t = tot(rs); return `<tr class="${cls}"><td colspan="4"><b>${esc(label)}</b></td>${prodCells(rs)}<td class="r">${nz(t.deb)}</td><td class="r">${nz(t.os)}</td>
+    <td class="r">${nz(t.t)}</td><td class="r">${t.t ? gapF(t.gap) : "–"}</td>${pctCell(t.pen, "k" + (kuadOf(t.pen) || 0))}<td class="nk"></td></tr>`; };
+  const areas = uniq(rows.map(r => r.area)).filter(Boolean).sort();
+  const aLbl = a => String(a).split("/")[0].trim().toUpperCase();
+  el.innerHTML = head + (hasPd ? "" : `<p class="note" style="margin:0"><b>Rincian produk (Karya / Pra-Purna / Purna) belum tersedia dari server.</b> Pasang Apps Script versi terbaru lalu tekan Sync.</p>`) + `
+    <div class="table-wrap"><table class="kt nett"><thead>
+      <tr><th rowspan="4">No</th><th rowspan="4">Kanca</th><th rowspan="4">Nama RM</th><th rowspan="4">JG RM</th>
+        <th colspan="12" class="nt">PRODUKTIVITAS NETT RM BRIGUNA RITEL - ${periode}</th>
+        <th colspan="2" rowspan="3" class="nt">TOTAL NETT DISBURSE<br>${periode}</th><th colspan="2" rowspan="2" class="nt">TARGET<br>${periode}</th><th rowspan="4" class="nt">Pencapaian<br>Target JG</th><th rowspan="4" class="nt">Kuadran</th></tr>
+      <tr>${NETT_PROD.map(([, l, c]) => `<th colspan="4" class="np-${c}">${l}</th>`).join("")}</tr>
+      <tr>${NETT_PROD.map(([, , c]) => ["Baru", "Suplesi"].map(j => `<th colspan="2" class="np-${c} s">${j}</th>`).join("")).join("")}
+        <th rowspan="2" class="nt">Target JG</th><th rowspan="2" class="nt">GAP Target JG</th></tr>
+      <tr>${NETT_PROD.map(([, , c]) => ["Deb", "OS", "Deb", "OS"].map(h => `<th class="np-${c} s">${h}</th>`).join("")).join("")}<th class="nt">Deb</th><th class="nt">Os</th></tr></thead>
+    <tbody>${rows.map((r, i) => `<tr><td class="r">${i + 1}</td><td>${esc(r.x.kc)}</td><td>${esc(r.x.rm)}</td><td class="c">${esc(r.x.jg || "")}</td>${prodCells(null, r)}
+      <td class="r tb">${nz(r.x.deb)}</td><td class="r tb">${nz(r.x.os)}</td><td class="r">${r.hasT ? nz(r.x.tDisb) : "–"}</td><td class="r tg">${gapF(r.gap)}</td>
+      ${pctCell(r.pen ?? (r.x.os ? null : 0), "k" + (kuadOf(r.pen) || 4))}${kuadCell(r.pen)}</tr>`).join("")}</tbody>
+    <tfoot>${sumLine("Grand Total", rows, "knv")}${areas.length > 1 ? areas.map(a => sumLine(aLbl(a), rows.filter(r => r.area === a), "knv a")).join("") : ""}</tfoot></table></div>
+    <p class="note" style="margin:0">Net disburse = Delta Suplesi (Rp juta) · Karya = Kretap, Purna = Kresun, Pra-Purna = Umum · GAP = realisasi − Target JG · kuadran: K1 ≥105%, K2 100–105%, K3 50–100%, K4 &lt;50%.</p>`;
+}
 /* ================= VIEW: Pipeline Brispot (dari file Pipeline BRISPOT) ================= */
 // DB.pipe = { asof, items[{kc,debitur,rm,pic,plafon,pengajuan,pencairan,putusan,tglPutusan,tatPrakarsa,tatClf,tatUker,tatTotal,status,tahap,akad,batal,proses,developer,jenis}], onhand[], rencana{dates[],rows[{kc,rm,v[]}]} }
 const PTAHAP = ["On Hand", "Prakarsa", "Rekomendasi", "Penilaian Agunan", "Analis", "Menunggu Putusan", "Putus & Siap Cair", "Verifikasi Pencairan"];
@@ -1423,7 +1470,7 @@ function viewPipeline(v) {
   if (!DB.pipe) {
     v.innerHTML = `<section class="panel" style="padding:12px 16px">${segB}</section>` + (PIPE_LOADING ? `<section class="panel"><div class="empty">Memuat data pipeline…</div></section>`
       : `<section class="panel"><div class="empty"><p style="font-weight:700;margin:0 0 6px">Belum ada data pipeline ${esc(PL.seg)}</p>${isAdmin() ? "Upload file <b>Pipeline BRISPOT</b> lewat menu Admin → Kelola data." : "Hubungi admin untuk upload Pipeline BRISPOT."}</div></section>`);
-    bindSeg(); return;
+    brsMount(v); bindSeg(); return;
   }
   const P = DB.pipe, base = pipeRows(), asof = P.asof;
   const areas = uniq(base.map(x => x.area)).filter(Boolean).sort();
@@ -1484,7 +1531,7 @@ function viewPipeline(v) {
       <div id="pList"></div>
     </section>`;
   const go = () => { savePS(); render(); };
-  bindSeg();
+  brsMount(v); bindSeg();
   $("#pA").onchange = e => { PS.area = e.target.value; PS.kc = "ALL"; PS.rm = "ALL"; go(); };
   $("#pK").onchange = e => { PS.kc = e.target.value; PS.rm = "ALL"; go(); };
   $("#pR").onchange = e => { PS.rm = e.target.value; go(); };
@@ -1551,6 +1598,174 @@ function viewPipeline(v) {
 
 }
 
+/* ================= Brispot Briguna: Warm / Hot Leads per RM, KC, Mantri, Unit (laporan 4 sheet template) ================= */
+// Aturan: docs/ketentuan_olah_data/18_brispot_warm_hot_leads.md. File sumber = "Brispot Briguna - <tgl> (<jam>) Temp.xlsx":
+// sheet Nominatif (data mentah), Rule, RM BGRITEL & Mantri BGMIKRO (daftar RM/Mantri, guidance, rencana realisasi), KC BGRITEL & Unit BGMIKRO (urutan KC/Unit).
+// DB.brs = { asof, jam, file, ren:{R,M}, rm[], kc[], mantri[], unit[], warn{} }
+// baris: { kode, kc, unit?, nama, dh?, n?, g, ren:[deb,net], w:[deb,plaf], h:[[deb,plaf]×3 (putusan, approved, pencairan)], c:[deb,plaf,net] }  — nominal Rp juta
+const BRS_RULE = { "menunggu proses putusan kredit": ["h", 0], "prakarsa telah diputus & siap cair": ["h", 1], "prakarsa dalam proses verifikasi pencairan": ["h", 2],
+  "prakarsa menunggu putusan pencairan": ["h", 2], "putusan berhasil diverifikasi adk": ["h", 2], "pencairan sukses": ["c"], "sedang dalam proses prakarsa": ["w"] };
+const brsK = s => String(s == null ? "" : s).toLowerCase().replace(/\s+/g, " ").trim();
+const BRS_BLN_PANJANG = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+function brsRp(v) {
+  if (typeof v === "number") return isFinite(v) ? v : 0;
+  let s = String(v == null ? "" : v).replace(/Rp|\s/gi, "").replace(/,-+$/, ""); if (!/\d/.test(s)) return 0;
+  s = /,\d{1,2}$/.test(s) ? s.replace(/\./g, "").replace(",", ".") : s.replace(/[.,](?=\d{3}(\D|$))/g, "");
+  const n = parseFloat(s.replace(/[^\d.\-]/g, "")); return isFinite(n) ? n : 0;
+}
+function brsIso(v) {
+  if (v instanceof Date && !isNaN(v)) return v.getFullYear() + "-" + String(v.getMonth() + 1).padStart(2, "0") + "-" + String(v.getDate()).padStart(2, "0");
+  if (typeof v === "number" && v > 20000 && v < 80000) return new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10);
+  const s = String(v == null ? "" : v).trim(); let m;
+  if ((m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/))) return m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0");
+  if ((m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})/))) return m[3] + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0");
+  return null;
+}
+const brsStamp = v => v instanceof Date ? v.getTime() : typeof v === "number" ? v : Date.parse(String(v || "")) || 0;
+function brsSim(a, b) {   // kemiripan nama (1 = sama), dipakai untuk ejaan yang berbeda antara Brispot dan master
+  if (a === b) return 1; if (!a || !b) return 0;
+  let p = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) { const q = [i]; for (let j = 1; j <= b.length; j++) q[j] = Math.min(p[j] + 1, q[j - 1] + 1, p[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); p = q; }
+  return 1 - p[b.length] / Math.max(a.length, b.length);
+}
+function brsSheet(wb, name) {   // sheet menurut nama (huruf besar/kecil & spasi bebas); jangkauan dibatasi supaya sheet template (16 ribu kolom) tidak membengkak
+  const k = brsK(name).replace(/ /g, ""), nm = wb.SheetNames.find(n => brsK(n).replace(/ /g, "") === k); if (!nm) return null;
+  const ws = wb.Sheets[nm], r = XLSX.utils.decode_range(ws["!ref"] || "A1"); r.e.c = Math.min(r.e.c, 70); r.e.r = Math.min(r.e.r, 6000);
+  return XLSX.utils.sheet_to_json(Object.assign({}, ws, { "!ref": XLSX.utils.encode_range(r) }), { header: 1, raw: true, defval: null });
+}
+// struktur sheet template: baris data dimulai dari baris di bawah header "No" sampai baris "TOTAL"; kolom dicari dari teks header
+function brsLayout(aoa, nameHdr) {
+  const hr = aoa.findIndex(r => r && r.some(c => String(c).trim() === "No")); if (hr < 0) return null;
+  const hdr = c => { for (let r = hr; r <= hr + 2; r++) { const x = (aoa[r] || [])[c]; if (x != null && String(x).trim()) return String(x).trim(); } return ""; };
+  const find = (txt, from = 0) => { for (let r = hr; r <= hr + 2; r++) { const i = (aoa[r] || []).findIndex((c, k) => k >= from && c != null && brsK(c) === brsK(txt)); if (i >= 0) return i; } return -1; };
+  const nameC = find(nameHdr), rows = [];
+  for (let r = hr + 3; r < aoa.length; r++) { const a = aoa[r] || []; if (String(a[0]).trim().toUpperCase() === "TOTAL") break; if (a[0] == null && a[nameC] == null && a[2] == null) continue; rows.push(a); }
+  return { hr, find, hdr, nameC, rows, aoa };
+}
+function brsRencana(aoa, hr, mainNameC, nameHdr) {   // tabel samping "Rencana Realisasi": Kanca / [Unit] / Nama / produk (Deb, OS) / Total (Deb, OS) + tanggal rencana
+  const hdrRow = aoa[hr + 2] || [], lblRow = aoa[hr + 1] || [];
+  const nC = hdrRow.findIndex((c, k) => k > mainNameC + 6 && brsK(c).startsWith("nama"));
+  let tC = lblRow.findIndex((c, k) => k > nC && brsK(c) === "total");
+  if (tC < 0) tC = hdrRow.reduce((m, c, k) => k > nC && brsK(c) === "deb" ? k : m, -1);   // sheet mantri tanpa label "Total": pasangan Deb/OS terakhir
+  if (nC < 0 || tC < 0) return { map: new Map(), date: null };
+  const map = new Map(); let date = null;
+  for (let r = hr + 3; r < aoa.length; r++) { const a = aoa[r] || []; if (a[nC] == null || !String(a[nC]).trim()) continue;
+    const k = nmKey(a[nC]), o = map.get(k) || { deb: 0, net: 0 }; o.deb += brsRp(a[tC]); o.net += brsRp(a[tC + 1]); map.set(k, o); if (!date) date = brsIso(a[tC + 2]); }
+  return { map, date };
+}
+function parseBrispot(wb, fname) {
+  const nom = brsSheet(wb, "Nominatif"), rmS = brsSheet(wb, "RM BGRITEL"), mkS = brsSheet(wb, "Mantri BGMIKRO");
+  if (!nom || !rmS || !mkS) return null;
+  const kcS = brsSheet(wb, "KC BGRITEL"), unS = brsSheet(wb, "Unit BGMIKRO"), ruleS = brsSheet(wb, "Rule");
+  const LR = brsLayout(rmS, "Nama RM"), LM = brsLayout(mkS, "Nama Mantri"); if (!LR || !LM) return null;
+  // ---------- nominatif ----------
+  const hi = nom.findIndex(r => r && r.some(c => brsK(c) === "refno")); if (hi < 0) return null;
+  const H = nom[hi].map(c => String(c == null ? "" : c).trim().toUpperCase()), ix = (...ks) => { for (const k of ks) { const i = H.indexOf(k); if (i >= 0) return i; } return -1; };
+  const iN = ix("NAMA PEMRAKARSA"), iNik = ix("NIK"), iSt = ix("STATUS KREDIT"), iPl = ix("PLAFON"), iNet = ix("NET OS"), iTg = ix("TANGGAL PENGAJUAN"), iCair = ix("TANGGAL PENCAIRAN SUKSES", "TANGGAL PENCAIRAN"), iRef = ix("REFNO");
+  if ([iN, iSt, iPl, iNet].some(i => i < 0)) return null;
+  const rule = Object.assign({}, BRS_RULE);
+  if (ruleS) { const sm = { "menunggu putusan": ["h", 0], approved: ["h", 1], "menunggu pencairan": ["h", 2], prakarsa: ["w"], "pencairan sukses": ["c"] };
+    ruleS.forEach(r => { const s = r && brsK(r[0]), t = r && sm[brsK(r[1])]; if (s && t && brsK(r[0]) !== "status kredit") rule[s] = t; }); }
+  const rank = c => !c ? 0 : c[0] === "w" ? 1 : c[0] === "h" ? 2 : 3;
+  const best = new Map(), loose = [];
+  nom.slice(hi + 1).forEach(r => { if (!r || r[iRef] == null || !String(r[iRef]).trim() || String(r[iN] == null ? "" : r[iN]).trim() === "") return;
+    const cat = rule[brsK(r[iSt])] || null, nik = String(r[iNik] == null ? "" : r[iNik]).replace(/\D/g, ""), o = { r, cat, t: brsStamp(r[iTg]) };
+    if (!nik) { loose.push(o); return; }
+    const b = best.get(nik); if (!b || rank(o.cat) > rank(b.cat) || (rank(o.cat) === rank(b.cat) && o.t > b.t)) best.set(nik, o); });
+  const leads = [...best.values(), ...loose].filter(o => o.cat);
+  // ---------- daftar RM & mantri dari template ----------
+  const mk = (a, L, extra) => Object.assign({ kode: a[1] != null ? String(a[1]).replace(/\.0+$/, "") : "", kc: String(a[2] == null ? "" : a[2]).trim(), nama: String(a[L.nameC]).trim(), g: brsRp(a[L.find("Guidance")]),
+    ren: [0, 0], w: [0, 0], h: [[0, 0], [0, 0], [0, 0]], c: [0, 0, 0] }, extra);
+  const rm = LR.rows.filter(a => a[LR.nameC]).map(a => mk(a, LR));
+  const mantri = LM.rows.filter(a => a[LM.nameC]).map(a => mk(a, LM, { unit: String(a[3] == null ? "" : a[3]).trim(), dh: String(a[LM.find("D / H")] || "").trim() }));
+  const RR = brsRencana(rmS, LR.hr, LR.nameC, "Nama RM"), RM = brsRencana(mkS, LM.hr, LM.nameC, "Nama Mantri");
+  // tanggal posisi & jam dari nama file: "Brispot Briguna - (21 Okt 26 (14.16) Temp.xlsx"
+  let asof = RR.date || RM.date, jam = "";
+  const mt = /(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{2,4}).*?\((\d{1,2})[.:](\d{2})\)/.exec(fname || "");
+  if (mt) { jam = mt[4].padStart(2, "0") + ":" + mt[5]; const mi = ["jan", "feb", "mar", "apr", "mei", "may", "jun", "jul", "agu", "aug", "sep", "okt", "oct", "nov", "des", "dec"].findIndex(x => brsK(mt[2]).startsWith(x));
+    if (mi >= 0) { const m = [0, 1, 2, 3, 4, 4, 5, 6, 7, 7, 8, 9, 9, 10, 11, 11][mi] + 1, y = mt[3].length === 2 ? "20" + mt[3] : mt[3]; asof = asof || y + "-" + String(m).padStart(2, "0") + "-" + mt[1].padStart(2, "0"); } }
+  const ren = { R: RR.date || asof, M: RM.date || asof };
+  rm.forEach(x => { const o = RR.map.get(nmKey(x.nama)); if (o) x.ren = [o.deb, o.net]; });
+  mantri.forEach(x => { const o = RM.map.get(nmKey(x.nama)); if (o) x.ren = [o.deb, o.net]; });
+  // ---------- atribusi lead ke RM / mantri ----------
+  const idx = new Map(); rm.forEach(x => idx.set(nmKey(x.nama), { x, seg: "R" })); mantri.forEach(x => idx.set(nmKey(x.nama), { x, seg: "M" }));
+  const fuzzy = [], miss = {}; const keys = [...idx.keys()];
+  const memo = new Map();
+  const pick = nm => { const k = nmKey(nm); if (memo.has(k)) return memo.get(k); let hit = idx.get(k) || null;
+    if (!hit && k) { let bs = 0, bk = null; keys.forEach(c => { const s = brsSim(k, c); if (s > bs) { bs = s; bk = c; } }); if (bs >= .9) { hit = idx.get(bk); fuzzy.push({ dari: String(nm).trim(), ke: hit.x.nama, skor: Math.round(bs * 100) / 100 }); } }
+    memo.set(k, hit); return hit; };
+  let dropped = 0;
+  leads.forEach(o => { const hit = pick(o.r[iN]); if (!hit) { dropped++; miss[String(o.r[iN]).trim()] = (miss[String(o.r[iN]).trim()] || 0) + 1; return; }
+    const x = hit.x, pl = brsRp(o.r[iPl]) / 1e6, net = brsRp(o.r[iNet]) / 1e6, cat = o.cat;
+    if (cat[0] === "w") { x.w[0]++; x.w[1] += pl; }
+    else if (cat[0] === "h") { x.h[cat[1]][0]++; x.h[cat[1]][1] += pl; }
+    else if (brsIso(o.r[iCair]) && brsIso(o.r[iCair]) === ren[hit.seg]) { x.c[0]++; x.c[1] += pl; x.c[2] += net; } });
+  // ---------- agregasi KC (dari RM) dan Unit (dari mantri) mengikuti urutan sheet template ----------
+  const sumInto = (t, x) => { t.g += x.g; t.ren[0] += x.ren[0]; t.ren[1] += x.ren[1]; t.w[0] += x.w[0]; t.w[1] += x.w[1]; x.h.forEach((a, i) => { t.h[i][0] += a[0]; t.h[i][1] += a[1]; }); t.c[0] += x.c[0]; t.c[1] += x.c[1]; t.c[2] += x.c[2]; t.n++; };
+  const blank = (o) => Object.assign({ g: 0, n: 0, ren: [0, 0], w: [0, 0], h: [[0, 0], [0, 0], [0, 0]], c: [0, 0, 0] }, o);
+  const lay = (aoa) => { const L = aoa && brsLayout(aoa, "Kantor Cabang"); return L ? L.rows : []; };
+  const kcRows = lay(kcS).filter(a => a[2]).map(a => blank({ kode: a[1] != null ? String(a[1]).replace(/\.0+$/, "") : "", kc: String(a[2]).trim() }));
+  rm.forEach(x => { let t = kcRows.find(k => nmKey(k.kc) === nmKey(x.kc)); if (!t) kcRows.push(t = blank({ kode: x.kode, kc: x.kc })); sumInto(t, x); });
+  const unRows = lay(unS).filter(a => a[2]).map(a => blank({ kode: a[1] != null ? String(a[1]).replace(/\.0+$/, "") : "", kc: String(a[2]).trim(), unit: String(a[3] == null ? "" : a[3]).trim() }));
+  mantri.forEach(x => { let t = unRows.find(k => nmKey(k.kc) === nmKey(x.kc) && nmKey(k.unit) === nmKey(x.unit)); if (!t) unRows.push(t = blank({ kode: x.kode, kc: x.kc, unit: x.unit })); sumInto(t, x); });
+  [...rm, ...mantri, ...kcRows, ...unRows].forEach(x => { x.w[1] = Math.round(x.w[1] * 100) / 100; x.h.forEach(a => a[1] = Math.round(a[1] * 100) / 100); x.c[1] = Math.round(x.c[1] * 100) / 100; x.c[2] = Math.round(x.c[2] * 100) / 100; });
+  return { asof, jam, file: fname || "", ren, rm, kc: kcRows, mantri, unit: unRows, warn: { fuzzy, tidakCocok: dropped, namaTidakCocok: Object.entries(miss).sort((a, b) => b[1] - a[1]).slice(0, 15) }, updated: new Date().toISOString() };
+}
+
+/* ---------- tampilan ---------- */
+const BRS = Object.assign({ tab: "rm" }, lsGet(STORE + "-brs") || {});
+const BRS_TABS = [["rm", "RM Briguna Ritel", "R", "Ritel", "RM"], ["kc", "KC Briguna Ritel", "R", "Ritel", "KC"], ["mantri", "Mantri Briguna Mikro", "M", "Mikro", "Mantri"], ["unit", "Unit Briguna Mikro", "M", "Mikro", "Unit"]];
+const brsTgl = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${+m[3]} ${BRS_BLN_PANJANG[+m[2] - 1]} ${m[1]}` : "–"; };
+const brsTglPendek = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ""); return m ? `${m[3]}-${BULAN[+m[2] - 1]}-${m[1].slice(2)}` : "–"; };
+function brsTable(tab, rows, ren) {
+  const unit = tab === "mantri" || tab === "unit", nama = tab === "unit" ? "Jumlah Mantri" : tab === "kc" ? "Jumlah RM" : tab === "mantri" ? "Nama Mantri" : "Nama RM", agg = tab === "kc" || tab === "unit", dh = tab === "mantri";
+  const nz = x => x ? nf0.format(Math.round(x)) : "–", gapF = x => x < 0 ? `<span class="ng">(${nf0.format(Math.round(-x))})</span>` : nz(x);
+  const ht = r => [r.h[0][0] + r.h[1][0] + r.h[2][0], r.h[0][1] + r.h[1][1] + r.h[2][1]];
+  const nums = r => { const t = ht(r), gh = t[1] - r.g, gr = r.c[2] - r.ren[1];
+    return `<td class="r">${nz(r.ren[0])}</td><td class="r">${nz(r.ren[1])}</td><td class="r bw">${nz(r.w[0])}</td><td class="r bw">${nz(r.w[1])}</td>
+      ${r.h.map(a => `<td class="r">${nz(a[0])}</td><td class="r">${nz(a[1])}</td>`).join("")}<td class="r bh">${nz(t[0])}</td><td class="r bh">${nz(t[1])}</td>
+      <td class="r">${nz(r.g)}</td><td class="r">${gapF(gh)}</td><td class="r bc">${nz(r.c[0])}</td><td class="r bc">${nz(r.c[1])}</td><td class="r bc">${nz(r.c[2])}</td><td class="r">${gapF(gr)}</td>`; };
+  const lead = r => `<td>${esc(r.kc)}</td>${unit ? `<td>${esc(r.unit || "–")}</td>` : ""}${agg ? `<td class="r">${nz(r.n)}</td>` : `<td>${esc(r.nama)}</td>`}${dh ? `<td class="c">${esc(r.dh || "")}</td>` : ""}`;
+  const T = { g: 0, n: 0, ren: [0, 0], w: [0, 0], h: [[0, 0], [0, 0], [0, 0]], c: [0, 0, 0] };
+  rows.forEach(r => { T.g += r.g; T.n += r.n || 0; T.ren[0] += r.ren[0]; T.ren[1] += r.ren[1]; T.w[0] += r.w[0]; T.w[1] += r.w[1]; r.h.forEach((a, i) => { T.h[i][0] += a[0]; T.h[i][1] += a[1]; }); T.c[0] += r.c[0]; T.c[1] += r.c[1]; T.c[2] += r.c[2]; });
+  const lbl = 2 + (unit ? 1 : 0) + (dh ? 1 : 0) + (agg ? 0 : 1);   // No + KC + [Unit] + [Nama] + [D/H]
+  return `<div class="table-wrap"><table class="kt brs"><thead>
+    <tr><th rowspan="3">No</th><th rowspan="3">Kantor Cabang</th>${unit ? '<th rowspan="3">Unit</th>' : ""}<th rowspan="3">${nama}</th>${dh ? '<th rowspan="3">D / H</th>' : ""}
+      <th colspan="2" rowspan="2" class="g0">Rencana Realisasi<br>${brsTglPendek(ren)}</th><th colspan="2" class="gw">WARM LEADS</th><th colspan="10" class="gh">Hot Leads</th><th colspan="2" class="g0">Target Disburse</th><th colspan="3" rowspan="2" class="gc">Pencairan Sukses</th><th rowspan="3" class="g0">Gap Rencana Real vs Pencairan Sukses</th></tr>
+    <tr><th colspan="2" class="gw">Prakarsa</th><th colspan="2" class="gh">Menunggu putusan</th><th colspan="2" class="gh">Approved</th><th colspan="2" class="gh">Menunggu Pencairan</th><th colspan="2" class="gh t">TOTAL</th><th rowspan="2" class="g0">Guidance</th><th rowspan="2" class="g0">Gap Hot Leads thd Guidance</th></tr>
+    <tr><th class="g0">Deb</th><th class="g0">Net</th>${["gw", "gh", "gh", "gh", "gh t"].map(c => `<th class="${c}">Deb</th><th class="${c}">Plaf.</th>`).join("")}<th class="gc">Deb</th><th class="gc">Plaf.</th><th class="gc">Net</th></tr></thead>
+    <tbody>${rows.length ? rows.map((r, i) => `<tr><td class="r">${i + 1}</td>${lead(r)}${nums(r)}</tr>`).join("") : `<tr><td colspan="${lbl + 17}" class="empty">Tidak ada data.</td></tr>`}</tbody>
+    <tfoot><tr class="knv"><td colspan="${lbl}"><b>TOTAL</b></td>${agg ? `<td class="r">${nz(T.n)}</td>` : ""}${nums(T)}</tr></tfoot></table></div>`;
+}
+function brsSorted(rows) {
+  const t = r => r.h[0][1] + r.h[1][1] + r.h[2][1];
+  return [...rows].sort((a, b) => b.c[2] - a.c[2] || t(b) - t(a) || b.w[1] - a.w[1] || a.kc.localeCompare(b.kc));
+}
+function renderBrs() {
+  const el = $("#brsWrap"); if (!el) return;
+  const B = DB.brs, seg = segBarHTML();
+  function segBarHTML() { return `<div class="seg" role="tablist" aria-label="Laporan Brispot Briguna">${BRS_TABS.map(([k, l]) => `<button type="button" role="tab" aria-selected="${BRS.tab === k}" data-brs="${k}">${l}</button>`).join("")}</div>`; }
+  if (!B) { el.innerHTML = `<section class="panel"><div class="panel-h"><h2>Brispot Briguna · Warm &amp; Hot Leads</h2></div><div class="empty">Belum ada data Warm / Hot Leads. ${isAdmin() ? "Upload file <b>Brispot Briguna</b> lewat Admin → Kelola data." : "Hubungi admin untuk upload file Brispot Briguna."}</div></section>`; return; }
+  if (!BRS_TABS.some(t => t[0] === BRS.tab)) BRS.tab = "rm";
+  const T = BRS_TABS.find(t => t[0] === BRS.tab), rows = B[BRS.tab], ren = B.ren[T[2]], pos = brsTgl(B.asof), jam = B.jam || "";
+  const wa = `Berikut disampaikan Brispot Briguna ${T[3]} per ${T[4]} posisi ${pos} Brispot (Update ${jam} WIB).`;
+  const w = B.warn || {}, warn = (w.fuzzy && w.fuzzy.length) || w.tidakCocok ? `<p class="note" style="margin:0">${w.fuzzy && w.fuzzy.length ? `Ejaan nama disamakan otomatis: ${w.fuzzy.map(f => `${esc(f.dari)} → ${esc(f.ke)}`).join("; ")}. ` : ""}${w.tidakCocok ? `${nf0.format(w.tidakCocok)} lead tidak masuk tabel karena nama pemrakarsa tidak ada di daftar RM/Mantri${w.namaTidakCocok && w.namaTidakCocok.length ? " (" + w.namaTidakCocok.slice(0, 5).map(x => esc(x[0]) + " " + x[1]).join(", ") + ")" : ""}.` : ""}</p>` : "";
+  el.innerHTML = `<section class="panel" id="brsH" style="padding:12px 16px"><div class="panel-h"><h2>Brispot Briguna · Warm &amp; Hot Leads</h2><span class="sub">posisi ${pos}${jam ? " · pukul " + jam : ""} · Rp juta</span></div>${seg}
+      <p class="note" style="margin:0">Warm = Prakarsa · Hot = Menunggu putusan + Approved + Menunggu pencairan (plafon) · Pencairan sukses = tanggal ${brsTgl(ren)} (plafon &amp; net OS) · 1 NIK dihitung 1 lead (status paling maju) · Gap Hot = Total Hot Plaf − Guidance · Gap Rencana = Net cair − Net rencana.</p>${warn}</section>
+    <section class="panel" id="brsA"><div class="panel-h"><h2>Hot Leads Brispot Briguna per ${esc(T[4])} · urutan master</h2><span class="sub">${esc(T[1])}</span></div>${brsTable(BRS.tab, rows, ren)}</section>
+    <section class="panel" id="brsB"><div class="panel-h"><h2>Hot Leads Brispot Briguna per ${esc(T[4])} · urut kirim (SORT BY)</h2><span class="sub">Pencairan Sukses Net ↓ · Total Hot ↓ · Warm ↓</span></div>
+      <p class="note" style="margin:0">Posisi tanggal : ${pos}${jam ? " · Pukul : " + jam : ""}</p>${brsTable(BRS.tab, brsSorted(rows), ren)}
+      <div class="brs-wa"><span id="brsWa">${esc(wa)}</span><button class="btn" type="button" id="brsCp">Salin teks</button></div></section>`;
+  el.querySelectorAll("[data-brs]").forEach(b => b.onclick = () => { BRS.tab = b.dataset.brs; lsSet(STORE + "-brs", { tab: BRS.tab }); renderBrs(); if (window.Exp) Exp.decorate(el); });
+  $("#brsCp").onclick = async () => { try { await navigator.clipboard.writeText(wa); toast("Teks disalin."); } catch { toast("Tidak bisa menyalin otomatis."); } };
+}
+// pasang wadah laporan di bawah panel pilihan segmen (hanya segmen Briguna)
+function brsMount(v) {
+  if (SEG.pipe !== "B") return;
+  const first = v.firstElementChild; if (!first) return;
+  const d = document.createElement("div"); d.id = "brsWrap"; d.className = "grid"; first.insertAdjacentElement("afterend", d);
+  renderBrs();
+}
 /* ================= Pipeline: tabel format laporan (rencana realisasi, rekap per KC, ringkasan jadwal akad) ================= */
 const BULAN_L = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
 const nfR = x => x ? nf0.format(Math.round(x)) : "–";
@@ -2500,6 +2715,7 @@ function dataCards() {
   const rmSt = s => { const P = R[s]; return P && P.months && P.months.length ? `<b>${uniq(P.months.filter(x => x.tDisb > 0).map(x => x.rm)).length}</b> ${RML[s].who.toLowerCase()} bertarget · s.d. <b>${tglS(P.asof)}</b>` : "belum ada data"; };
   const lwSt = s => { const x = lw[s]; return x ? `<b>${nf0.format(x.n)} rekening</b>, posisi <b>${nS(x.asof)}</b>${x.prev ? " · pembanding " + nS(x.prev) : " · <span class='bad'>belum ada bulan lalu</span>"}` : "belum ada data"; };
   const pSt = s => { const x = M["pipe_" + s]; return x ? `<b>${nf0.format(x.n)} berkas</b> + ${nf0.format(x.oh)} on hand, posisi <b>${tglS(x.asof)}</b> · diunggah ${updS(x.updated)}` : "belum ada data"; };
+  const bSt = () => { const x = M.brs_B; return x ? `posisi <b>${tglS(x.asof)}</b>${x.jam ? " pukul <b>" + esc(x.jam) + "</b>" : ""} · ${nf0.format(x.n)} RM &amp; mantri · diunggah ${updS(x.updated)}` : "belum ada data"; };
   const card = (k, ico, title, st, note, body) => `<section class="dcard" data-k="${k}"><div class="dc-h">${ico}<div><h3>${title}</h3><p class="dc-st">${st}</p></div></div><p class="note">${note}</p>${body}<p class="note dc-prog" id="pr_${k}" hidden></p></section>`;
   const file = (k, accept = ".xlsx,.xlsm,.xls,.csv", multi = false, lbl = "Upload") => `<label class="btn" for="f_${k}">${ICO_UP}${lbl}</label><input type="file" id="f_${k}" data-up="${k}" accept="${accept}" ${multi ? "multiple" : ""} hidden>`;
   const lwBody = s => `<div class="toolbar"><select class="ctl" id="m_lw${s}" style="flex:1 1 180px"><option value="cur">Posisi terkini</option><option value="prev">Bulan lalu (pembanding DG/UG)</option></select>${file("lw" + s, undefined, true)}</div><p class="note" style="margin:6px 0 0">Bisa pilih 2 file sekaligus (posisi terkini &amp; bulan lalu): yang tanggalnya lebih baru otomatis jadi posisi terkini.</p><div id="i_lw${s}"></div>`;
@@ -2515,6 +2731,8 @@ function dataCards() {
         "LW321 KPR (deskripsi KPR / Kredit Pemilikan Rumah). Subsidi bila FLPP/Sejahtera atau plafon ≤ Rp185 juta.", lwBody("K"))}
       ${card("pipeB", dIco('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'), "Pipeline Brispot Briguna", pSt("B"),
         "File Pipeline BRISPOT Briguna (sheet Pipeline, OnHand, Ref_Batal, Rencana Realisasi RM). Jenis Ritel/Mikro dari kolom produk/segmen bila ada. Menggantikan data sebelumnya.", file("pipeB"))}
+      ${card("brsB", dIco('<path d="M4 6h16M4 12h10M4 18h7"/><path d="M16 16l2.2 2.2L22 14"/>'), "Brispot Briguna · Warm / Hot Leads", bSt(),
+        "File <b>Brispot Briguna</b> per jam (sheet Nominatif, Rule, RM BGRITEL, Mantri BGMIKRO, KC BGRITEL, Unit BGMIKRO). Dihitung otomatis menjadi tabel Warm / Hot Leads &amp; Pencairan Sukses per RM, KC, Mantri dan Unit di menu Pipeline Brispot. Menggantikan data sebelumnya.", file("brsB"))}
       ${card("pipeK", dIco('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'), "Pipeline Brispot KPR", pSt("K"),
         "File Pipeline BRISPOT KPR (sheet Pipeline, OnHand, Ref_Batal, Rencana Realisasi RM). Menggantikan data sebelumnya.", file("pipeK"))}
       ${card("rate", dIco('<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h4"/>'), "Tabel suku bunga KPR",
@@ -2530,7 +2748,7 @@ function bindDataCards(root) {
   const b = root.querySelector("#btnSyncF"); if (b) b.onclick = () => doSync(true, b);
   root.querySelectorAll("input[type=file][data-up]").forEach(inp => inp.addEventListener("change", e => {
     const k = inp.dataset.up, files = [...e.target.files]; if (!files.length) return;
-    (k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
+    (k === "brsB" ? upBrs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
   }));
 }
 function openData() { if (!isAdmin()) return; const b = $("#dataBody"); b.innerHTML = dataCards(); bindDataCards(b); $("#dlgData").showModal(); }
@@ -2587,6 +2805,24 @@ async function upLW(files, set, inp) {
     };
   } catch (er) { pg.done(); toast(er.message); }
   if (inp) inp.value = "";
+}
+// Brispot Briguna: file diolah di browser (parseBrispot) menjadi tabel RM / KC / Mantri / Unit, lalu disimpan sebagai bagian data "brs_B"
+async function upBrs(f, inp) {
+  const pg = progOf("brsB");
+  try {
+    pg.set("Membaca " + f.name + "…"); await new Promise(r => setTimeout(r, 40));
+    const wb = await readWB(f); pg.set("Mengolah…"); await new Promise(r => setTimeout(r, 20));
+    const data = parseBrispot(wb, f.name);
+    if (!data) throw new Error("File ini bukan Brispot Briguna (butuh sheet Nominatif, RM BGRITEL dan Mantri BGMIKRO).");
+    if (!data.asof) throw new Error("Tanggal posisi tidak terbaca. Pastikan nama file memuat tanggal & jam, mis. \"Brispot Briguna - (21 Okt 26 (14.16) Temp.xlsx\".");
+    pg.set("Mengirim ke server…");
+    await Auth.call("partUpload", { name: "brs_B", data });
+    await loadParts(["meta", "brs_B"]);
+    okCard("brsB"); const w = data.warn || {};
+    toast(`Brispot Briguna posisi ${tglS(data.asof)}${data.jam ? " " + data.jam : ""}: ${data.rm.length} RM, ${data.mantri.length} mantri · tersimpan.${w.tidakCocok ? " " + w.tidakCocok + " lead tanpa RM/mantri cocok." : ""}`);
+    render(); refreshDataUI();
+  } catch (er) { toast(er.message); }
+  pg.done(); if (inp) inp.value = "";
 }
 async function upPart(f, k, inp) {
   const pg = progOf(k);
@@ -3066,6 +3302,7 @@ function applyPart(p, o) {
   else if (p === "gerak") DB.gerak = o || {};
   else if (p === "foto") DB.foto = o && o.rm ? o : { rm: {}, kc: {} };
   else if (p === "rate") DB.rate = o && o.rows ? o : null;
+  else if (p === "brs_B") DB.brs = o && o.rm ? o : null;
 }
 async function loadParts(parts, onEach) {
   await Promise.all(parts.map(async p => { const j = await Auth.call("data", { part: p }); applyPart(p, await Auth.Crypt.gunzip(j.gz)); if (onEach) onEach(p); }));
@@ -3077,7 +3314,7 @@ async function loadParts(parts, onEach) {
 const bootMsg = (t, q) => { const b = $("#boot"); b.hidden = !t; if (t) { $("#bootMsg").textContent = t; $("#bootBar").style.width = Math.round((q || 0) * 100) + "%"; } };
 let LOAD_SEQ = 0;
 async function loadAll(silent) {
-  const seq = ++LOAD_SEQ, core = ["ker", "rmk_R", "rmk_M", "rmk_K", "gerak", "foto", "rate", "pipe_B", "pipe_K"];
+  const seq = ++LOAD_SEQ, core = ["ker", "rmk_R", "rmk_M", "rmk_K", "gerak", "foto", "rate", "pipe_B", "pipe_K", "brs_B"];
   LOADING.core = LOADING.lw = true; KER_LOADING = RM_LOADING = PIPE_LOADING = RATE_LOADING = true;
   let n = 0; const tot = core.length + 1;
   if (!silent) bootMsg("Menyiapkan data…", .05);
@@ -3118,7 +3355,7 @@ $("#loginForm").addEventListener("submit", async e => {
 });
 $("#lgEye").onclick = () => { const i = $("#lgPass"); i.type = i.type === "password" ? "text" : "password"; $("#lgEye").setAttribute("aria-label", i.type === "password" ? "Tampilkan password" : "Sembunyikan password"); };
 function resetData() {
-  ++LOAD_SEQ; Object.assign(DB, { meta: null, ker: null, rmk: null, pipe: null, lw: null, rate: null, rmkSets: {}, pipeSets: {}, lwSets: {}, gerak: {}, foto: { rm: {}, kc: {} } });
+  ++LOAD_SEQ; Object.assign(DB, { meta: null, ker: null, rmk: null, pipe: null, lw: null, rate: null, brs: null, rmkSets: {}, pipeSets: {}, lwSets: {}, gerak: {}, foto: { rm: {}, kc: {} } });
   LWR = []; LWK = new Map(); LWCIF = new Map(); LWPK = new Map(); LWPCIF = new Map(); KV = null;
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; }); $("#view").innerHTML = ""; $("#landing").innerHTML = "";
   document.querySelectorAll("dialog[open]").forEach(d => d.close());

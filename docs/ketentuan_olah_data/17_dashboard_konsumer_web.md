@@ -41,6 +41,9 @@ Seluruh menu **mengikuti pola menu dashboard KPR** (filter, kartu, panel buka/tu
 - **Pipeline Briguna**: Ritel vs Mikro dipisahkan otomatis dari nama produk/segmen di file Brispot. Berkas BATAL tidak dihitung. Usia: HOT = hari ini − tgl putusan; WARM/COLD = hari ini − tgl prakarsa.
   - *(update 21 Okt'26)* Untuk file **Brispot Briguna** (sheet Nominatif), segmen dikonfirmasi: `UNIT KERJA` mengandung "Unit" (tanpa beda huruf besar/kecil) → **BG MIKRO**, selain itu **BG RITEL** (berlaku juga untuk unit dedicated). Klasifikasi WARM/HOT/Pencairan Sukses, nominal (Warm/Hot = plafon, Cair = net OS), dan unik per NIK mengikuti [18](18_brispot_warm_hot_leads.md).
 
+- **Tabel Produktivitas Nett RM Briguna Ritel** *(update 22 Okt'26, menu Produktivitas RM → segmen Briguna Ritel)*: per RM untuk bulan terpilih (bulan berjalan = tanggal 1 s.d. tanggal data terakhir) — Karya / Pra-Purna / Purna × Baru / Suplesi (Deb, OS), Total Nett Disburse, Target JG, GAP (= realisasi − target), % pencapaian, Kuadran; urut pencapaian tertinggi; baris Grand Total dan per Area. Produk: Kretap = Karya, Kresun = Purna, Umum = Pra-Purna ([12](12_database_disburse_dan_rm.md)). Mengikuti filter Area/KC di atasnya. Rincian produk dikirim Apps Script di `months[].pd`.
+- **Brispot Briguna · Warm / Hot Leads** *(update 22 Okt'26, menu Pipeline Brispot → Briguna)*: 4 tabel RM / KC / Mantri / Unit dari file Brispot per jam; ketentuan & cara upload di [18](18_brispot_warm_hot_leads.md).
+
 # ISTILAH
 
 - Kata **DSR diganti RPC** (*repayment capacity*, batas angsuran terhadap penghasilan) di seluruh dashboard, termasuk simulasi. Default simulasi Briguna: RPC 70%, bunga 11%, tenor 120 bulan.

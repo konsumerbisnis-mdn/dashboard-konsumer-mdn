@@ -2911,8 +2911,13 @@ async function adUsers(el) {
   table($("#uTbl"), [{ key: "username", label: "Username", fmt: x => `<b>${esc(x)}</b>` }, { key: "nama", label: "Nama" }, { key: "role", label: "Peran", fmt: x => chip(esc(Auth.ROLE_LABEL[x] || x), x === "admin" ? "crit" : x === "rm" ? "good" : "neutral") },
     { key: "rm_name", label: "Nama RM (data)", fmt: x => esc(x || "–") }, { key: "pn", label: "PN", fmt: x => esc(x || "–") }, { key: "active", label: "Status", fmt: x => x ? chip("aktif", "good") : chip("nonaktif", "neutral") },
     { key: "last_login", label: "Login terakhir", fmt: x => x ? new Date(x).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) : "–" },
-    { key: "_e", label: "", nosort: 1, fmt: (x, r) => `<button class="linkish" data-u="${esc(r.username)}">Ubah</button>` }], users,
-    { sortKey: "username", sortDir: 1, after: t => t.querySelectorAll("[data-u]").forEach(b => b.onclick = () => form(users.find(u => u.username === b.dataset.u))) });
+    { key: "_e", label: "", nosort: 1, fmt: (x, r) => `<button class="linkish" data-u="${esc(r.username)}">Ubah</button>${r.username === (Auth.user || {}).username ? "" : ` <button class="linkish bad" data-del="${esc(r.username)}">Hapus</button>`}` }], users,
+    { sortKey: "username", sortDir: 1, after: t => { t.querySelectorAll("[data-u]").forEach(b => b.onclick = () => form(users.find(u => u.username === b.dataset.u)));
+      t.querySelectorAll("[data-del]").forEach(b => b.onclick = () => hapus(users.find(u => u.username === b.dataset.del))); } });
+  const hapus = async u => {
+    if (!u || !confirm(`Hapus user "${u.username}" (${Auth.ROLE_LABEL[u.role] || u.role})? User ini tidak bisa login lagi dan tindakan ini tidak bisa dibatalkan.`)) return;
+    try { await Auth.call("userDelete", { username: u.username }); toast("User " + u.username + " dihapus."); adUsers(el); } catch (er) { toast(er.message); }
+  };
   const form = u => {
     $("#dlgTitle").textContent = u ? "Ubah user " + u.username : "Tambah user";
     $("#dlgBody").innerHTML = `<form id="uForm" class="form" novalidate>
@@ -3304,28 +3309,41 @@ function applyPart(p, o) {
   else if (p === "rate") DB.rate = o && o.rows ? o : null;
   else if (p === "brs_B") DB.brs = o && o.rm ? o : null;
 }
-async function loadParts(parts, onEach) {
-  await Promise.all(parts.map(async p => { const j = await Auth.call("data", { part: p }); applyPart(p, await Auth.Crypt.gunzip(j.gz)); if (onEach) onEach(p); }));
+// soft = true: satu bagian data yang gagal / lambat tidak menggagalkan bagian lain; yang gagal dikembalikan sebagai [[nama, pesan], ...]
+async function loadParts(parts, onEach, soft) {
+  const bad = [];
+  await Promise.all(parts.map(async p => {
+    try { const j = await Auth.call("data", { part: p }); applyPart(p, await Auth.Crypt.gunzip(j.gz)); }
+    catch (er) { if (!soft || er.code === "auth") throw er; bad.push([p, er.message]); }
+    if (onEach) onEach(p);
+  }));
   if (parts.some(p => p.startsWith("rmk_"))) useRM(SEG.rm);
   if (parts.some(p => p.startsWith("pipe_"))) usePipe(SEG.pipe);
   if (parts.some(p => p.startsWith("lw_"))) { prepKer(); useLW(SEG.lw); }
-  syncLabel();
+  syncLabel(); return bad;
 }
 const bootMsg = (t, q) => { const b = $("#boot"); b.hidden = !t; if (t) { $("#bootMsg").textContent = t; $("#bootBar").style.width = Math.round((q || 0) * 100) + "%"; } };
 let LOAD_SEQ = 0;
 async function loadAll(silent) {
-  const seq = ++LOAD_SEQ, core = ["ker", "rmk_R", "rmk_M", "rmk_K", "gerak", "foto", "rate", "pipe_B", "pipe_K", "brs_B"];
+  const seq = ++LOAD_SEQ, core = ["ker", "rmk_R", "rmk_M", "rmk_K", "gerak", "foto", "rate", "pipe_B", "pipe_K"];
   LOADING.core = LOADING.lw = true; KER_LOADING = RM_LOADING = PIPE_LOADING = RATE_LOADING = true;
   let n = 0; const tot = core.length + 1;
   if (!silent) bootMsg("Menyiapkan data…", .05);
+  const pend = new Set(core), t0 = Date.now(); let bad = [];
+  // bila ada bagian yang lama menjawab, sebutkan namanya di bilah muat supaya terlihat apa yang ditunggu
+  const tick = setInterval(() => { if (!silent && pend.size && Date.now() - t0 > 20000) bootMsg("Memuat data… " + Math.round(n / tot * 100) + "% · menunggu " + [...pend].join(", "), n / tot); }, 2000);
   try {
     await loadParts(["meta"]); n++;   // meta dulu: bila cache server belum ada, dibangun sekali di sini
     if (!silent) bootMsg("Memuat data…", n / tot);
-    await loadParts(core, () => { n++; if (!silent) bootMsg("Memuat data… " + Math.round(n / tot * 100) + "%", n / tot); });
+    bad = await loadParts(core, p => { n++; pend.delete(p); if (!silent) bootMsg("Memuat data… " + Math.round(n / tot * 100) + "%", n / tot); }, true);
   } catch (er) { if (seq === LOAD_SEQ) toast(er.message); }
+  clearInterval(tick);
+  if (bad.length && seq === LOAD_SEQ) toast("Sebagian data tidak termuat: " + bad.map(b => b[0]).join(", ") + " (" + bad[0][1] + ")");
   if (seq !== LOAD_SEQ) return;
   LOADING.core = false; KER_LOADING = RM_LOADING = PIPE_LOADING = RATE_LOADING = false; bootMsg("");
   KS.date = KS.date || null; render();
+  // laporan Brispot Warm/Hot dimuat terpisah: tidak menahan data inti dan boleh gagal tanpa mengganggu
+  loadParts(["brs_B"], null, true).then(() => { if (seq === LOAD_SEQ && curView() === "pipeline") render(); }).catch(() => {});
   if (Auth.can("detail")) { try { await loadParts(["lw_B", "lw_K"]); } catch (er) { toast("LW321: " + er.message); } }
   if (seq !== LOAD_SEQ) return;
   LOADING.lw = false;

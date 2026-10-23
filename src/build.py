@@ -106,7 +106,7 @@ ker = rep(ker, '''  const pc = v => `<td class="kp ${osCls(v)}">${pct(v, 2)}</td
 ker = rep(ker, '''pv = c => capP(c.cur[sk], c.rk?.[sk], sup);''', '''pv = c => capP(c.cur[sk], c.rk?.[sk], sup) ?? -1;''')
 ker = rep(ker, '''    const c = calc(us), L = [["OS KPR", "os", 1, 0, 0], ["SML KPR", "sml", 0, 0, 0], ["% SML", "psml", 0, 1, 0], ["NPL KPR", "npl", 0, 0, 0], ["% NPL", "pnpl", 0, 1, 0], ["Debitur", "deb", 1, 0, 1]];''',
 '''    const PS_ = prodS(KV.p), c = calc(us), L = [["OS " + PS_, "os", 1, 0, 0], ["SML " + PS_, "sml", 0, 0, 0], ["% SML", "psml", 0, 1, 0], ["NPL " + PS_, "npl", 0, 0, 0], ["% NPL", "pnpl", 0, 1, 0], ["Debitur", "deb", 1, 0, 1]];''')
-ker = rep(ker, '''<th colspan="4">OS KPR</th>''', '''<th colspan="4">OS ${prodS(KV.p)}</th>''')
+ker = rep(ker, '''<th colspan="5">OS KPR</th>''', '''<th colspan="5">OS ${prodS(KV.p)}</th>''')
 ker = rep(ker, '''<td class="sk1" colspan="${AC}">KC NON RM KPR</td>''', '''<td class="sk1" colspan="${AC}">KC NON RM ${grpL()}</td>''')
 ker = rep(ker, '''<th rowspan="2" class="sk1">Kantor Cabang</th>''', '''<th rowspan="2" class="sk1">${KV.ud ? "Unit Dedicated" : "Kantor Cabang"}</th>''', 2)
 ker = rep(ker, '''  const L = k === "sml" ? "SML" : "NPL";

@@ -45,6 +45,8 @@ function renderRmNett(ctx) {
       <span class="sub">${periode} · Rp juta${custom ? " · rentang khusus" : ""}</span></div></div>`;
   const bind = () => {
     const set = (f, t) => { RS.nFrom = f; RS.nTo = t; saveRS(); renderRmNett(ctx); Exp.decorate(el.parentElement); };
+    // klik di mana pun pada kolom tanggal langsung membuka kalender (bukan hanya ikon kecilnya)
+    ["#nFrom", "#nTo"].forEach(q => { $(q).onclick = e => { try { e.currentTarget.showPicker(); } catch {} }; });
     $("#nFrom").onchange = e => set(e.target.value || null, RS.nTo || to); $("#nTo").onchange = e => set(RS.nFrom || from, e.target.value || null);
     el.querySelectorAll("[data-np]").forEach(b => b.onclick = () => { const k = b.dataset.np, end = dMax < to ? to : dMax;
       if (k === "mon") set(null, null); else { const f = nettAdd(end, 1 - +k); set(f < dMin ? dMin : f, end); } });

@@ -283,3 +283,11 @@ body{font-variant-numeric:tabular-nums}
 .toolbar.nrange label{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted)}
 .toolbar.nrange input[type=date]{width:auto;padding:5px 8px;color-scheme:light dark}
 .toolbar.nrange .sub{flex:1 1 100%}
+
+/* ---------- menu samping bisa disembunyikan ---------- */
+.nav{transition:transform .25s ease,visibility 0s}
+.main{transition:margin-left .25s ease}
+@media (min-width:960px){body.nav-off .nav{transform:translateX(-100%);visibility:hidden;transition:transform .25s ease,visibility 0s .25s}body.nav-off .main{margin-left:0}}
+@media (max-width:959px){body.nav-off .nav{transform:translateY(100%);visibility:hidden;transition:transform .25s ease,visibility 0s .25s}body.nav-off .main{padding-bottom:0}}
+body.nav-off .content{max-width:none}
+.topbar .ttl #btnNav{margin-right:6px;flex:none}

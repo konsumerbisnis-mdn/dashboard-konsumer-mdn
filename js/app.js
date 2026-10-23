@@ -1421,6 +1421,8 @@ function renderRmNett(ctx) {
       <span class="sub">${periode} · Rp juta${custom ? " · rentang khusus" : ""}</span></div></div>`;
   const bind = () => {
     const set = (f, t) => { RS.nFrom = f; RS.nTo = t; saveRS(); renderRmNett(ctx); Exp.decorate(el.parentElement); };
+    // klik di mana pun pada kolom tanggal langsung membuka kalender (bukan hanya ikon kecilnya)
+    ["#nFrom", "#nTo"].forEach(q => { $(q).onclick = e => { try { e.currentTarget.showPicker(); } catch {} }; });
     $("#nFrom").onchange = e => set(e.target.value || null, RS.nTo || to); $("#nTo").onchange = e => set(RS.nFrom || from, e.target.value || null);
     el.querySelectorAll("[data-np]").forEach(b => b.onclick = () => { const k = b.dataset.np, end = dMax < to ? to : dMax;
       if (k === "mon") set(null, null); else { const f = nettAdd(end, 1 - +k); set(f < dMin ? dMin : f, end); } });
@@ -3283,6 +3285,11 @@ document.querySelectorAll("dialog").forEach(d => {
 $("#btnData").onclick = () => { if (curView() === "admin") { AD.tab = "data"; renderAdminTab(); } else openData(); };
 $("#btnSync").onclick = e => doSync(isAdmin(), e.currentTarget);
 $("#btnSyncPart").onclick = e => doSyncPart(e.currentTarget);
+// menu samping bisa disembunyikan supaya isi halaman (tabel, grafik) melebar; pilihan diingat per perangkat
+const setNavOff = (off, save) => { document.body.classList.toggle("nav-off", off); const b = $("#btnNav"); b.setAttribute("aria-pressed", String(off));
+  const t = off ? "Tampilkan menu samping" : "Sembunyikan menu samping"; b.title = t; b.setAttribute("aria-label", t); if (save) lsSet(STORE + "-nav", off ? 1 : 0); };
+$("#btnNav").onclick = () => { setNavOff(!document.body.classList.contains("nav-off"), true); [260, 520].forEach(ms => setTimeout(() => window.dispatchEvent(new Event("resize")), ms)); };
+setNavOff(!!lsGet(STORE + "-nav"), false);
 $("#btnPdf").onclick = () => Exp.page();
 $("#btnTheme").onclick = () => {
   const root = document.documentElement, dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;

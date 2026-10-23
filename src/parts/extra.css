@@ -304,3 +304,7 @@ body.nav-off .content{max-width:none}
 .rk-h{display:inline-flex;flex-direction:column;align-items:center;gap:1px;line-height:1}
 .rk-h small{font-size:8.5px;color:var(--muted);font-weight:700;text-transform:uppercase}
 .rk-h .kq{margin-right:0}
+
+/* ikon KC: bingkai bulat seperti foto RM, gambar memenuhi bingkai */
+.rmc .av.kc.img{border-radius:50%;background:none}
+.rmc .av.kc.img img{object-fit:cover}

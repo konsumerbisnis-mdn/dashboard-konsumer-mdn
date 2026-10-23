@@ -163,8 +163,7 @@ async function upFoto(files, kind, inp) {
     if (!nm) { miss.push(base); continue; }
     try {
       const bmp = await createImageBitmap(f), S = kind === "kc" ? 256 : 320, cv = document.createElement("canvas"); cv.width = cv.height = S; const c2 = cv.getContext("2d");
-      if (kind === "kc") { const sc = Math.min(S / bmp.width, S / bmp.height), w = bmp.width * sc, h = bmp.height * sc; c2.drawImage(bmp, (S - w) / 2, (S - h) / 2, w, h); }
-      else { const side = Math.min(bmp.width, bmp.height), sx = (bmp.width - side) / 2, sy = bmp.height > bmp.width ? (bmp.height - side) * .2 : 0; c2.drawImage(bmp, sx, sy, side, side, 0, 0, S, S); }
+      { const side = Math.min(bmp.width, bmp.height), sx = (bmp.width - side) / 2, sy = bmp.height > bmp.width ? (bmp.height - side) * .2 : 0; c2.drawImage(bmp, sx, sy, side, side, 0, 0, S, S); }
       let url = cv.toDataURL("image/webp", .82); if (!url.startsWith("data:image/webp")) url = cv.toDataURL(kind === "kc" ? "image/png" : "image/jpeg", .85);
       items.push({ kind, name: nm, data: url }); ok.push(nm);
     } catch { miss.push(base); }

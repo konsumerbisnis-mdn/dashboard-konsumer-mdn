@@ -912,3 +912,6 @@ body.nav-off .content{max-width:none}
 .nav-hide:hover{background:var(--accent-soft);color:var(--accent)}
 .nav-hide svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 @media (min-width:960px){.nav-hide{display:inline-flex}.nav .brand{padding-right:2px}}
+
+/* kartu KC tanpa ikon: bingkai bulat juga, supaya seragam dengan yang berikon */
+.rmc .av.kc{border-radius:50%}

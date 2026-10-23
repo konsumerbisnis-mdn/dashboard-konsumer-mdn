@@ -557,14 +557,15 @@ function hlKonsumer(d, filt, mode) {
   const fd = (x, low) => { if (x == null || Math.abs(x) < 1e-9) return "-"; const bad = low ? x > 0 : x < 0, t = nf0.format(Math.abs(x)); return `<span class="${bad ? "bad" : ""}">${x < 0 ? "(" + t + ")" : t}</span>`; };
   let html;
   if (mode === "ro") {
+    const gp = (a, r, low) => `<td class="r">${r == null ? "–" : fd(a - r, low)}</td>`;   // gap thd RKA = aktual − RKA
     const rows = HL_SEG.map(([p, l]) => ({ p, l, c: calc(p) }));
     const tr = x => { const c = x.c, cu = c.cur, rk = c.rk || {};
-      return `<tr class="${x.p === "konsumer" ? "ktot" : ""}"><td class="sk1" style="left:0"><b>${x.l}</b></td><td class="r">${nf0.format(cu.os)}</td>${pc(capUp(cu.os, rk.os))}<td class="r">${fd(c.pm ? cu.os - c.pm.os : null)}</td><td class="r">${fd(c.py ? cu.os - c.py.os : null)}</td>`
-        + `<td class="r">${nf0.format(cu.sml)}</td><td class="r">${pct(cu.psml, 2)}</td>${pc(capLo(cu.sml, rk.sml))}<td class="r">${fd(c.pm ? cu.sml - c.pm.sml : null, 1)}</td>`
-        + `<td class="r">${nf0.format(cu.npl)}</td><td class="r">${pct(cu.pnpl, 2)}</td>${pc(capLo(cu.npl, rk.npl))}<td class="r">${fd(c.pm ? cu.npl - c.pm.npl : null, 1)}</td>`
-        + `<td class="r">${nf0.format(cu.deb)}</td>${pc(capUp(cu.deb, rk.deb))}<td class="r">${fd(c.pm ? cu.deb - c.pm.deb : null)}</td></tr>`; };
-    html = `<div class="table-wrap"><table class="kt"><thead><tr><th rowspan="2" class="sk1" style="left:0">Segmen</th><th colspan="4">OS</th><th colspan="4">SML</th><th colspan="4">NPL</th><th colspan="3">Debitur</th></tr>
-      <tr><th>Posisi</th><th>%Penc ${BULAN[+d.slice(5, 7) - 1]}</th><th>MtD</th><th>YtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>MtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>MtD</th><th>Posisi</th><th>%Penc</th><th>MtD</th></tr></thead>
+      return `<tr class="${x.p === "konsumer" ? "ktot" : ""}"><td class="sk1" style="left:0"><b>${x.l}</b></td><td class="r">${nf0.format(cu.os)}</td>${pc(capUp(cu.os, rk.os))}${gp(cu.os, rk.os)}<td class="r">${fd(c.pm ? cu.os - c.pm.os : null)}</td><td class="r">${fd(c.py ? cu.os - c.py.os : null)}</td>`
+        + `<td class="r">${nf0.format(cu.sml)}</td><td class="r">${pct(cu.psml, 2)}</td>${pc(capLo(cu.sml, rk.sml))}${gp(cu.sml, rk.sml, 1)}<td class="r">${fd(c.pm ? cu.sml - c.pm.sml : null, 1)}</td>`
+        + `<td class="r">${nf0.format(cu.npl)}</td><td class="r">${pct(cu.pnpl, 2)}</td>${pc(capLo(cu.npl, rk.npl))}${gp(cu.npl, rk.npl, 1)}<td class="r">${fd(c.pm ? cu.npl - c.pm.npl : null, 1)}</td>`
+        + `<td class="r">${nf0.format(cu.deb)}</td>${pc(capUp(cu.deb, rk.deb))}</tr>`; };
+    html = `<div class="table-wrap"><table class="kt"><thead><tr><th rowspan="2" class="sk1" style="left:0">Segmen</th><th colspan="5">OS</th><th colspan="5">SML</th><th colspan="5">NPL</th><th colspan="2">Debitur</th></tr>
+      <tr><th>Posisi</th><th>%Penc ${BULAN[+d.slice(5, 7) - 1]}</th><th>Gap thd RKA</th><th>MtD</th><th>YtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Gap thd RKA</th><th>MtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Gap thd RKA</th><th>MtD</th><th>Posisi</th><th>%Penc</th></tr></thead>
       <tbody>${rows.map(tr).join("")}</tbody></table></div>`;
   } else {
     setKV("konsumer"); const base = unitsOf().filter(u => !/^RO\b/i.test(u.nama));
@@ -581,7 +582,7 @@ function hlKonsumer(d, filt, mode) {
       <tr class="ktot"><td class="sk1" style="left:0">TOTAL</td>${cells(tot.c)}</tr></tbody></table></div>`;
   }
   KV = keep;
-  return html + `<p class="note" style="margin:8px 0 0">Nominal Rp juta · %Penc OS & Debitur = aktual ÷ RKA, SML & NPL = RKA ÷ aktual (maks. 120%) · warna: hijau ≥100%, kuning 95–100%, merah &lt;95% · angka dalam kurung = minus · Total Konsumer = Briguna Ritel + Briguna Mikro + KPR${mode !== "ro" ? " · TOTAL tanpa RO Medan" : ""}.</p>`;
+  return html + `<p class="note" style="margin:8px 0 0">Nominal Rp juta · %Penc OS & Debitur = aktual ÷ RKA, SML & NPL = RKA ÷ aktual (maks. 120%) · Gap thd RKA = aktual − RKA · warna: hijau ≥100%, kuning 95–100%, merah &lt;95% · angka dalam kurung = minus · Total Konsumer = Briguna Ritel + Briguna Mikro + KPR${mode !== "ro" ? " · TOTAL tanpa RO Medan" : ""}.</p>`;
 }
 /* ================= VIEW: Keragaan (dari Master Keragaan) ================= */
 // DB.ker = { dates[], units[{boc,nama,area}], m:{os,sml,npl,deb,dsml,dnpl}[date][unit] (juta), rka:{months[], os,sml,npl,deb [month][unit]} }
@@ -683,17 +684,18 @@ function kpiTable(d, us, kpi, kmode) {
   }
   const cells = metric ? c => cellsM(c, metric) : c => {
     const os = { up: true }, lo = { up: false }, nd = { up: true }, cu = c.cur, rk = c.rk || {};
-    return `<td class="r">${fv(cu.os, os)}</td>${pc(capP(cu.os, rk.os, true))}<td class="r">${fd(c.pm ? cu.os - c.pm.os : null, os)}</td><td class="r">${fd(c.py ? cu.os - c.py.os : null, os)}</td>`
-      + `<td class="r">${fv(cu.sml, lo)}</td><td class="r">${pct(cu.psml, 2)}</td>${pc(capP(cu.sml, rk.sml, false))}`
-      + `<td class="r">${fv(cu.npl, lo)}</td><td class="r">${pct(cu.pnpl, 2)}</td>${pc(capP(cu.npl, rk.npl, false))}`
-      + `<td class="r">${fv(cu.deb, nd)}</td>${pc(capP(cu.deb, rk.deb, true))}<td class="r">${fd(c.pm ? cu.deb - c.pm.deb : null, nd)}</td>`;
+    const gap = (a, r, m) => `<td class="r">${r == null ? "–" : fd(a - r, m)}</td>`;   // gap thd RKA = aktual − RKA
+    return `<td class="r">${fv(cu.os, os)}</td>${pc(capP(cu.os, rk.os, true))}${gap(cu.os, rk.os, os)}<td class="r">${fd(c.pm ? cu.os - c.pm.os : null, os)}</td><td class="r">${fd(c.py ? cu.os - c.py.os : null, os)}</td>`
+      + `<td class="r">${fv(cu.sml, lo)}</td><td class="r">${pct(cu.psml, 2)}</td>${pc(capP(cu.sml, rk.sml, false))}${gap(cu.sml, rk.sml, lo)}`
+      + `<td class="r">${fv(cu.npl, lo)}</td><td class="r">${pct(cu.pnpl, 2)}</td>${pc(capP(cu.npl, rk.npl, false))}${gap(cu.npl, rk.npl, lo)}`
+      + `<td class="r">${fv(cu.deb, nd)}</td>${pc(capP(cu.deb, rk.deb, true))}`;
   };
-  const nCols = (metric ? 19 : 16) - (narrow ? 1 : 0);
+  const nCols = (metric ? 19 : 18) - (narrow ? 1 : 0);
   const head = metric
     ? `<tr><th rowspan="2" class="sk0">NO</th><th rowspan="2" class="sk1">${KV.ud ? "Unit Dedicated" : "Kantor Cabang"}</th>${narrow ? "" : `<th rowspan="2">Area</th>`}<th colspan="5">Histori</th><th rowspan="2">RKA<br>${mon}</th><th rowspan="2">RKA<br>Des ${yr}</th><th colspan="2">%Penc</th><th colspan="5">Delta</th><th rowspan="2">YoY<br><small>vs ${blnS(lyM)}</small></th></tr>
        <tr>${hist.map(h => `<th>${h[0]}</th>`).join("")}<th>${mon}</th><th>Des ${yr}</th><th>DtD</th><th>MtD</th><th>YtD</th><th>RKA ${BULAN[+ym.slice(5) - 1]}</th><th>RKA Des</th></tr>`
-    : `<tr><th rowspan="2" class="sk0">NO</th><th rowspan="2" class="sk1">${KV.ud ? "Unit Dedicated" : "Kantor Cabang"}</th>${narrow ? "" : `<th rowspan="2">Area</th>`}<th colspan="4">OS ${prodS(KV.p)}</th><th colspan="3">SML</th><th colspan="3">NPL</th><th colspan="3">Debitur</th></tr>
-       <tr><th>Posisi</th><th>%Penc ${BULAN[+ym.slice(5) - 1]}</th><th>MtD</th><th>YtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Posisi</th><th>%Penc</th><th>MtD</th></tr>`;
+    : `<tr><th rowspan="2" class="sk0">NO</th><th rowspan="2" class="sk1">${KV.ud ? "Unit Dedicated" : "Kantor Cabang"}</th>${narrow ? "" : `<th rowspan="2">Area</th>`}<th colspan="5">OS ${prodS(KV.p)}</th><th colspan="4">SML</th><th colspan="4">NPL</th><th colspan="2">Debitur</th></tr>
+       <tr><th>Posisi</th><th>%Penc ${BULAN[+ym.slice(5) - 1]}</th><th>Gap thd RKA</th><th>MtD</th><th>YtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Gap thd RKA</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Gap thd RKA</th><th>Posisi</th><th>%Penc</th></tr>`;
   const row = x => `<tr><td class="sk0">${++no}</td><td class="sk1">${esc(x.u.nama)}</td>${narrow ? "" : `<td>${esc(areaS(x.u.area))}</td>`}${cells(x.c)}</tr>`;
   const body = g1.map(row).join("") + (g2.length ? (g1.length ? `<tr class="kgrp"><td class="sk0"></td><td class="sk1" colspan="${AC}">KC NON RM ${grpL()}</td><td colspan="${nCols - 3}"></td></tr>` : "") + g2.map(row).join("") : "")
     + subs.map(x => `<tr class="${x.cls}"><td class="sk0"></td><td class="sk1" colspan="${AC}">${esc(x.name === "TOTAL" ? "TOTAL" : String(x.name).toUpperCase())}</td>${cells(x.c)}</tr>`).join("");

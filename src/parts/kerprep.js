@@ -53,14 +53,15 @@ function hlKonsumer(d, filt, mode) {
   const fd = (x, low) => { if (x == null || Math.abs(x) < 1e-9) return "-"; const bad = low ? x > 0 : x < 0, t = nf0.format(Math.abs(x)); return `<span class="${bad ? "bad" : ""}">${x < 0 ? "(" + t + ")" : t}</span>`; };
   let html;
   if (mode === "ro") {
+    const gp = (a, r, low) => `<td class="r">${r == null ? "–" : fd(a - r, low)}</td>`;   // gap thd RKA = aktual − RKA
     const rows = HL_SEG.map(([p, l]) => ({ p, l, c: calc(p) }));
     const tr = x => { const c = x.c, cu = c.cur, rk = c.rk || {};
-      return `<tr class="${x.p === "konsumer" ? "ktot" : ""}"><td class="sk1" style="left:0"><b>${x.l}</b></td><td class="r">${nf0.format(cu.os)}</td>${pc(capUp(cu.os, rk.os))}<td class="r">${fd(c.pm ? cu.os - c.pm.os : null)}</td><td class="r">${fd(c.py ? cu.os - c.py.os : null)}</td>`
-        + `<td class="r">${nf0.format(cu.sml)}</td><td class="r">${pct(cu.psml, 2)}</td>${pc(capLo(cu.sml, rk.sml))}<td class="r">${fd(c.pm ? cu.sml - c.pm.sml : null, 1)}</td>`
-        + `<td class="r">${nf0.format(cu.npl)}</td><td class="r">${pct(cu.pnpl, 2)}</td>${pc(capLo(cu.npl, rk.npl))}<td class="r">${fd(c.pm ? cu.npl - c.pm.npl : null, 1)}</td>`
-        + `<td class="r">${nf0.format(cu.deb)}</td>${pc(capUp(cu.deb, rk.deb))}<td class="r">${fd(c.pm ? cu.deb - c.pm.deb : null)}</td></tr>`; };
-    html = `<div class="table-wrap"><table class="kt"><thead><tr><th rowspan="2" class="sk1" style="left:0">Segmen</th><th colspan="4">OS</th><th colspan="4">SML</th><th colspan="4">NPL</th><th colspan="3">Debitur</th></tr>
-      <tr><th>Posisi</th><th>%Penc ${BULAN[+d.slice(5, 7) - 1]}</th><th>MtD</th><th>YtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>MtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>MtD</th><th>Posisi</th><th>%Penc</th><th>MtD</th></tr></thead>
+      return `<tr class="${x.p === "konsumer" ? "ktot" : ""}"><td class="sk1" style="left:0"><b>${x.l}</b></td><td class="r">${nf0.format(cu.os)}</td>${pc(capUp(cu.os, rk.os))}${gp(cu.os, rk.os)}<td class="r">${fd(c.pm ? cu.os - c.pm.os : null)}</td><td class="r">${fd(c.py ? cu.os - c.py.os : null)}</td>`
+        + `<td class="r">${nf0.format(cu.sml)}</td><td class="r">${pct(cu.psml, 2)}</td>${pc(capLo(cu.sml, rk.sml))}${gp(cu.sml, rk.sml, 1)}<td class="r">${fd(c.pm ? cu.sml - c.pm.sml : null, 1)}</td>`
+        + `<td class="r">${nf0.format(cu.npl)}</td><td class="r">${pct(cu.pnpl, 2)}</td>${pc(capLo(cu.npl, rk.npl))}${gp(cu.npl, rk.npl, 1)}<td class="r">${fd(c.pm ? cu.npl - c.pm.npl : null, 1)}</td>`
+        + `<td class="r">${nf0.format(cu.deb)}</td>${pc(capUp(cu.deb, rk.deb))}</tr>`; };
+    html = `<div class="table-wrap"><table class="kt"><thead><tr><th rowspan="2" class="sk1" style="left:0">Segmen</th><th colspan="5">OS</th><th colspan="5">SML</th><th colspan="5">NPL</th><th colspan="2">Debitur</th></tr>
+      <tr><th>Posisi</th><th>%Penc ${BULAN[+d.slice(5, 7) - 1]}</th><th>Gap thd RKA</th><th>MtD</th><th>YtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Gap thd RKA</th><th>MtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Gap thd RKA</th><th>MtD</th><th>Posisi</th><th>%Penc</th></tr></thead>
       <tbody>${rows.map(tr).join("")}</tbody></table></div>`;
   } else {
     setKV("konsumer"); const base = unitsOf().filter(u => !/^RO\b/i.test(u.nama));
@@ -77,5 +78,5 @@ function hlKonsumer(d, filt, mode) {
       <tr class="ktot"><td class="sk1" style="left:0">TOTAL</td>${cells(tot.c)}</tr></tbody></table></div>`;
   }
   KV = keep;
-  return html + `<p class="note" style="margin:8px 0 0">Nominal Rp juta · %Penc OS & Debitur = aktual ÷ RKA, SML & NPL = RKA ÷ aktual (maks. 120%) · warna: hijau ≥100%, kuning 95–100%, merah &lt;95% · angka dalam kurung = minus · Total Konsumer = Briguna Ritel + Briguna Mikro + KPR${mode !== "ro" ? " · TOTAL tanpa RO Medan" : ""}.</p>`;
+  return html + `<p class="note" style="margin:8px 0 0">Nominal Rp juta · %Penc OS & Debitur = aktual ÷ RKA, SML & NPL = RKA ÷ aktual (maks. 120%) · Gap thd RKA = aktual − RKA · warna: hijau ≥100%, kuning 95–100%, merah &lt;95% · angka dalam kurung = minus · Total Konsumer = Briguna Ritel + Briguna Mikro + KPR${mode !== "ro" ? " · TOTAL tanpa RO Medan" : ""}.</p>`;
 }

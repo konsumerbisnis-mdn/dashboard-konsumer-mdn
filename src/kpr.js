@@ -494,17 +494,18 @@ function kpiTable(d, us, kpi, kmode) {
   }
   const cells = metric ? c => cellsM(c, metric) : c => {
     const os = { up: true }, lo = { up: false }, nd = { up: true }, cu = c.cur, rk = c.rk || {};
-    return `<td class="r">${fv(cu.os, os)}</td>${pc(capP(cu.os, rk.os, true))}<td class="r">${fd(c.pm ? cu.os - c.pm.os : null, os)}</td><td class="r">${fd(c.py ? cu.os - c.py.os : null, os)}</td>`
-      + `<td class="r">${fv(cu.sml, lo)}</td><td class="r">${pct(cu.psml, 2)}</td>${pc(capP(cu.sml, rk.sml, false))}`
-      + `<td class="r">${fv(cu.npl, lo)}</td><td class="r">${pct(cu.pnpl, 2)}</td>${pc(capP(cu.npl, rk.npl, false))}`
-      + `<td class="r">${fv(cu.deb, nd)}</td>${pc(capP(cu.deb, rk.deb, true))}<td class="r">${fd(c.pm ? cu.deb - c.pm.deb : null, nd)}</td>`;
+    const gap = (a, r, m) => `<td class="r">${r == null ? "–" : fd(a - r, m)}</td>`;   // gap thd RKA = aktual − RKA
+    return `<td class="r">${fv(cu.os, os)}</td>${pc(capP(cu.os, rk.os, true))}${gap(cu.os, rk.os, os)}<td class="r">${fd(c.pm ? cu.os - c.pm.os : null, os)}</td><td class="r">${fd(c.py ? cu.os - c.py.os : null, os)}</td>`
+      + `<td class="r">${fv(cu.sml, lo)}</td><td class="r">${pct(cu.psml, 2)}</td>${pc(capP(cu.sml, rk.sml, false))}${gap(cu.sml, rk.sml, lo)}`
+      + `<td class="r">${fv(cu.npl, lo)}</td><td class="r">${pct(cu.pnpl, 2)}</td>${pc(capP(cu.npl, rk.npl, false))}${gap(cu.npl, rk.npl, lo)}`
+      + `<td class="r">${fv(cu.deb, nd)}</td>${pc(capP(cu.deb, rk.deb, true))}`;
   };
-  const nCols = (metric ? 19 : 16) - (narrow ? 1 : 0);
+  const nCols = (metric ? 19 : 18) - (narrow ? 1 : 0);
   const head = metric
     ? `<tr><th rowspan="2" class="sk0">NO</th><th rowspan="2" class="sk1">Kantor Cabang</th>${narrow ? "" : `<th rowspan="2">Area</th>`}<th colspan="5">Histori</th><th rowspan="2">RKA<br>${mon}</th><th rowspan="2">RKA<br>Des ${yr}</th><th colspan="2">%Penc</th><th colspan="5">Delta</th><th rowspan="2">YoY<br><small>vs ${blnS(lyM)}</small></th></tr>
        <tr>${hist.map(h => `<th>${h[0]}</th>`).join("")}<th>${mon}</th><th>Des ${yr}</th><th>DtD</th><th>MtD</th><th>YtD</th><th>RKA ${BULAN[+ym.slice(5) - 1]}</th><th>RKA Des</th></tr>`
-    : `<tr><th rowspan="2" class="sk0">NO</th><th rowspan="2" class="sk1">Kantor Cabang</th>${narrow ? "" : `<th rowspan="2">Area</th>`}<th colspan="4">OS KPR</th><th colspan="3">SML</th><th colspan="3">NPL</th><th colspan="3">Debitur</th></tr>
-       <tr><th>Posisi</th><th>%Penc ${BULAN[+ym.slice(5) - 1]}</th><th>MtD</th><th>YtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Posisi</th><th>%Penc</th><th>MtD</th></tr>`;
+    : `<tr><th rowspan="2" class="sk0">NO</th><th rowspan="2" class="sk1">Kantor Cabang</th>${narrow ? "" : `<th rowspan="2">Area</th>`}<th colspan="5">OS KPR</th><th colspan="4">SML</th><th colspan="4">NPL</th><th colspan="2">Debitur</th></tr>
+       <tr><th>Posisi</th><th>%Penc ${BULAN[+ym.slice(5) - 1]}</th><th>Gap thd RKA</th><th>MtD</th><th>YtD</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Gap thd RKA</th><th>Nominal</th><th>%</th><th>%Penc</th><th>Gap thd RKA</th><th>Posisi</th><th>%Penc</th></tr>`;
   const row = x => `<tr><td class="sk0">${++no}</td><td class="sk1">${esc(x.u.nama)}</td>${narrow ? "" : `<td>${esc(areaS(x.u.area))}</td>`}${cells(x.c)}</tr>`;
   const body = g1.map(row).join("") + (g2.length ? (g1.length ? `<tr class="kgrp"><td class="sk0"></td><td class="sk1" colspan="${AC}">KC NON RM KPR</td><td colspan="${nCols - 3}"></td></tr>` : "") + g2.map(row).join("") : "")
     + subs.map(x => `<tr class="${x.cls}"><td class="sk0"></td><td class="sk1" colspan="${AC}">${esc(x.name === "TOTAL" ? "TOTAL" : String(x.name).toUpperCase())}</td>${cells(x.c)}</tr>`).join("");

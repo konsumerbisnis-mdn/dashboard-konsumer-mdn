@@ -17,6 +17,8 @@ function dataCards() {
         `Keragaan s.d. <b>${K ? tglS(K.dates[K.dates.length - 1]) : "–"}</b>${K && K.rka ? " · RKA " + blnS(K.rka.months[0]) + "–" + blnS(K.rka.months[K.rka.months.length - 1]) : ""}<br>Ritel: ${rmSt("R")}<br>Mikro: ${rmSt("M")}<br>KPR: ${rmSt("K")}<br>Cache server: ${updS(M.updated)}`,
         "Sheet: keragaan, RKA, disburse ritel 2025/2026, disburse mikro, list RM ritel, list mantri mikro, produktivitas KPR (Database History & Database Monthly), RM & KC card.",
         `<button class="btn primary" type="button" id="btnSyncF">${'<svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/></svg>'}Sync sekarang</button> <button class="btn" type="button" id="btnSyncR" title="Bangun ulang hanya produktivitas Briguna Ritel & Mikro (cepat)">Sync produktivitas</button>${syncResHtml()}`)}
+      ${card("kerDb", dIco('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'), "Keragaan Konsumer (tanpa Sync)", `Keragaan s.d. <b>${K ? tglS(K.dates[K.dates.length - 1]) : "–"}</b>${K ? " · " + K.dates.length + " tanggal" : ""}`,
+        "File <b>Gabung KAP/DLY</b> (.xlsm): hanya sheet <b>Database</b> yang dibaca. Tanggal di file digabung ke data keragaan (tanggal yang sama diganti, tanggal lain tetap), langsung tampil tanpa Sync.", file("kerDb"))}
       ${card("lwB", dIco('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h3M8 16h6"/>'), "LW321 Briguna", lwSt("B"),
         "LW321 Briguna Ritel + Mikro (semua sheet dibaca, rekening ganda dibuang, produk non-Briguna diabaikan). Posisi terkini yang lebih baru sebulan otomatis menggeser yang lama menjadi pembanding bulan lalu.", lwBody("B"))}
       ${card("lwK", dIco('<path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>'), "LW321 KPR", lwSt("K"),
@@ -41,7 +43,7 @@ function bindDataCards(root) {
   const br = root.querySelector("#btnSyncR"); if (br) br.onclick = () => doSyncRmk(br);
   root.querySelectorAll("input[type=file][data-up]").forEach(inp => inp.addEventListener("change", e => {
     const k = inp.dataset.up, files = [...e.target.files]; if (!files.length) return;
-    (k === "brsB" ? upBrs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
+    (k === "kerDb" ? upKer(files[0], inp) : k === "brsB" ? upBrs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
   }));
 }
 function openData() { if (!isAdmin()) return; const b = $("#dataBody"); b.innerHTML = dataCards(); bindDataCards(b); $("#dlgData").showModal(); }
@@ -113,6 +115,22 @@ async function upBrs(f, inp) {
     await loadParts(["meta", "brs_B"]);
     okCard("brsB"); const w = data.warn || {};
     toast(`Brispot Briguna posisi ${tglS(data.asof)}${data.jam ? " " + data.jam : ""}: ${data.rm.length} RM, ${data.mantri.length} mantri · tersimpan.${w.tidakCocok ? " " + w.tidakCocok + " lead tanpa RM/mantri cocok." : ""}`);
+    render(); refreshDataUI();
+  } catch (er) { toast(er.message); }
+  pg.done(); if (inp) inp.value = "";
+}
+async function upKer(f, inp) {
+  const pg = progOf("kerDb");
+  try {
+    pg.set("Membaca " + f.name + "…"); await new Promise(r => setTimeout(r, 40));
+    const wb = await readWB(f); pg.set("Mengolah sheet Database…"); await new Promise(r => setTimeout(r, 20));
+    const d = parseKerDb(wb);
+    if (!d) throw new Error("Sheet Database tidak ditemukan (butuh kolom Uker, Tanggal, Desc, DEB, OS, DPK, NPL).");
+    if (!d.rows.length) throw new Error("Tidak ada baris Briguna/KPR yang terbaca di sheet Database.");
+    pg.set("Mengirim " + nf0.format(d.rows.length) + " baris ke server…");
+    const j = await Auth.call("kerUpload", { rows: d.rows });
+    await loadParts(["meta", "ker"], null, true);
+    okCard("kerDb"); toast(`Keragaan posisi ${d.dates.map(tglS).join(", ")}: ${nf0.format(d.rows.length)} baris tersimpan${j && j.sheet === false ? " (cache saja, sheet tidak terisi)" : ""}.`);
     render(); refreshDataUI();
   } catch (er) { toast(er.message); }
   pg.done(); if (inp) inp.value = "";

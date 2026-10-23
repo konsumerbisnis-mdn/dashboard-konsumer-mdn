@@ -150,6 +150,16 @@ async function upPart(f, k, inp) {
   pg.done(); if (inp) inp.value = "";
 }
 // foto RM / ikon KC: nama file dicocokkan ke nama RM/mantri (produktivitas & LW321) atau nama KC (master), dipotong persegi lalu diperkecil
+// area gambar tanpa pinggiran kosong (transparan / putih polos), supaya ikon KC memenuhi bingkai tanpa sisa putih
+function trimBox(bmp) {
+  const k = Math.min(1, 400 / Math.max(bmp.width, bmp.height)), w = Math.max(1, Math.round(bmp.width * k)), h = Math.max(1, Math.round(bmp.height * k)), cv = document.createElement("canvas"); cv.width = w; cv.height = h;
+  const g = cv.getContext("2d", { willReadFrequently: true }); g.drawImage(bmp, 0, 0, w, h); const d = g.getImageData(0, 0, w, h).data;
+  const blank = (x, y) => { const i = (y * w + x) * 4; return d[i + 3] < 24 || (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240); };
+  const rowB = y => { for (let x = 0; x < w; x++) if (!blank(x, y)) return false; return true; }, colB = x => { for (let y = 0; y < h; y++) if (!blank(x, y)) return false; return true; };
+  let t = 0, b = h - 1, l = 0, r = w - 1; while (t < b && rowB(t)) t++; while (b > t && rowB(b)) b--; while (l < r && colB(l)) l++; while (r > l && colB(r)) r--;
+  if ((r - l + 1) < w * .3 || (b - t + 1) < h * .3) return { x: 0, y: 0, w: bmp.width, h: bmp.height };
+  return { x: l / k, y: t / k, w: (r - l + 1) / k, h: (b - t + 1) / k };
+}
 async function upFoto(files, kind, inp) {
   const pg = progOf(kind === "kc" ? "fotoKc" : "fotoRm");
   const names = kind === "kc" ? KC_MASTER.map(u => u.nama) : uniq([...Object.values(DB.rmkSets).flatMap(P => P && P.months ? P.months.map(x => x.rm) : []), ...Object.values(DB.lwSets).flatMap(L => L && L.rmN ? L.rmN : [])]).filter(n => n && !/^PN |^\(?Tanpa/.test(n));
@@ -163,7 +173,7 @@ async function upFoto(files, kind, inp) {
     if (!nm) { miss.push(base); continue; }
     try {
       const bmp = await createImageBitmap(f), S = kind === "kc" ? 256 : 320, cv = document.createElement("canvas"); cv.width = cv.height = S; const c2 = cv.getContext("2d");
-      { const side = Math.min(bmp.width, bmp.height), sx = (bmp.width - side) / 2, sy = bmp.height > bmp.width ? (bmp.height - side) * .2 : 0; c2.drawImage(bmp, sx, sy, side, side, 0, 0, S, S); }
+      { const r = kind === "kc" ? trimBox(bmp) : { x: 0, y: 0, w: bmp.width, h: bmp.height }, side = Math.min(r.w, r.h), sx = r.x + (r.w - side) / 2, sy = r.y + (r.h > r.w ? (r.h - side) * .2 : (r.h - side) / 2); c2.drawImage(bmp, sx, sy, side, side, 0, 0, S, S); }
       let url = cv.toDataURL("image/webp", .82); if (!url.startsWith("data:image/webp")) url = cv.toDataURL(kind === "kc" ? "image/png" : "image/jpeg", .85);
       items.push({ kind, name: nm, data: url }); ok.push(nm);
     } catch { miss.push(base); }

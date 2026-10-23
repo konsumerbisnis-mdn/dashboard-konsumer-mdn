@@ -634,8 +634,6 @@ dialog::backdrop{background:rgba(5,15,20,.5)}
 .kt td .good{color:var(--good);font-weight:700}
 td .bad,b.bad{color:var(--crit)} td .good,b.good{color:var(--good)}
 /* ikon KC di kartu cabang */
-.rmc .av.kc.img{background:#fff!important;padding:10px}
-.rmc .av.kc.img img{object-fit:contain}
 /* login */
 .login .l-center{max-width:460px}
 .lg-card{width:100%;display:grid;gap:14px;padding:22px;border-radius:18px;color:var(--ink);background:color-mix(in srgb,var(--surface) 92%,transparent);
@@ -904,7 +902,7 @@ body.nav-off .content{max-width:none}
 .rk-h .kq{margin-right:0}
 
 /* ikon KC: bingkai bulat persis seperti foto profil RM */
-.rmc .av.kc.img{border-radius:50%;background:none}
+.rmc .av.kc.img{border-radius:50%;background:none;padding:0}
 .rmc .av.kc.img img{object-fit:cover}
 
 /* ---------- tombol sembunyikan di dalam menu samping (hanya layar lebar; di HP memakai tombol banner) ---------- */

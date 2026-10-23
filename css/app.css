@@ -913,3 +913,10 @@ body.nav-off .content{max-width:none}
 
 /* kartu KC tanpa ikon: bingkai bulat juga, supaya seragam dengan yang berikon */
 .rmc .av.kc{border-radius:50%}
+
+/* pratinjau besar foto RM / ikon KC saat kursor di atasnya */
+.foto-zoom{position:fixed;left:0;top:0;width:280px;height:280px;z-index:9999;pointer-events:none;border-radius:18px;overflow:hidden;background:#fff;box-shadow:0 0 0 4px #fff,0 18px 44px -8px rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:opacity .15s ease,visibility .15s}
+.foto-zoom.on{opacity:1;visibility:visible}
+.foto-zoom img{width:100%;height:100%;object-fit:cover;display:block}
+.foto-zoom.kc{border-radius:50%}
+@media (prefers-reduced-motion:reduce){.foto-zoom{transition:none}}

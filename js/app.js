@@ -3333,7 +3333,8 @@ $("#btnSyncPart").onclick = e => doSyncPart(e.currentTarget);
 // menu samping bisa disembunyikan supaya isi halaman (tabel, grafik) melebar; pilihan diingat per perangkat
 const setNavOff = (off, save) => { document.body.classList.toggle("nav-off", off); const b = $("#btnNav"); b.setAttribute("aria-pressed", String(off));
   const t = off ? "Tampilkan menu samping" : "Sembunyikan menu samping"; b.title = t; b.setAttribute("aria-label", t); if (save) lsSet(STORE + "-nav", off ? 1 : 0); };
-$("#btnNav").onclick = () => { setNavOff(!document.body.classList.contains("nav-off"), true); [260, 520].forEach(ms => setTimeout(() => window.dispatchEvent(new Event("resize")), ms)); };
+const toggleNav = () => { setNavOff(!document.body.classList.contains("nav-off"), true); [260, 520].forEach(ms => setTimeout(() => window.dispatchEvent(new Event("resize")), ms)); };
+$("#btnNav").onclick = toggleNav; $("#btnNavIn").onclick = toggleNav;
 setNavOff(!!lsGet(STORE + "-nav"), false);
 $("#btnPdf").onclick = () => Exp.page();
 $("#btnTheme").onclick = () => {

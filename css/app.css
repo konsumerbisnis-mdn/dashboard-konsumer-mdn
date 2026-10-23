@@ -906,3 +906,9 @@ body.nav-off .content{max-width:none}
 /* ikon KC: bingkai bulat persis seperti foto profil RM */
 .rmc .av.kc.img{border-radius:50%;background:none}
 .rmc .av.kc.img img{object-fit:cover}
+
+/* ---------- tombol sembunyikan di dalam menu samping (hanya layar lebar; di HP memakai tombol banner) ---------- */
+.nav-hide{display:none;margin-left:auto;flex:none;width:32px;height:32px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2);color:var(--ink-2);cursor:pointer;align-items:center;justify-content:center;padding:0}
+.nav-hide:hover{background:var(--accent-soft);color:var(--accent)}
+.nav-hide svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+@media (min-width:960px){.nav-hide{display:inline-flex}.nav .brand{padding-right:2px}}

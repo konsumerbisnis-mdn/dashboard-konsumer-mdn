@@ -895,3 +895,10 @@ body.nav-off .content{max-width:none}
 .kq.k2{background:#18a957;color:#fff}
 .kq.k3{background:#ffd400;color:#1a1a1a}
 .kq.k4{background:#e5252d;color:#fff}
+
+/* ---------- peringkat RM: pilih bulan & histori 5 bulan ---------- */
+.rk-sel{width:auto;min-width:130px;padding:5px 8px}
+.rk-hist{display:inline-flex;gap:3px;align-items:flex-end;margin-left:4px;vertical-align:middle}
+.rk-h{display:inline-flex;flex-direction:column;align-items:center;gap:1px;line-height:1}
+.rk-h small{font-size:8.5px;color:var(--muted);font-weight:700;text-transform:uppercase}
+.rk-h .kq{margin-right:0}

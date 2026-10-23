@@ -887,7 +887,7 @@ const numX = v => { if (typeof v === "number") return isFinite(v) ? v : 0; const
 const isoX = v => typeof v === "number" ? new Date(Math.round((v - 25569) * 864e5)).toISOString().slice(0, 10) : v instanceof Date ? iso(v) : normDate(v);
 /* ================= VIEW: Produktivitas RM (dari Database history + database harian) ================= */
 // DB.rmk = { months[{ym,kc,rm,jg,area,tDeb,tDisb,sDeb,sOs,kDeb,kOs,deb,os,kuad}], tx[{d,rm,kc,pl,deb,jenis}], asof }
-const RS = Object.assign({ ym: null, area: "ALL", kc: "ALL", cmp: "mtd", cmpG: "kc", sel: null, selKc: null, pm: "rm", selYr: null, co: "berjalan", rkm: "m", apxG: "kc" }, lsGet(STORE + "-rm") || {});
+const RS = Object.assign({ ym: null, area: "ALL", kc: "ALL", cmp: "mtd", cmpG: "kc", sel: null, selKc: null, pm: "rm", selYr: null, co: "berjalan", rkm: "m", rkMonth: null, apxG: "kc" }, lsGet(STORE + "-rm") || {});
 const saveRS = () => lsSet(STORE + "-rm", RS);
 const kuadOf = p => p == null ? null : p >= 1.05 ? 1 : p >= 1 ? 2 : p >= .5 ? 3 : 4;
 const kq = k => k ? `<span class="kq k${k}" title="Kuadran ${k}">K${k}</span>` : `<span class="kq k0">–</span>`;
@@ -937,6 +937,7 @@ function viewRM(v) {
   const P = DB.rmk, yms = uniq(P.months.filter(x => x.os > 0 || x.deb > 0).map(x => x.ym)).sort();
   if (!yms.includes(RS.ym)) RS.ym = P.asof && yms.includes(P.asof.slice(0, 7)) ? P.asof.slice(0, 7) : yms[yms.length - 1];
   const ym = RS.ym, yr = ym.slice(0, 4), isCur = P.asof && P.asof.startsWith(ym), day = isCur ? +P.asof.slice(8) : 31;
+  const rkYm = yms.includes(RS.rkMonth) ? RS.rkMonth : ym;
   const areas = uniq(P.months.map(x => x.area)).filter(Boolean).sort();
   const kcs = uniq(P.months.filter(x => RS.area === "ALL" || x.area === RS.area).map(x => x.kc)).filter(Boolean).sort();
   if (RS.kc !== "ALL" && !kcs.includes(RS.kc)) RS.kc = "ALL";
@@ -983,11 +984,11 @@ function viewRM(v) {
       <section class="panel"><div class="panel-h"><h2>Disbursement bulanan vs target</h2><span class="sub">${RL.s} & ${RL.k}</span></div><div class="chart"><canvas id="cRmMon"></canvas></div></section>
       <section class="panel"><div class="panel-h"><h2>Komposisi ${RL.s} & ${RL.k}</h2><span class="sub">${per}</span></div><div class="chart"><canvas id="cRmJen"></canvas></div></section>
     </div>
-    <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>Peringkat ${RL.who}</h2><div class="toolbar"><div class="seg" role="tablist" aria-label="Dasar peringkat"><button type="button" role="tab" aria-selected="${RS.rkm !== "co"}" data-rkm="m">Bulan berjalan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div><span class="sub" id="rLbS">garis = 100% target · klik nama untuk lihat pencapaiannya</span><button class="btn" id="rExp" type="button">Ekspor CSV</button></div></div><div class="lb" id="rLb"></div></section>
+    <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>Peringkat ${RL.who}</h2><div class="toolbar"><div class="seg" role="tablist" aria-label="Dasar peringkat"><button type="button" role="tab" aria-selected="${RS.rkm !== "co"}" data-rkm="m">Pilih bulan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div>${RS.rkm === "co" ? "" : `<select class="ctl rk-sel" id="rkMonth" aria-label="Pilih bulan peringkat">${[...yms].reverse().map(m => `<option value="${m}" ${m === rkYm ? "selected" : ""}>${ymS(m)}${P.asof && P.asof.startsWith(m) ? " (berjalan)" : ""}</option>`).join("")}</select>`}<span class="sub" id="rLbS">garis = 100% target · klik nama untuk lihat pencapaiannya</span><button class="btn" id="rExp" type="button">Ekspor CSV</button></div></div><div class="lb" id="rLb"></div></section>
     <section class="panel" ${RS.pm === "kc" ? "" : "hidden"}><div class="panel-h"><h2>Per kantor cabang</h2><span class="sub">${ymS(ym)}</span></div><div id="rKc"></div></section>
     <section class="panel" ${RS.pm === "kc" ? "hidden" : ""}><div class="panel-h"><h2>History kuadran ${RL.who} ${yr}</h2><span class="sub">per bulan</span></div><div id="rHq"></div></section>
     <section class="panel" id="rApx" data-nosec></section>`;
-  $("#rY").onchange = e => { RS.ym = e.target.value; saveRS(); render(); };
+  $("#rY").onchange = e => { RS.ym = e.target.value; RS.rkMonth = null; saveRS(); render(); };
   bindSeg();
   v.querySelectorAll("[data-rmm]").forEach(b => b.onclick = () => { if (RS.pm === b.dataset.rmm) return; RS.pm = RS.cmpG = b.dataset.rmm; RS.selYr = null; saveRS(); render(); });
   $("#rA").onchange = e => { RS.area = e.target.value; RS.kc = "ALL"; saveRS(); render(); };
@@ -1000,22 +1001,27 @@ function viewRM(v) {
     const a = P.months.filter(x => coMs.includes(x.ym) && inScope(x) && nmKey(x.rm) === k), l = a[a.length - 1];
     const o = { rm: l.rm, kc: l.kc, jg: l.jg, tDisb: sum(a, "tDisb"), tDeb: sum(a, "tDeb"), os: sum(a, "os"), deb: sum(a, "deb"), sDeb: sum(a, "sDeb"), sOs: sum(a, "sOs"), kDeb: sum(a, "kDeb"), kOs: sum(a, "kOs") };
     o.pen = o.tDisb ? o.os / o.tDisb : null; return o; });
-  const lb = [...(isCo ? coRows() : rows)].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);
-  $("#rLbS").textContent = (isCo ? `carry over Jan s.d. ${BULAN[coEnd - 1]} ${yr} · ` : `${ymS(ym)} · `) + "garis = 100% target · klik nama untuk lihat pencapaiannya";
+  const rowsRk = rkYm === ym ? rows : P.months.filter(x => x.ym === rkYm && inScope(x) && (x.tDisb > 0 || x.os > 0)).map(x => ({ ...x, pen: x.tDisb ? x.os / x.tDisb : null }));
+  const lb = [...(isCo ? coRows() : rowsRk)].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);
+  $("#rLbS").textContent = (isCo ? `carry over Jan s.d. ${BULAN[coEnd - 1]} ${yr} · ` : `${ymS(rkYm)} · `) + "garis = 100% target · klik nama untuk lihat pencapaiannya";
   v.querySelectorAll("[data-rkm]").forEach(b => b.onclick = () => { if (RS.rkm === b.dataset.rkm) return; RS.rkm = b.dataset.rkm; saveRS(); render(); });
-  const last6 = (() => { const out = []; for (let i = 5; i >= 0; i--) { const d = new Date(+yr, +ym.slice(5, 7) - 1 - i, 1); out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); } return out; })();
+  { const rs = $("#rkMonth"); if (rs) rs.onchange = e => { RS.rkMonth = e.target.value; RS.rkm = "m"; saveRS(); render(); }; }
+  const rkBase = isCo ? yr + "-" + String(coEnd).padStart(2, "0") : rkYm;
+  const hist5 = (() => { const out = []; for (let i = 5; i >= 1; i--) { const d = new Date(+rkBase.slice(0, 4), +rkBase.slice(5, 7) - 1 - i, 1); out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); } return out; })();
   const kOf = (rm, m) => { const r = P.months.find(x => x.ym === m && nmKey(x.rm) === nmKey(rm)); return r && r.tDisb ? kuadOf(r.os / r.tDisb) : null; };
+  const histChip = (rm, m) => { const r = P.months.find(x => x.ym === m && nmKey(x.rm) === nmKey(rm)), p = r && r.tDisb ? r.os / r.tDisb : null; return `<span class="rk-h" title="${ymS(m)}: ${p == null ? "tanpa target" : pct(p, 0)}"><small>${BULAN[+m.slice(5, 7) - 1]}</small>${kq(kuadOf(p))}</span>`; };
+  $("#rLbS").textContent += ` · histori kuadran ${ymS(hist5[0])}–${ymS(hist5[4])}`;
   $("#rLb").innerHTML = lb.length ? lb.map((x, i) => `<div class="lb-row" style="grid-template-columns:28px minmax(0,1.4fr) minmax(0,2fr) auto">
       <span class="lb-rank">${i + 1}</span>
       <div class="lb-name wav">${rmAvatar(x.rm, 34)}<div><button class="linkish" data-rm="${esc(x.rm)}">${esc(x.rm)}</button><small>${esc(x.kc)}${x.jg ? " · " + esc(x.jg) : ""}</small></div></div>
       <div class="lb-mid"><div class="lb-bar"><i style="width:${clamp((x.pen || 0) / 1.5, 0, 1) * 100}%;background:var(--${x.pen == null ? "muted" : capaiCls(x.pen)})"></i><span class="tick"></span></div>
-        <div class="lb-val">${rpJ(x.os)} / ${x.tDisb ? rpJ(x.tDisb) : "tanpa target"} · ${x.deb} deb (${RL.s[0]} ${x.sDeb} · ${RL.k[0]} ${x.kDeb}) · ${last6.map(m => kq(kOf(x.rm, m))).join("")}</div></div>
+        <div class="lb-val">${rpJ(x.os)} / ${x.tDisb ? rpJ(x.tDisb) : "tanpa target"} · ${x.deb} deb (${RL.s[0]} ${x.sDeb} · ${RL.k[0]} ${x.kDeb}) · <span class="rk-hist">${hist5.map(m => histChip(x.rm, m)).join("")}</span></div></div>
       <span style="display:flex;gap:6px;align-items:center">${x.pen != null ? chip(pct(x.pen, 0), capaiCls(x.pen)) : ""}${kq(kuadOf(x.pen))}</span></div>`).join("") : '<div class="empty">Tidak ada RM pada filter ini.</div>';
   $("#rLb").querySelectorAll("[data-rm]").forEach(b => b.onclick = () => openRM(b.dataset.rm));
   if (!RS.sel || !P.months.some(x => nmKey(x.rm) === nmKey(RS.sel) && inScope(x))) RS.sel = lb.length ? lb[0].rm : null;
   renderRMPer(inScope);
   if (SEG.rm !== "K") renderRmNett({ P, inScope, ym, isCur });
-  $("#rExp").onclick = () => exportCSV("produktivitas-" + RL.seg.toLowerCase().replace(/\W+/g, "-") + "-" + (isCo ? "carry-over-" + yr + "-" + String(coEnd).padStart(2, "0") : ym), [["rm","RM"],["kc","KC"],["jg","JG"],["tDisb","Target disb (juta)"],["os","Realisasi (juta)"],["pen","Pencapaian"],["tDeb","Target deb"],["deb","Deb"],["sDeb","Deb " + RL.s.toLowerCase()],["sOs",RL.s + " (juta)"],["kDeb","Deb " + RL.k.toLowerCase()],["kOs",RL.k + " (juta)"]], lb);
+  $("#rExp").onclick = () => exportCSV("produktivitas-" + RL.seg.toLowerCase().replace(/\W+/g, "-") + "-" + (isCo ? "carry-over-" + yr + "-" + String(coEnd).padStart(2, "0") : rkYm), [["rm","RM"],["kc","KC"],["jg","JG"],["tDisb","Target disb (juta)"],["os","Realisasi (juta)"],["pen","Pencapaian"],["tDeb","Target deb"],["deb","Deb"],["sDeb","Deb " + RL.s.toLowerCase()],["sOs",RL.s + " (juta)"],["kDeb","Deb " + RL.k.toLowerCase()],["kOs",RL.k + " (juta)"]], lb);
 
   // per KC
   const kcRows = uniq(rows.map(x => x.kc)).map(kc => { const a = rows.filter(x => x.kc === kc), t = a.filter(x => x.tDisb > 0), tt = sum(t, "tDisb"), o = sum(a, "os");

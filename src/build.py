@@ -267,6 +267,28 @@ rm = rep(rm, '''  const lb = [...rows].sort((a, b) => (b.pen ?? -1) - (a.pen ?? 
   $("#rLbS").textContent = (isCo ? `carry over Jan s.d. ${BULAN[coEnd - 1]} ${yr} · ` : `${ymS(ym)} · `) + "garis = 100% target · klik nama untuk lihat pencapaiannya";
   v.querySelectorAll("[data-rkm]").forEach(b => b.onclick = () => { if (RS.rkm === b.dataset.rkm) return; RS.rkm = b.dataset.rkm; saveRS(); render(); });''')
 rm = rep(rm, '''.replace(/\\W+/g, "-") + "-" + ym,''', '''.replace(/\\W+/g, "-") + "-" + (isCo ? "carry-over-" + yr + "-" + String(coEnd).padStart(2, "0") : ym),''')
+# peringkat: pilih bulan sendiri + histori kuadran 5 bulan sebelum bulan itu (carry over: sebelum bulan batas carry over)
+rm = rep(rm, """co: "berjalan", rkm: "m", apxG: "kc" }""", """co: "berjalan", rkm: "m", rkMonth: null, apxG: "kc" }""")
+rm = rep(rm, """$("#rY").onchange = e => { RS.ym = e.target.value; saveRS(); render(); };""", """$("#rY").onchange = e => { RS.ym = e.target.value; RS.rkMonth = null; saveRS(); render(); };""")
+rm = rep(rm, """const ym = RS.ym, yr = ym.slice(0, 4), isCur = P.asof && P.asof.startsWith(ym), day = isCur ? +P.asof.slice(8) : 31;""",
+         """const ym = RS.ym, yr = ym.slice(0, 4), isCur = P.asof && P.asof.startsWith(ym), day = isCur ? +P.asof.slice(8) : 31;
+  const rkYm = yms.includes(RS.rkMonth) ? RS.rkMonth : ym;""")
+rm = rep(rm, """data-rkm="m">Bulan berjalan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div>""",
+         """data-rkm="m">Pilih bulan</button><button type="button" role="tab" aria-selected="${RS.rkm === "co"}" data-rkm="co">Carry over</button></div>${RS.rkm === "co" ? "" : `<select class="ctl rk-sel" id="rkMonth" aria-label="Pilih bulan peringkat">${[...yms].reverse().map(m => `<option value="${m}" ${m === rkYm ? "selected" : ""}>${ymS(m)}${P.asof && P.asof.startsWith(m) ? " (berjalan)" : ""}</option>`).join("")}</select>`}""")
+rm = rep(rm, """  const lb = [...(isCo ? coRows() : rows)].sort(""", """  const rowsRk = rkYm === ym ? rows : P.months.filter(x => x.ym === rkYm && inScope(x) && (x.tDisb > 0 || x.os > 0)).map(x => ({ ...x, pen: x.tDisb ? x.os / x.tDisb : null }));
+  const lb = [...(isCo ? coRows() : rowsRk)].sort(""")
+rm = rep(rm, """`${ymS(ym)} · `) + "garis = 100% target""", """`${ymS(rkYm)} · `) + "garis = 100% target""")
+rm = rep(rm, """RS.rkm = b.dataset.rkm; saveRS(); render(); });""", """RS.rkm = b.dataset.rkm; saveRS(); render(); });
+  { const rs = $("#rkMonth"); if (rs) rs.onchange = e => { RS.rkMonth = e.target.value; RS.rkm = "m"; saveRS(); render(); }; }""")
+rm = rep(rm, """String(coEnd).padStart(2, "0") : ym),""", """String(coEnd).padStart(2, "0") : rkYm),""")
+rm = rep(rm, """const last6 = (() => { const out = []; for (let i = 5; i >= 0; i--) { const d = new Date(+yr, +ym.slice(5, 7) - 1 - i, 1); out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); } return out; })();""",
+         """const rkBase = isCo ? yr + "-" + String(coEnd).padStart(2, "0") : rkYm;
+  const hist5 = (() => { const out = []; for (let i = 5; i >= 1; i--) { const d = new Date(+rkBase.slice(0, 4), +rkBase.slice(5, 7) - 1 - i, 1); out.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")); } return out; })();""")
+rm = rep(rm, """const kOf = (rm, m) => { const r = P.months.find(x => x.ym === m && nmKey(x.rm) === nmKey(rm)); return r && r.tDisb ? kuadOf(r.os / r.tDisb) : null; };""",
+         """const kOf = (rm, m) => { const r = P.months.find(x => x.ym === m && nmKey(x.rm) === nmKey(rm)); return r && r.tDisb ? kuadOf(r.os / r.tDisb) : null; };
+  const histChip = (rm, m) => { const r = P.months.find(x => x.ym === m && nmKey(x.rm) === nmKey(rm)), p = r && r.tDisb ? r.os / r.tDisb : null; return `<span class="rk-h" title="${ymS(m)}: ${p == null ? "tanpa target" : pct(p, 0)}"><small>${BULAN[+m.slice(5, 7) - 1]}</small>${kq(kuadOf(p))}</span>`; };
+  $("#rLbS").textContent += ` · histori kuadran ${ymS(hist5[0])}–${ymS(hist5[4])}`;""")
+rm = rep(rm, """${last6.map(m => kq(kOf(x.rm, m))).join("")}""", """<span class="rk-hist">${hist5.map(m => histChip(x.rm, m)).join("")}</span>""")
 # pencapaian per RM / cabang: rincian bulanan (grafik & tabel Jan s.d. Des, RM di cabang) disembunyikan, dibuka bila perlu
 rm = rep(rm, '''    <div class="chart"><canvas id="cRmPer"></canvas></div>
     <div id="tRmPer"></div>''', '''    <details class="rm-more" ${RS.perOpen ? "open" : ""}><summary>Rincian per bulan ${yr}${isKc ? " & RM di cabang" : ""} <small class="note">grafik & tabel Jan–Des, carry over ${coLbl}</small></summary>

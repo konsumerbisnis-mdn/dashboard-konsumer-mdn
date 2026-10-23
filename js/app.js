@@ -2921,15 +2921,6 @@ async function upPart(f, k, inp) {
   pg.done(); if (inp) inp.value = "";
 }
 // foto RM / ikon KC: nama file dicocokkan ke nama RM/mantri (produktivitas & LW321) atau nama KC (master), dipotong persegi lalu diperkecil
-// ikon KC berbingkai: sudut yang transparan / hitam di tepi dibuat transparan (dari tepi ke dalam, berhenti di bingkai berwarna)
-function clearEdgeBg(c2, S) {
-  const im = c2.getImageData(0, 0, S, S), d = im.data, seen = new Uint8Array(S * S), st = [];
-  const bg = i => d[i * 4 + 3] < 40 || (d[i * 4] + d[i * 4 + 1] + d[i * 4 + 2] < 60 && d[i * 4 + 3] > 0 && d[i * 4 + 3] <= 255);
-  const push = i => { if (!seen[i] && bg(i)) { seen[i] = 1; st.push(i); } };
-  for (let k = 0; k < S; k++) { push(k); push((S - 1) * S + k); push(k * S); push(k * S + S - 1); }
-  while (st.length) { const i = st.pop(), x = i % S, y = (i - x) / S; d[i * 4 + 3] = 0; if (x > 0) push(i - 1); if (x < S - 1) push(i + 1); if (y > 0) push(i - S); if (y < S - 1) push(i + S); }
-  c2.putImageData(im, 0, 0);
-}
 async function upFoto(files, kind, inp) {
   const pg = progOf(kind === "kc" ? "fotoKc" : "fotoRm");
   const names = kind === "kc" ? KC_MASTER.map(u => u.nama) : uniq([...Object.values(DB.rmkSets).flatMap(P => P && P.months ? P.months.map(x => x.rm) : []), ...Object.values(DB.lwSets).flatMap(L => L && L.rmN ? L.rmN : [])]).filter(n => n && !/^PN |^\(?Tanpa/.test(n));
@@ -2943,7 +2934,7 @@ async function upFoto(files, kind, inp) {
     if (!nm) { miss.push(base); continue; }
     try {
       const bmp = await createImageBitmap(f), S = kind === "kc" ? 256 : 320, cv = document.createElement("canvas"); cv.width = cv.height = S; const c2 = cv.getContext("2d");
-      if (kind === "kc") { const sc = Math.min(S / bmp.width, S / bmp.height), w = bmp.width * sc, h = bmp.height * sc; c2.drawImage(bmp, (S - w) / 2, (S - h) / 2, w, h); clearEdgeBg(c2, S); }
+      if (kind === "kc") { const sc = Math.min(S / bmp.width, S / bmp.height), w = bmp.width * sc, h = bmp.height * sc; c2.drawImage(bmp, (S - w) / 2, (S - h) / 2, w, h); }
       else { const side = Math.min(bmp.width, bmp.height), sx = (bmp.width - side) / 2, sy = bmp.height > bmp.width ? (bmp.height - side) * .2 : 0; c2.drawImage(bmp, sx, sy, side, side, 0, 0, S, S); }
       let url = cv.toDataURL("image/webp", .82); if (!url.startsWith("data:image/webp")) url = cv.toDataURL(kind === "kc" ? "image/png" : "image/jpeg", .85);
       items.push({ kind, name: nm, data: url }); ok.push(nm);

@@ -902,7 +902,3 @@ body.nav-off .content{max-width:none}
 .rk-h{display:inline-flex;flex-direction:column;align-items:center;gap:1px;line-height:1}
 .rk-h small{font-size:8.5px;color:var(--muted);font-weight:700;text-transform:uppercase}
 .rk-h .kq{margin-right:0}
-
-/* ikon KC berbingkai: tampil apa adanya, tanpa cincin putih, latar, atau pemotongan sudut */
-.rmc .av.kc.img{border-radius:0;background:none;box-shadow:none;overflow:visible}
-.rmc .av.kc.img img{object-fit:contain;filter:drop-shadow(0 8px 14px rgba(0,0,0,.35))}

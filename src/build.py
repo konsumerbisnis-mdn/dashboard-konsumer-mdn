@@ -414,4 +414,10 @@ js = rep(js, '''const secs = [...v.querySelectorAll("section.panel")].filter(x =
 open(os.path.join(ROOT, 'js', 'app.js'), 'w', encoding='utf8').write(js)
 css = open(os.path.join(HERE, 'kpr.css'), encoding='utf8').read() + '\n' + P('extra.css')
 open(os.path.join(ROOT, 'css', 'app.css'), 'w', encoding='utf8').write(css)
+# versi di tautan index.html (hash isi) supaya browser/CDN tidak memakai app.js / app.css lama sesudah update
+import hashlib, re
+ix = os.path.join(ROOT, 'index.html'); h = open(ix, encoding='utf8').read()
+vj = hashlib.md5(js.encode('utf8')).hexdigest()[:8]; vc = hashlib.md5(css.encode('utf8')).hexdigest()[:8]
+h = re.sub(r'js/app\.js(\?v=\w+)?"', 'js/app.js?v=' + vj + '"', h); h = re.sub(r'css/app\.css(\?v=\w+)?"', 'css/app.css?v=' + vc + '"', h)
+open(ix, 'w', encoding='utf8').write(h)
 print('app.js', len(js), 'app.css', len(css))

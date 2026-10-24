@@ -935,5 +935,7 @@ body.nav-off .content{max-width:none}
   .l-side .l-alert summary::after{content:none}
   .l-side .l-alert[open] summary{writing-mode:horizontal-tb;align-self:stretch;padding:12px 16px 8px;border-bottom:1px solid rgba(255,255,255,.18)}
   .l-side .l-alert[open] summary::after{content:"✕";margin-left:auto;opacity:.8}
-  .l-side .l-alert ul{margin:0;padding:12px 16px 16px;gap:10px;overflow:auto;flex:1}
+  .l-side .l-alert[open]{overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.45) transparent}   /* catatan banyak: panel bisa digulir ke bawah */
+  .l-side .l-alert[open] summary{position:sticky;top:0;z-index:1;background:rgba(14,56,132,.96);backdrop-filter:blur(6px)}
+  .l-side .l-alert ul{margin:0;padding:12px 16px 16px;gap:10px}
 }

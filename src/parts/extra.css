@@ -325,16 +325,17 @@ body.nav-off .content{max-width:none}
 .foto-lb{cursor:zoom-out}
 .foto-lb img{width:100%;height:100%;object-fit:cover;display:block}
 
-/* beranda desktop: catatan perlu perhatian jadi panel vertikal di sebelah kanan kartu dashboard */
-.l-main{display:block;width:100%}
-.l-left{display:grid;gap:14px;width:100%;min-width:0}
+/* beranda desktop lebar: catatan perlu perhatian = tab vertikal menempel di kanan kartu; diklik melebar ke kanan (menu tetap di tengah) */
 .l-side{margin-top:14px}
-@media (min-width:1100px){
-  .l-center{max-width:1260px}
-  .l-main{display:grid;grid-template-columns:minmax(0,900px) 340px;gap:16px;justify-content:center;align-items:stretch}
-  .l-side{position:relative;margin-top:0}
-  .l-side .l-alert{position:absolute;inset:0;overflow:auto;display:flex;flex-direction:column;padding:6px 14px 10px}
-  .l-side .l-alert summary{pointer-events:none;cursor:default;padding:10px 0 8px;border-bottom:1px solid rgba(255,255,255,.18);margin-bottom:8px}
+@media (min-width:1500px){
+  .l-row{position:relative;width:100%}
+  .l-side{position:absolute;left:calc(100% + 16px);top:0;bottom:0;margin:0;z-index:5}
+  .l-side .l-alert{position:absolute;left:0;top:0;bottom:0;width:56px;display:flex;flex-direction:column;overflow:hidden;padding:0;background:rgba(10,45,110,.34);transition:width .25s ease}
+  .l-side .l-alert[open]{width:min(470px,calc((100vw - 900px) / 2 - 36px))}
+  .l-side .l-alert summary{writing-mode:vertical-rl;align-self:center;padding:16px 0;gap:10px;font-size:14px}
+  .l-side .l-alert summary .l-badge{writing-mode:horizontal-tb}
   .l-side .l-alert summary::after{content:none}
-  .l-side .l-alert ul{margin:0;gap:10px}
+  .l-side .l-alert[open] summary{writing-mode:horizontal-tb;align-self:stretch;padding:12px 16px 8px;border-bottom:1px solid rgba(255,255,255,.18)}
+  .l-side .l-alert[open] summary::after{content:"✕";margin-left:auto;opacity:.8}
+  .l-side .l-alert ul{margin:0;padding:12px 16px 16px;gap:10px;overflow:auto;flex:1}
 }

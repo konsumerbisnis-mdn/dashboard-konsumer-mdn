@@ -461,6 +461,7 @@ function viewBeranda(v) {
         <p>Halo, ${esc((Auth.user || {}).nama || (Auth.user || {}).username || "")} · silakan pilih dashboard</p>
         <span class="l-now" id="lNow"></span>
       </div>
+      <div class="l-main"><div class="l-left">
       <nav class="l-cards" aria-label="Pilih dashboard">
         ${ks ? card("keragaan", ICON.keragaan, "Keragaan Konsumer", `OS ${rpM(ks.cur.os)}${ks.rka && ks.rka.os ? " · " + pct(ks.cur.os / ks.rka.os, 1) + " RKA" : ""} · SML ${pct(ks.cur.psml, 2)} · NPL ${pct(ks.cur.pnpl, 2)}`, "Tersedia · posisi " + tglS(ks.d))
           : card("keragaan", ICON.keragaan, "Keragaan Konsumer", "OS, SML, NPL & debitur Briguna Ritel, Mikro & KPR per KC", ld(KER_LOADING, "Belum ada data"), "warn")}
@@ -481,8 +482,8 @@ function viewBeranda(v) {
         <button type="button" class="l-qv-x" id="lQvX" aria-label="Tutup data" ${LQV.key ? "" : "hidden"}><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </div>
       <section class="l-qvp" id="lQvP" ${LQV.key ? "" : "hidden"}></section>
-      ${alerts.length ? `<details class="l-alert"><summary><span class="l-badge red">${alerts.length}</span> Catatan perlu perhatian</summary>
-        <ul>${alerts.map(a => `<li><span class="l-badge ${a[0]}">${a[1]}</span><span>${a[2]}</span></li>`).join("")}</ul></details>` : ""}
+      </div>${alerts.length ? `<div class="l-side"><details class="l-alert" ${matchMedia("(min-width:1100px)").matches ? "open" : ""}><summary><span class="l-badge red">${alerts.length}</span> Catatan perlu perhatian</summary>
+        <ul>${alerts.map(a => `<li><span class="l-badge ${a[0]}">${a[1]}</span><span>${a[2]}</span></li>`).join("")}</ul></details></div>` : ""}</div>
       <div class="l-meta">
         <span>${ks ? `Keragaan posisi <b>${tglS(ks.d)}</b>${DB.meta && DB.meta.updated ? ", data server diperbarui " + tgl(new Date(DB.meta.updated)) + " pukul " + new Date(DB.meta.updated).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : ""}.` : KER_LOADING ? "Memuat data…" : "Data keragaan belum tersedia."}
           ${rsAsof ? `Produktivitas s.d. <b>${tglS(rsAsof)}</b>.` : ""} ${psAsof ? `Pipeline posisi <b>${tglS(psAsof)}</b>.` : ""} ${lwAsof ? `LW321 posisi <b>${nS(lwAsof)}</b>.` : ""}</span>
@@ -3434,7 +3435,9 @@ sndLabel();
   const fit = () => {
     raf = 0; if (land.hidden) return;
     const c = land.querySelector(".l-center"); if (!c) return; c.style.zoom = "";
-    if (innerWidth < 720 || land.querySelector(".l-alert[open]")) return;
+    const wide = innerWidth >= 1100, al = land.querySelector(".l-alert");
+    if (al && land.dataset.w !== String(wide)) { land.dataset.w = String(wide); al.open = wide; }   // layar lebar: catatan selalu terbuka di panel kanan; layar sempit: tertutup
+    if (innerWidth < 720 || (al && al.open && !wide)) return;
     const over = land.offsetHeight - innerHeight; if (over <= 2) return;   // tinggi elemen (bukan scrollHeight: hiasan latar ikut terhitung)
     const h = c.offsetHeight; if (!h) return;   // offsetHeight: tidak terpengaruh animasi masuk (transform)
     c.style.zoom = String(Math.max(.7, Math.floor((h - over - 2) / h * 100) / 100));

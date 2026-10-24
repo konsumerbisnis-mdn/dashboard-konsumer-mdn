@@ -7,7 +7,9 @@
   const fit = () => {
     raf = 0; if (land.hidden) return;
     const c = land.querySelector(".l-center"); if (!c) return; c.style.zoom = "";
-    if (innerWidth < 720 || land.querySelector(".l-alert[open]")) return;
+    const wide = innerWidth >= 1100, al = land.querySelector(".l-alert");
+    if (al && land.dataset.w !== String(wide)) { land.dataset.w = String(wide); al.open = wide; }   // layar lebar: catatan selalu terbuka di panel kanan; layar sempit: tertutup
+    if (innerWidth < 720 || (al && al.open && !wide)) return;
     const over = land.offsetHeight - innerHeight; if (over <= 2) return;   // tinggi elemen (bukan scrollHeight: hiasan latar ikut terhitung)
     const h = c.offsetHeight; if (!h) return;   // offsetHeight: tidak terpengaruh animasi masuk (transform)
     c.style.zoom = String(Math.max(.7, Math.floor((h - over - 2) / h * 100) / 100));

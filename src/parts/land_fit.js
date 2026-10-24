@@ -7,7 +7,8 @@
   const fit = () => {
     raf = 0; if (land.hidden) return;
     const c = land.querySelector(".l-center"); if (!c) return; c.style.zoom = "";
-    if (innerWidth < 720 || land.querySelector(".l-alert[open]")) return;
+    const side = innerWidth >= 1500, al = land.querySelector(".l-alert");   // layar sangat lebar: catatan jadi tab di kanan kartu (tidak menambah tinggi)
+    if (innerWidth < 720 || (al && al.open && !side)) return;
     const over = land.offsetHeight - innerHeight; if (over <= 2) return;   // tinggi elemen (bukan scrollHeight: hiasan latar ikut terhitung)
     const h = c.offsetHeight; if (!h) return;   // offsetHeight: tidak terpengaruh animasi masuk (transform)
     c.style.zoom = String(Math.max(.7, Math.floor((h - over - 2) / h * 100) / 100));

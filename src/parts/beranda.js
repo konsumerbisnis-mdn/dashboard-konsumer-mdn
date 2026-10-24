@@ -114,7 +114,7 @@ function viewBeranda(v) {
         <p>Halo, ${esc((Auth.user || {}).nama || (Auth.user || {}).username || "")} · silakan pilih dashboard</p>
         <span class="l-now" id="lNow"></span>
       </div>
-      <nav class="l-cards" aria-label="Pilih dashboard">
+      <div class="l-row"><nav class="l-cards" aria-label="Pilih dashboard">
         ${ks ? card("keragaan", ICON.keragaan, "Keragaan Konsumer", `OS ${rpM(ks.cur.os)}${ks.rka && ks.rka.os ? " · " + pct(ks.cur.os / ks.rka.os, 1) + " RKA" : ""} · SML ${pct(ks.cur.psml, 2)} · NPL ${pct(ks.cur.pnpl, 2)}`, "Tersedia · posisi " + tglS(ks.d))
           : card("keragaan", ICON.keragaan, "Keragaan Konsumer", "OS, SML, NPL & debitur Briguna Ritel, Mikro & KPR per KC", ld(KER_LOADING, "Belum ada data"), "warn")}
         ${rsAsof ? card("produktivitas", ICON.produktivitas, "Produktivitas RM", ["R", "M", "K"].filter(s => rsum[s]).map(s => `${s === "R" ? "Ritel" : s === "M" ? "Mikro" : "KPR"} ${rpJ(rsum[s].os)}`).join(" · "), "Tersedia · s.d. " + tglS(rsAsof))
@@ -126,7 +126,8 @@ function viewBeranda(v) {
         ${psAsof ? card("pipeline", ICON.pipeline, "Pipeline Brispot RM", ["B", "K"].filter(s => psum[s]).map(s => `${s === "B" ? "Briguna" : "KPR"} ${rpJ(psum[s].pl)} · ${nf0.format(psum[s].n)} deb`).join(" · "), "Tersedia · posisi " + tglS(psAsof))
           : card("pipeline", ICON.pipeline, "Pipeline Brispot RM", "Funnel, jadwal akad, TAT & rencana realisasi RM", ld(PIPE_LOADING, "Belum ada data"), "warn")}
         ${card("simulasi", ICON.simulasi, "Simulasi Suku Bunga", `Briguna (max plafond & angsuran) · KPR ${DB.rate ? uniq(DB.rate.rows.map(x => x.prog)).length + " program" : ""}`, DB.rate ? (String(DB.rate.title || "").replace(/^.*PROGRAM\s*/i, "Program ") || "Tersedia") : "Tersedia")}
-      </nav>
+      </nav>${alerts.length ? `<div class="l-side"><details class="l-alert"><summary><span class="l-badge red">${alerts.length}</span> Catatan perlu perhatian</summary>
+        <ul>${alerts.map(a => `<li><span class="l-badge ${a[0]}">${a[1]}</span><span>${a[2]}</span></li>`).join("")}</ul></details></div>` : ""}</div>
       <div class="l-qv">
         <span class="l-qv-ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
         <label for="lQv">Lihat data cepat</label>
@@ -134,8 +135,7 @@ function viewBeranda(v) {
         <button type="button" class="l-qv-x" id="lQvX" aria-label="Tutup data" ${LQV.key ? "" : "hidden"}><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </div>
       <section class="l-qvp" id="lQvP" ${LQV.key ? "" : "hidden"}></section>
-      ${alerts.length ? `<details class="l-alert"><summary><span class="l-badge red">${alerts.length}</span> Catatan perlu perhatian</summary>
-        <ul>${alerts.map(a => `<li><span class="l-badge ${a[0]}">${a[1]}</span><span>${a[2]}</span></li>`).join("")}</ul></details>` : ""}
+
       <div class="l-meta">
         <span>${ks ? `Keragaan posisi <b>${tglS(ks.d)}</b>${DB.meta && DB.meta.updated ? ", data server diperbarui " + tgl(new Date(DB.meta.updated)) + " pukul " + new Date(DB.meta.updated).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : ""}.` : KER_LOADING ? "Memuat data…" : "Data keragaan belum tersedia."}
           ${rsAsof ? `Produktivitas s.d. <b>${tglS(rsAsof)}</b>.` : ""} ${psAsof ? `Pipeline posisi <b>${tglS(psAsof)}</b>.` : ""} ${lwAsof ? `LW321 posisi <b>${nS(lwAsof)}</b>.` : ""}</span>

@@ -29,7 +29,10 @@ function chartTheme(cfg) {
   const o = cfg.options = cfg.options || {};
   o.layout = o.layout || {}; const p = o.layout.padding || {};
   o.layout.padding = typeof p === "number" ? { top: Math.max(p, 24), right: Math.max(p, 14), left: p, bottom: p } : { ...p, top: Math.max(p.top || 0, 24), right: Math.max(p.right || 0, 14) };
-  cfg.plugins = [...(cfg.plugins || []), DATA_LBL];
+  // animasi: batang tumbuh bergantian dari dasar; garis tergambar dari kiri ke kanan (dimatikan bila perangkat memakai "kurangi gerakan")
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) o.animation = false;
+  else if (o.animation === undefined) { const n = Math.max(1, ...ds.map(d => (d.data || []).length)); o.animation = { duration: 900, easing: "easeOutCubic", delay: c => c.type === "data" && c.mode === "default" ? c.dataIndex * Math.min(45, 700 / n) + (c.datasetIndex || 0) * 60 : 0 }; }
+  cfg.plugins = [...(cfg.plugins || []), DATA_LBL, ...(type === "line" && !nBar && o.animation ? [REVEAL] : [])];
   return cfg;
 }
 // teks label: persen mengikuti format sumbu; angka lain ditulis lengkap (pemisah ribuan)
@@ -82,3 +85,8 @@ const DATA_LBL = { id: "dataLbl", afterDatasetsDraw(ch) {
   });
   g.restore();
 } };
+// garis tergambar dari kiri ke kanan: area gambar dipotong sebesar kemajuan animasi (label angka ikut tersingkap)
+const REVEAL = { id: "reveal", afterInit(ch) { ch.$t0 = performance.now(); },
+  beforeDatasetsDraw(ch) { const A = ch.chartArea, p = Math.min(1, (performance.now() - (ch.$t0 || 0)) / 1000); if (!A || p >= 1) return; const e = 1 - Math.pow(1 - p, 3);
+    ch.ctx.save(); ch.ctx.beginPath(); ch.ctx.rect(0, 0, A.left + (A.right - A.left) * e + 2, ch.height); ch.ctx.clip(); ch.$clip = true; },
+  afterDatasetsDraw(ch) { if (!ch.$clip) return; ch.ctx.restore(); ch.$clip = false; if (ch.$raf) return; ch.$raf = requestAnimationFrame(() => { ch.$raf = 0; if (ch.canvas && ch.ctx) ch.draw(); }); } };

@@ -20,7 +20,7 @@ function render() {
   { const tt = document.querySelector(".topbar .ttl"); if (tt && tt.dataset.v !== title) { tt.dataset.v = title; tt.classList.remove("tb-in"); void tt.offsetWidth; tt.classList.add("tb-in"); } }
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; });
   try { fn(v); } catch (er) { console.error(er); v.innerHTML = `<section class="panel"><div class="empty"><p style="font-weight:700;margin:0 0 6px">Bagian ini belum bisa ditampilkan</p>${esc(er.message || er)}</div></section>`; }
-  setupSections(v, k); Exp.decorate(v);
+  setupSections(v, k); Exp.decorate(v); Anim.run(v, k);
 }
 // tombol Unduh tetap ada saat isi section digambar ulang (sub-tab, filter di dalam section)
 { let t = 0; const deco = () => { clearTimeout(t); t = setTimeout(() => { Exp.decorate($("#view")); Exp.decorate($("#landing")); }, 60); };

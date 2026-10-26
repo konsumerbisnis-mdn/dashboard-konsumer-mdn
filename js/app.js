@@ -147,12 +147,13 @@ function chartTheme(cfg) {
   o.layout = o.layout || {}; const p = o.layout.padding || {};
   o.layout.padding = typeof p === "number" ? { top: Math.max(p, 24), right: Math.max(p, 14), left: p, bottom: p } : { ...p, top: Math.max(p.top || 0, 24), right: Math.max(p.right || 0, 14) };
   // animasi: batang tumbuh bergantian dari dasar; garis tergambar dari kiri ke kanan (dimatikan bila perangkat memakai "kurangi gerakan")
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) o.animation = false;
-  else if (o.animation === undefined) { const n = Math.max(1, ...ds.map(d => (d.data || []).length)); o.animation = { duration: 900, easing: "easeOutCubic", delay: c => c.type === "data" && c.mode === "default" ? c.dataIndex * Math.min(45, 700 / n) + (c.datasetIndex || 0) * 60 : 0 }; }
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || LITE.on) o.animation = false;
+  else if (o.animation === undefined) { const n = Math.max(1, ...ds.map(d => (d.data || []).length)); o.animation = { duration: 520, easing: "easeOutCubic", delay: c => c.type === "data" && c.mode === "default" ? c.dataIndex * Math.min(24, 320 / n) + (c.datasetIndex || 0) * 30 : 0,
+    onComplete: c => { const ch = c.chart; if (ch.$lblWait) { ch.$lblWait = false; ch.draw(); } } }; }
   // tooltip: muncul / berpindah dengan transisi singkat dan halus
   o.plugins = o.plugins || {}; o.plugins.tooltip = { animation: { duration: 160, easing: "easeOutQuart" }, ...(o.plugins.tooltip || {}) };
   const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
-  cfg.plugins = [...(cfg.plugins || []), ...(nBar && motion ? [HOVER_FOCUS] : []), DATA_LBL, ...(type === "line" && !nBar && o.animation ? [REVEAL] : [])];
+  cfg.plugins = [...(cfg.plugins || []), ...(o.animation ? [LBL_WAIT] : []), ...(nBar && motion ? [HOVER_FOCUS] : []), DATA_LBL, ...(type === "line" && !nBar && o.animation ? [REVEAL] : [])];
   return cfg;
 }
 // teks label: persen mengikuti format sumbu; angka lain ditulis lengkap (pemisah ribuan)
@@ -163,6 +164,7 @@ function lblText(ch, d, v) {
   const a = Math.abs(v); return a >= 100 || Number.isInteger(v) ? nf0.format(Math.round(v)) : a >= 10 ? nf1.format(v) : nf2.format(v);
 }
 const DATA_LBL = { id: "dataLbl", afterDatasetsDraw(ch) {
+  if (ch.$lblWait) return;   // sedang animasi tumbuh: label menyusul setelah selesai
   const g = ch.ctx, A = ch.chartArea, horiz = ch.options.indexAxis === "y", placed = [], fs = 11, H = fs + 6;
   g.save(); g.font = `700 ${fs}px Inter, system-ui, sans-serif`; g.textBaseline = "middle"; g.textAlign = "center";
   const hit = r => placed.some(q => r.x < q.x + q.w + 2 && q.x < r.x + r.w + 2 && r.y < q.y + q.h + 1 && q.y < r.y + r.h + 1);
@@ -221,6 +223,8 @@ const HOVER_FOCUS = { id: "hoverFocus",
     g.save(); g.fillStyle = cssv("--surface"); g.globalAlpha = .55 * h.a; const w = (horiz ? A.bottom - A.top : A.right - A.left) / n;
     for (let i = 0; i < n; i++) { if (i === keep) continue; if (horiz) g.fillRect(A.left, A.top + i * w, A.right - A.left, w); else g.fillRect(A.left + i * w, A.top, w, A.bottom - A.top); }
     g.restore(); } };
+// label angka ditahan selama animasi tumbuh (berat bila digambar tiap frame); cadangan waktu bila animasi tidak pernah "selesai"
+const LBL_WAIT = { id: "lblWait", afterInit(ch) { ch.$lblWait = true; setTimeout(() => { if (ch.$lblWait && ch.canvas) { ch.$lblWait = false; ch.draw(); } }, 1400); } };
 /* ================= table helper ================= */
 // section yang bisa diminimize (klik judul). Pipeline Brispot: awalnya semua section diminimize. Pilihan diingat per perangkat.
 const SEC_DEFAULT_MIN = { pipeline: true };
@@ -508,7 +512,7 @@ function viewBeranda(v) {
       <div class="l-meta">
         <span>${ks ? `Keragaan posisi <b>${tglS(ks.d)}</b>${DB.meta && DB.meta.updated ? ", data server diperbarui " + tgl(new Date(DB.meta.updated)) + " pukul " + new Date(DB.meta.updated).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : ""}.` : KER_LOADING ? "Memuat data…" : "Data keragaan belum tersedia."}
           ${rsAsof ? `Produktivitas s.d. <b>${tglS(rsAsof)}</b>.` : ""} ${psAsof ? `Pipeline posisi <b>${tglS(psAsof)}</b>.` : ""} ${lwAsof ? `LW321 posisi <b>${nS(lwAsof)}</b>.` : ""}</span>
-        <span style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">${isAdmin() ? `<button type="button" id="lData">Kelola data</button>` : ""}<button type="button" id="lSnd"></button><button type="button" id="lOut">Keluar</button></span>
+        <span style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">${isAdmin() ? `<button type="button" id="lData">Kelola data</button>` : ""}<button type="button" id="lSnd"></button><button type="button" id="lAni"></button><button type="button" id="lOut">Keluar</button></span>
       </div>
     </div>
     <div class="l-foot">
@@ -522,7 +526,7 @@ function viewBeranda(v) {
   if (LQV.key) qvRender($("#lQvP"));
   if ($("#lData")) $("#lData").onclick = openData;
   $("#lOut").onclick = () => Auth.logout("manual");
-  sndLabel();
+  sndLabel(); aniLabel(); if ($("#lAni")) $("#lAni").onclick = () => { setLite(!LITE.on); toast(LITE.on ? "Animasi ringan: gerakan hiasan dimatikan." : "Animasi penuh diaktifkan."); };
 }
 /* ---------- keragaan per produk (data dari sheet keragaan & RKA) ---------- */
 // Desc → produk. Briguna Ritel = Karya + Purna + Pra-Purna (anti double-count; "Pra0Purna" = Pra-Purna). Konsumer = Briguna Ritel + Mikro + KPR.
@@ -3352,6 +3356,11 @@ const Exp = (() => {
 window.Exp = Exp;
 /* ================= animasi halus: kartu muncul bertahap + angka menghitung naik ================= */
 // Hanya gerak (transform / opacity / teks angka); warna dan tema tidak diubah. Mati otomatis bila perangkat memakai "kurangi gerakan".
+// mode ringan: semua animasi hiasan dimatikan (otomatis bila perangkat terasa lambat, atau dipilih lewat tombol "Animasi" di beranda)
+const LITE = { on: lsGet(STORE + "-lite") === "1" };
+const setLite = on => { LITE.on = on; lsSet(STORE + "-lite", on ? "1" : "0"); document.documentElement.classList.toggle("lite", on); aniLabel(); };
+const aniLabel = () => { const l = $("#lAni"); if (l) l.textContent = LITE.on ? "Animasi: ringan" : "Animasi: penuh"; };
+document.documentElement.classList.toggle("lite", LITE.on);
 const Anim = (() => {
   const mq = matchMedia("(prefers-reduced-motion: reduce)"), prev = new Map();
   let lastView = null;
@@ -3369,24 +3378,34 @@ const Anim = (() => {
     const flat = items.flatMap(it => it.ps), old = prev.get(key), from = flat.map((p, i) => old && old.length === flat.length && isFinite(old[i]) ? old[i] : 0);
     prev.set(key, flat.map(p => p.v));
     if (flat.every((p, i) => p.v === from[i])) return;
-    const t0 = performance.now();
+    const t0 = performance.now(); let lastT = 0;
     const step = now => {
       const t = Math.min(1, (now - t0) / dur), e = ease(t); let k = 0;
+      if (t < 1 && now - lastT < 33) { requestAnimationFrame(step); return; } lastT = now;   // ±30 fps: cukup halus untuk angka, lebih ringan
       items.forEach(it => { it.n.nodeValue = t >= 1 ? it.s : it.parts.reduce((o, part, i) => o + part + (i < it.ps.length ? fmt(from[k + i] + (it.ps[i].v - from[k + i]) * e, it.ps[i]) : ""), ""); k += it.ps.length; });
       if (t < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
   }
-  const stagger = (els, base, gap, cls) => els.forEach((el, i) => { if (el.hidden) return; el.style.setProperty("--si", base + i * gap + "ms"); el.classList.add(cls);
+  const stagger = (els, base, gap, cls) => els.filter(el => !el.hidden && el.getBoundingClientRect().top < innerHeight * 1.05).slice(0, 12).forEach((el, i) => {   // hanya yang terlihat (maks. 12) el.style.setProperty("--si", base + i * gap + "ms"); el.classList.add(cls);
     el.addEventListener("animationend", function f(e) { if (e.target !== el) return; el.classList.remove(cls); el.style.removeProperty("--si"); el.removeEventListener("animationend", f); }); });
+  // pantau kelancaran 1,6 dtk sesudah pindah halaman; bila sering tersendat 2x berturut-turut, pindah ke mode ringan otomatis
+  let strikes = 0;
+  function watch(k) {
+    if (k === "beranda" && strikes === 0) return;
+    const t0 = performance.now(); let last = t0, bad = 0;
+    const f = t => { const d = t - last; last = t; if (t - t0 > 120 && d > 40 && d < 450) bad++; if (t - t0 < 1600) requestAnimationFrame(f); else { strikes = bad >= 7 ? strikes + 1 : 0; if (strikes >= 2 && !LITE.on) { setLite(true); toast("Animasi diringankan otomatis agar tidak patah-patah. Bisa dikembalikan lewat tombol Animasi di beranda."); } } };
+    requestAnimationFrame(f);
+  }
   function run(v, k) {
-    if (mq.matches || !v) return;
+    if (mq.matches || LITE.on || !v) return;
+    watch(k);
     const first = lastView !== k; lastView = k;
     if (first) {
       if (k === "beranda") stagger([...v.querySelectorAll(".l-head, .l-card, .l-qv, .l-side, .l-meta")], 0, 70, "stg");
       else { const top = [...v.children].filter(e => e.tagName !== "STYLE"); stagger(top, 0, 70, "stg"); stagger([...v.querySelectorAll(".tile")], 140, 55, "stg"); }
     }
-    v.querySelectorAll(".tile .val, .rmc-ring .val").forEach((el, i) => countUp(el, k + "|" + i + "|" + ((el.closest(".tile") || {}).firstElementChild || {}).textContent, first ? 1000 : 600));
+    v.querySelectorAll(".tile .val, .rmc-ring .val").forEach((el, i) => countUp(el, k + "|" + i + "|" + ((el.closest(".tile") || {}).firstElementChild || {}).textContent, first ? 750 : 450));
   }
   return { run };
 })();
@@ -3458,7 +3477,7 @@ $("#btnTheme").onclick = () => {
   const root = document.documentElement, dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
   const apply = () => { root.dataset.theme = dark ? "light" : "dark"; lsSet(STORE + "-theme", root.dataset.theme); };
   // tema baru melebar melingkar dari tombol (View Transitions); tanpa dukungan / "kurangi gerakan": langsung ganti
-  if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return apply();
+  if (!document.startViewTransition || LITE.on || matchMedia("(prefers-reduced-motion: reduce)").matches) return apply();
   const b = $("#btnTheme").getBoundingClientRect(); root.style.setProperty("--vx", Math.round(b.left + b.width / 2) + "px"); root.style.setProperty("--vy", Math.round(b.top + b.height / 2) + "px");
   root.dataset.vt = "theme";
   const vt = document.startViewTransition(apply);
@@ -3482,7 +3501,7 @@ function navTo() {
   if (!Auth.session) return;
   const k = curView(), changed = k !== lastView, prev = lastView; lastView = k;
   if (changed && prev !== null) uiSound(k === "beranda" ? "home" : "nav");
-  if (!changed || prev === null || reduceMotion) { render(); if (changed) window.scrollTo(0, 0); return; }
+  if (!changed || prev === null || reduceMotion || LITE.on) { render(); if (changed) window.scrollTo(0, 0); return; }
   // beranda → menu: zoom in; menu → beranda: zoom out; antar menu: naik (menu di bawahnya) atau turun (menu di atasnya)
   const order = Object.keys(VIEWS), kind = prev === "beranda" ? "zin" : k === "beranda" ? "zout" : order.indexOf(k) > order.indexOf(prev) ? "up" : "down";
   if (document.startViewTransition) {

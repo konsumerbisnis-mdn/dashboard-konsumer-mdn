@@ -139,7 +139,7 @@ function viewBeranda(v) {
       <div class="l-meta">
         <span>${ks ? `Keragaan posisi <b>${tglS(ks.d)}</b>${DB.meta && DB.meta.updated ? ", data server diperbarui " + tgl(new Date(DB.meta.updated)) + " pukul " + new Date(DB.meta.updated).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) : ""}.` : KER_LOADING ? "Memuat data…" : "Data keragaan belum tersedia."}
           ${rsAsof ? `Produktivitas s.d. <b>${tglS(rsAsof)}</b>.` : ""} ${psAsof ? `Pipeline posisi <b>${tglS(psAsof)}</b>.` : ""} ${lwAsof ? `LW321 posisi <b>${nS(lwAsof)}</b>.` : ""}</span>
-        <span style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">${isAdmin() ? `<button type="button" id="lData">Kelola data</button>` : ""}<button type="button" id="lSnd"></button><button type="button" id="lOut">Keluar</button></span>
+        <span style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap">${isAdmin() ? `<button type="button" id="lData">Kelola data</button>` : ""}<button type="button" id="lSnd"></button><button type="button" id="lAni"></button><button type="button" id="lOut">Keluar</button></span>
       </div>
     </div>
     <div class="l-foot">
@@ -153,5 +153,5 @@ function viewBeranda(v) {
   if (LQV.key) qvRender($("#lQvP"));
   if ($("#lData")) $("#lData").onclick = openData;
   $("#lOut").onclick = () => Auth.logout("manual");
-  sndLabel();
+  sndLabel(); aniLabel(); if ($("#lAni")) $("#lAni").onclick = () => { setLite(!LITE.on); toast(LITE.on ? "Animasi ringan: gerakan hiasan dimatikan." : "Animasi penuh diaktifkan."); };
 }

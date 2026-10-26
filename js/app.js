@@ -1401,6 +1401,7 @@ function nettMonths(from, to) {   // daftar bulan (yyyy-mm) yang disentuh rentan
 }
 function renderRmNett(ctx) {
   const { P, inScope, ym, isCur } = ctx, el = $("#rNett"); if (!el) return;
+  document.body.classList.toggle("nett-fs-open", el.classList.contains("nett-fs"));   // bagian dibuat ulang: sinkronkan penguncian gulir halaman
   const isM = SEG.rm === "M", who = isM ? "Mantri" : "RM", prodN = isM ? "MIKRO" : "RITEL";
   const nz = x => x ? nf0.format(Math.round(x)) : "–";
   const gapF = x => x == null ? "–" : x < 0 ? `<span class="ng">(${nf0.format(Math.round(-x))})</span>` : nf0.format(Math.round(x));
@@ -1426,12 +1427,14 @@ function renderRmNett(ctx) {
   const head = `<div class="panel-h"><h2>Produktivitas Nett ${who} Briguna ${isM ? "Mikro" : "Ritel"}</h2><div class="toolbar nrange">
       <label>Dari <input class="ctl" type="date" id="nFrom" value="${from}" min="${dMin}" max="${dMax}"></label><label>Sampai <input class="ctl" type="date" id="nTo" value="${to}" min="${dMin}" max="${dMax}"></label>
       <button class="btn" type="button" data-np="mon">Bulan terpilih</button><button class="btn" type="button" data-np="7">7 hari</button><button class="btn" type="button" data-np="30">30 hari</button>
+      <button class="btn" type="button" id="nFs" title="Tampilkan tabel selayar penuh (Esc untuk keluar)">${NETT_FS_ICO}<span>${el.classList.contains("nett-fs") ? "Keluar layar penuh" : "Layar penuh"}</span></button>
       <span class="sub">${periode} · Rp juta${custom ? " · rentang khusus" : ""}</span></div></div>`;
   const bind = () => {
     const set = (f, t) => { RS.nFrom = f; RS.nTo = t; saveRS(); renderRmNett(ctx); Exp.decorate(el.parentElement); };
     // klik di mana pun pada kolom tanggal langsung membuka kalender (bukan hanya ikon kecilnya)
     ["#nFrom", "#nTo"].forEach(q => { $(q).onclick = e => { try { e.currentTarget.showPicker(); } catch {} }; });
     $("#nFrom").onchange = e => set(e.target.value || null, RS.nTo || to); $("#nTo").onchange = e => set(RS.nFrom || from, e.target.value || null);
+    $("#nFs").onclick = () => nettFullscreen(el, !el.classList.contains("nett-fs"));
     el.querySelectorAll("[data-np]").forEach(b => b.onclick = () => { const k = b.dataset.np, end = dMax < to ? to : dMax;
       if (k === "mon") set(null, null); else { const f = nettAdd(end, 1 - +k); set(f < dMin ? dMin : f, end); } });
   };
@@ -1459,8 +1462,32 @@ function renderRmNett(ctx) {
       <td class="r tb">${nz(r.deb)}</td><td class="r tb">${nz(r.os)}</td><td class="r">${r.hasT ? nz(r.t) : "–"}</td><td class="r tg">${gapF(r.gap)}</td>
       ${pctCell(r.pen ?? (r.os ? null : 0), "k" + (kuadOf(r.pen) || 4))}${kuadCell(r.pen)}</tr>`).join("")}</tbody>
     <tfoot>${sumLine("Grand Total", rows, "knv")}${areas.length > 1 ? areas.map(a => sumLine(aLbl(a), rows.filter(r => r.area === a), "knv a")).join("") : ""}</tfoot></table></div>
-    <p class="note" style="margin:0">Net disburse = Delta Suplesi (Rp juta) · Karya = Kretap, Purna = Kresun, Pra-Purna = Umum · Target JG = jumlah target bulanan pada bulan yang tersentuh rentang${months.length > 1 || custom ? " (rentang yang tidak penuh sebulan dibandingkan dengan target sebulan)" : ""} · GAP = realisasi − Target JG · kuadran: K1 ≥105%, K2 100–105%, K3 50–100%, K4 &lt;50%.</p>`;
+    <p class="note nett-note" style="margin:0">Net disburse = Delta Suplesi (Rp juta) · Karya = Kretap, Purna = Kresun, Pra-Purna = Umum · Target JG = jumlah target bulanan pada bulan yang tersentuh rentang${months.length > 1 || custom ? " (rentang yang tidak penuh sebulan dibandingkan dengan target sebulan)" : ""} · GAP = realisasi − Target JG · kuadran: K1 ≥105%, K2 100–105%, K3 50–100%, K4 &lt;50%.</p>`;
   bind();
+  if (el.classList.contains("nett-fs")) nettFit(el);
+}
+// ---------- layar penuh: tabel diperkecil seperlunya agar muat tanpa scroll; bila terlalu lebar/panjang tetap bisa digulir ----------
+const NETT_FS_ICO = '<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+function nettFit(el) {
+  const t = el.querySelector("table.nett"), w = el.querySelector(".table-wrap"); if (!t || !w) return;
+  t.style.zoom = ""; if (!el.classList.contains("nett-fs")) return;
+  setTimeout(() => {
+    const aw = w.clientWidth - 4, ah = w.clientHeight - 4, tw = t.offsetWidth, th = t.offsetHeight;
+    const k = Math.max(.6, Math.min(1, aw / tw, ah / th)); t.style.zoom = k < 1 ? String(Math.round(k * 100) / 100) : "";
+  }, 0);
+}
+function nettFullscreen(el, on) {
+  el.classList.toggle("nett-fs", on); document.body.classList.toggle("nett-fs-open", on);
+  const b = el.querySelector("#nFs span"); if (b) b.textContent = on ? "Keluar layar penuh" : "Layar penuh";
+  if (on && el.requestFullscreen) el.requestFullscreen().catch(() => {});          // layar penuh sungguhan bila didukung
+  if (!on && document.fullscreenElement === el) document.exitFullscreen().catch(() => {});
+  setTimeout(() => nettFit(el), 60); setTimeout(() => nettFit(el), 400);
+}
+if (!window.__nettFsBound) {
+  window.__nettFsBound = true;
+  document.addEventListener("fullscreenchange", () => { const el = $("#rNett"); if (el && !document.fullscreenElement && el.classList.contains("nett-fs")) nettFullscreen(el, false); else if (el) nettFit(el); });
+  document.addEventListener("keydown", e => { const el = $("#rNett"); if (e.key === "Escape" && el && el.classList.contains("nett-fs")) nettFullscreen(el, false); });
+  addEventListener("resize", () => { const el = $("#rNett"); if (el && el.classList.contains("nett-fs")) nettFit(el); });
 }
 /* ================= VIEW: Pipeline Brispot (dari file Pipeline BRISPOT) ================= */
 // DB.pipe = { asof, items[{kc,debitur,rm,pic,plafon,pengajuan,pencairan,putusan,tglPutusan,tatPrakarsa,tatClf,tatUker,tatTotal,status,tahap,akad,batal,proses,developer,jenis}], onhand[], rencana{dates[],rows[{kc,rm,v[]}]} }

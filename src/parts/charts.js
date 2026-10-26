@@ -32,7 +32,10 @@ function chartTheme(cfg) {
   // animasi: batang tumbuh bergantian dari dasar; garis tergambar dari kiri ke kanan (dimatikan bila perangkat memakai "kurangi gerakan")
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) o.animation = false;
   else if (o.animation === undefined) { const n = Math.max(1, ...ds.map(d => (d.data || []).length)); o.animation = { duration: 900, easing: "easeOutCubic", delay: c => c.type === "data" && c.mode === "default" ? c.dataIndex * Math.min(45, 700 / n) + (c.datasetIndex || 0) * 60 : 0 }; }
-  cfg.plugins = [...(cfg.plugins || []), DATA_LBL, ...(type === "line" && !nBar && o.animation ? [REVEAL] : [])];
+  // tooltip: muncul / berpindah dengan transisi singkat dan halus
+  o.plugins = o.plugins || {}; o.plugins.tooltip = { animation: { duration: 160, easing: "easeOutQuart" }, ...(o.plugins.tooltip || {}) };
+  const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
+  cfg.plugins = [...(cfg.plugins || []), ...(nBar && motion ? [HOVER_FOCUS] : []), DATA_LBL, ...(type === "line" && !nBar && o.animation ? [REVEAL] : [])];
   return cfg;
 }
 // teks label: persen mengikuti format sumbu; angka lain ditulis lengkap (pemisah ribuan)
@@ -90,3 +93,14 @@ const REVEAL = { id: "reveal", afterInit(ch) { ch.$t0 = performance.now(); },
   beforeDatasetsDraw(ch) { const A = ch.chartArea, p = Math.min(1, (performance.now() - (ch.$t0 || 0)) / 1000); if (!A || p >= 1) return; const e = 1 - Math.pow(1 - p, 3);
     ch.ctx.save(); ch.ctx.beginPath(); ch.ctx.rect(0, 0, A.left + (A.right - A.left) * e + 2, ch.height); ch.ctx.clip(); ch.$clip = true; },
   afterDatasetsDraw(ch) { if (!ch.$clip) return; ch.ctx.restore(); ch.$clip = false; if (ch.$raf) return; ch.$raf = requestAnimationFrame(() => { ch.$raf = 0; if (ch.canvas && ch.ctx) ch.draw(); }); } };
+// sorot batang: kursor di atas satu kolom → kolom lain meredup halus (label angka tetap jelas)
+const HOVER_FOCUS = { id: "hoverFocus",
+  afterEvent(ch, args) { const e = args.event, A = ch.chartArea, h = ch.$hf = ch.$hf || { idx: -1, a: 0 }, horiz = ch.options.indexAxis === "y"; let idx = -1;
+    if (A && e && e.type !== "mouseout" && e.x != null && e.x >= A.left && e.x <= A.right && e.y >= A.top && e.y <= A.bottom) { const n = (ch.data.labels || []).length;
+      if (n > 1) idx = Math.min(n - 1, Math.floor(horiz ? (e.y - A.top) / ((A.bottom - A.top) / n) : (e.x - A.left) / ((A.right - A.left) / n))); }
+    if (idx !== h.idx) { h.idx = idx; h.to = idx < 0 ? 0 : 1; HOVER_FOCUS.tick(ch); } },
+  tick(ch) { const h = ch.$hf; if (!h || h.raf) return; const step = () => { h.raf = 0; if (!ch.canvas || !ch.ctx) return; h.a += (h.to - h.a) * .35; if (Math.abs(h.to - h.a) < .02) h.a = h.to; ch.draw(); if (h.a !== h.to) h.raf = requestAnimationFrame(step); }; h.raf = requestAnimationFrame(step); },
+  afterDatasetsDraw(ch) { const h = ch.$hf, A = ch.chartArea; if (!h || !h.a || !A) return; const n = (ch.data.labels || []).length, horiz = ch.options.indexAxis === "y", g = ch.ctx, keep = h.idx < 0 ? (h.last == null ? -1 : h.last) : (h.last = h.idx);
+    g.save(); g.fillStyle = cssv("--surface"); g.globalAlpha = .55 * h.a; const w = (horiz ? A.bottom - A.top : A.right - A.left) / n;
+    for (let i = 0; i < n; i++) { if (i === keep) continue; if (horiz) g.fillRect(A.left, A.top + i * w, A.right - A.left, w); else g.fillRect(A.left + i * w, A.top, w, A.bottom - A.top); }
+    g.restore(); } };

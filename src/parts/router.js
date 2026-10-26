@@ -66,7 +66,7 @@ $("#btnTheme").onclick = () => {
   const root = document.documentElement, dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
   const apply = () => { root.dataset.theme = dark ? "light" : "dark"; lsSet(STORE + "-theme", root.dataset.theme); };
   // tema baru melebar melingkar dari tombol (View Transitions); tanpa dukungan / "kurangi gerakan": langsung ganti
-  if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return apply();
+  if (!document.startViewTransition || LITE.on || matchMedia("(prefers-reduced-motion: reduce)").matches) return apply();
   const b = $("#btnTheme").getBoundingClientRect(); root.style.setProperty("--vx", Math.round(b.left + b.width / 2) + "px"); root.style.setProperty("--vy", Math.round(b.top + b.height / 2) + "px");
   root.dataset.vt = "theme";
   const vt = document.startViewTransition(apply);
@@ -90,7 +90,7 @@ function navTo() {
   if (!Auth.session) return;
   const k = curView(), changed = k !== lastView, prev = lastView; lastView = k;
   if (changed && prev !== null) uiSound(k === "beranda" ? "home" : "nav");
-  if (!changed || prev === null || reduceMotion) { render(); if (changed) window.scrollTo(0, 0); return; }
+  if (!changed || prev === null || reduceMotion || LITE.on) { render(); if (changed) window.scrollTo(0, 0); return; }
   // beranda → menu: zoom in; menu → beranda: zoom out; antar menu: naik (menu di bawahnya) atau turun (menu di atasnya)
   const order = Object.keys(VIEWS), kind = prev === "beranda" ? "zin" : k === "beranda" ? "zout" : order.indexOf(k) > order.indexOf(prev) ? "up" : "down";
   if (document.startViewTransition) {

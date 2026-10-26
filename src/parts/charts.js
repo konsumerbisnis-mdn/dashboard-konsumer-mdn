@@ -30,12 +30,13 @@ function chartTheme(cfg) {
   o.layout = o.layout || {}; const p = o.layout.padding || {};
   o.layout.padding = typeof p === "number" ? { top: Math.max(p, 24), right: Math.max(p, 14), left: p, bottom: p } : { ...p, top: Math.max(p.top || 0, 24), right: Math.max(p.right || 0, 14) };
   // animasi: batang tumbuh bergantian dari dasar; garis tergambar dari kiri ke kanan (dimatikan bila perangkat memakai "kurangi gerakan")
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) o.animation = false;
-  else if (o.animation === undefined) { const n = Math.max(1, ...ds.map(d => (d.data || []).length)); o.animation = { duration: 900, easing: "easeOutCubic", delay: c => c.type === "data" && c.mode === "default" ? c.dataIndex * Math.min(45, 700 / n) + (c.datasetIndex || 0) * 60 : 0 }; }
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches || LITE.on) o.animation = false;
+  else if (o.animation === undefined) { const n = Math.max(1, ...ds.map(d => (d.data || []).length)); o.animation = { duration: 520, easing: "easeOutCubic", delay: c => c.type === "data" && c.mode === "default" ? c.dataIndex * Math.min(24, 320 / n) + (c.datasetIndex || 0) * 30 : 0,
+    onComplete: c => { const ch = c.chart; if (ch.$lblWait) { ch.$lblWait = false; ch.draw(); } } }; }
   // tooltip: muncul / berpindah dengan transisi singkat dan halus
   o.plugins = o.plugins || {}; o.plugins.tooltip = { animation: { duration: 160, easing: "easeOutQuart" }, ...(o.plugins.tooltip || {}) };
   const motion = !matchMedia("(prefers-reduced-motion: reduce)").matches;
-  cfg.plugins = [...(cfg.plugins || []), ...(nBar && motion ? [HOVER_FOCUS] : []), DATA_LBL, ...(type === "line" && !nBar && o.animation ? [REVEAL] : [])];
+  cfg.plugins = [...(cfg.plugins || []), ...(o.animation ? [LBL_WAIT] : []), ...(nBar && motion ? [HOVER_FOCUS] : []), DATA_LBL, ...(type === "line" && !nBar && o.animation ? [REVEAL] : [])];
   return cfg;
 }
 // teks label: persen mengikuti format sumbu; angka lain ditulis lengkap (pemisah ribuan)
@@ -46,6 +47,7 @@ function lblText(ch, d, v) {
   const a = Math.abs(v); return a >= 100 || Number.isInteger(v) ? nf0.format(Math.round(v)) : a >= 10 ? nf1.format(v) : nf2.format(v);
 }
 const DATA_LBL = { id: "dataLbl", afterDatasetsDraw(ch) {
+  if (ch.$lblWait) return;   // sedang animasi tumbuh: label menyusul setelah selesai
   const g = ch.ctx, A = ch.chartArea, horiz = ch.options.indexAxis === "y", placed = [], fs = 11, H = fs + 6;
   g.save(); g.font = `700 ${fs}px Inter, system-ui, sans-serif`; g.textBaseline = "middle"; g.textAlign = "center";
   const hit = r => placed.some(q => r.x < q.x + q.w + 2 && q.x < r.x + r.w + 2 && r.y < q.y + q.h + 1 && q.y < r.y + r.h + 1);
@@ -104,3 +106,5 @@ const HOVER_FOCUS = { id: "hoverFocus",
     g.save(); g.fillStyle = cssv("--surface"); g.globalAlpha = .55 * h.a; const w = (horiz ? A.bottom - A.top : A.right - A.left) / n;
     for (let i = 0; i < n; i++) { if (i === keep) continue; if (horiz) g.fillRect(A.left, A.top + i * w, A.right - A.left, w); else g.fillRect(A.left + i * w, A.top, w, A.bottom - A.top); }
     g.restore(); } };
+// label angka ditahan selama animasi tumbuh (berat bila digambar tiap frame); cadangan waktu bila animasi tidak pernah "selesai"
+const LBL_WAIT = { id: "lblWait", afterInit(ch) { ch.$lblWait = true; setTimeout(() => { if (ch.$lblWait && ch.canvas) { ch.$lblWait = false; ch.draw(); } }, 1400); } };

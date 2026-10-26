@@ -3388,6 +3388,22 @@ const VIEWS = {
   admin: ["Admin", "Admin", viewAdmin]
 };
 const curView = () => { const h = location.hash.slice(1); return VIEWS[h] && Auth.can(h) ? h : "beranda"; };
+// penanda menu aktif: satu kotak yang meluncur ke menu terpilih (menggantikan latar per menu)
+const NavInd = (() => {
+  let el = null, shown = false;
+  const sync = () => {
+    const nav = document.querySelector(".nav"); if (!nav) return;
+    const a = nav.querySelector('a[aria-current="page"]');
+    if (!el) { el = document.createElement("span"); el.className = "nav-ind"; el.setAttribute("aria-hidden", "true"); nav.prepend(el); nav.classList.add("has-ind"); }
+    if (!a || !a.offsetWidth) { el.classList.remove("on"); shown = false; return; }   // menu tersembunyi (beranda / menu samping ditutup)
+    if (!shown) el.classList.add("snap");
+    el.style.width = a.offsetWidth + "px"; el.style.height = a.offsetHeight + "px"; el.style.transform = `translate(${a.offsetLeft}px,${a.offsetTop}px)`; el.classList.add("on");
+    if (!shown) { void el.offsetWidth; el.classList.remove("snap"); shown = true; }
+    if (nav.scrollWidth > nav.clientWidth) nav.scrollTo({ left: a.offsetLeft - (nav.clientWidth - a.offsetWidth) / 2, behavior: "smooth" });   // HP: menu aktif digeser ke tengah
+  };
+  addEventListener("resize", () => requestAnimationFrame(sync));
+  return { sync };
+})();
 function render() {
   if (!Auth.session) return;
   const k = curView(), [title, eb, fn] = VIEWS[k], home = k === "beranda";
@@ -3398,7 +3414,7 @@ function render() {
   { const tt = document.querySelector(".topbar .ttl"); if (tt && tt.dataset.v !== title) { tt.dataset.v = title; tt.classList.remove("tb-in"); void tt.offsetWidth; tt.classList.add("tb-in"); } }
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; });
   try { fn(v); } catch (er) { console.error(er); v.innerHTML = `<section class="panel"><div class="empty"><p style="font-weight:700;margin:0 0 6px">Bagian ini belum bisa ditampilkan</p>${esc(er.message || er)}</div></section>`; }
-  setupSections(v, k); Exp.decorate(v); Anim.run(v, k);
+  setupSections(v, k); Exp.decorate(v); Anim.run(v, k); NavInd.sync();
 }
 // tombol Unduh tetap ada saat isi section digambar ulang (sub-tab, filter di dalam section)
 { let t = 0; const deco = () => { clearTimeout(t); t = setTimeout(() => { Exp.decorate($("#view")); Exp.decorate($("#landing")); }, 60); };
@@ -3426,7 +3442,13 @@ setNavOff(!!lsGet(STORE + "-nav"), false);
 $("#btnPdf").onclick = () => Exp.page();
 $("#btnTheme").onclick = () => {
   const root = document.documentElement, dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-  root.dataset.theme = dark ? "light" : "dark"; lsSet(STORE + "-theme", root.dataset.theme);
+  const apply = () => { root.dataset.theme = dark ? "light" : "dark"; lsSet(STORE + "-theme", root.dataset.theme); };
+  // tema baru melebar melingkar dari tombol (View Transitions); tanpa dukungan / "kurangi gerakan": langsung ganti
+  if (!document.startViewTransition || matchMedia("(prefers-reduced-motion: reduce)").matches) return apply();
+  const b = $("#btnTheme").getBoundingClientRect(); root.style.setProperty("--vx", Math.round(b.left + b.width / 2) + "px"); root.style.setProperty("--vy", Math.round(b.top + b.height / 2) + "px");
+  root.dataset.vt = "theme";
+  const vt = document.startViewTransition(apply);
+  vt.ready.catch(() => {}); vt.updateCallbackDone.catch(() => {}); vt.finished.catch(() => {}).finally(() => { delete root.dataset.vt; });
 };
 const th = lsGet(STORE + "-theme"); if (th) document.documentElement.dataset.theme = th;
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", render);

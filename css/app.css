@@ -789,14 +789,14 @@ body{font-variant-numeric:tabular-nums}
 .kt.rd2{min-width:1040px}
 .kt.rp{min-width:900px}
 /* perpindahan layar: beranda→menu zoom in + fade, menu→beranda zoom out + fade, antar menu naik/turun + fade */
-@keyframes vtZinOld{to{opacity:0;transform:scale(1.12)}}
-@keyframes vtZinNew{from{opacity:0;transform:scale(.88)}}
-@keyframes vtZoutOld{to{opacity:0;transform:scale(.88)}}
-@keyframes vtZoutNew{from{opacity:0;transform:scale(1.1)}}
-@keyframes vtUpOld{to{opacity:0;transform:translateY(-48px)}}
-@keyframes vtUpNew{from{opacity:0;transform:translateY(56px)}}
-@keyframes vtDownOld{to{opacity:0;transform:translateY(48px)}}
-@keyframes vtDownNew{from{opacity:0;transform:translateY(-56px)}}
+@keyframes vtZinOld{to{opacity:0;transform:scale(1.08);filter:blur(8px)}}
+@keyframes vtZinNew{from{opacity:0;transform:scale(.94);filter:blur(10px)}}
+@keyframes vtZoutOld{to{opacity:0;transform:scale(.94);filter:blur(8px)}}
+@keyframes vtZoutNew{from{opacity:0;transform:scale(1.06);filter:blur(10px)}}
+@keyframes vtUpOld{to{opacity:0;transform:translateY(-22px);filter:blur(7px)}}
+@keyframes vtUpNew{from{opacity:0;transform:translateY(26px);filter:blur(9px)}}
+@keyframes vtDownOld{to{opacity:0;transform:translateY(22px);filter:blur(7px)}}
+@keyframes vtDownNew{from{opacity:0;transform:translateY(-26px);filter:blur(9px)}}
 :root[data-vt="zin"]::view-transition-old(root){animation:vtZinOld .32s cubic-bezier(.4,0,1,1) both}
 :root[data-vt="zin"]::view-transition-new(root){animation:vtZinNew .5s cubic-bezier(.16,.84,.3,1) .18s both}
 :root[data-vt="zout"]::view-transition-old(root){animation:vtZoutOld .32s cubic-bezier(.4,0,1,1) both}
@@ -951,3 +951,18 @@ body.nav-off .content{max-width:none}
 #rNett.nett-fs .nett-note{flex:none}
 body.nett-fs-open{overflow:hidden}
 #rNett.nett-fs .kt.nett th,#rNett.nett-fs .kt.nett td{padding:3px 6px;line-height:1.25}
+
+/* perpindahan layar: fade + blur halus; elemen halaman baru muncul bertahap setelah halaman lama memudar */
+:root[data-vt] .stg{animation-delay:calc(var(--si,0ms) + 200ms)}
+/* penanda menu aktif meluncur ke menu yang dipilih */
+.nav{position:fixed}
+.nav .nav-ind{position:absolute;left:0;top:0;border-radius:8px;background:var(--accent-soft);z-index:0;pointer-events:none;opacity:0;transition:transform .38s cubic-bezier(.3,.9,.3,1),width .38s cubic-bezier(.3,.9,.3,1),height .38s cubic-bezier(.3,.9,.3,1),opacity .2s}
+.nav .nav-ind.on{opacity:1}
+.nav .nav-ind.snap{transition:none}
+.nav.has-ind a{position:relative;z-index:1}
+.nav.has-ind a[aria-current="page"]{background:transparent}
+/* ganti tema: tema baru melebar melingkar dari tombol */
+@keyframes themeReveal{from{clip-path:circle(0 at var(--vx,50%) var(--vy,0))}to{clip-path:circle(150vmax at var(--vx,50%) var(--vy,0))}}
+:root[data-vt="theme"]::view-transition-old(root){animation:none;mix-blend-mode:normal;z-index:1}
+:root[data-vt="theme"]::view-transition-new(root){animation:themeReveal .7s cubic-bezier(.4,.1,.2,1) both;mix-blend-mode:normal;z-index:2}
+@media (prefers-reduced-motion:reduce){.nav .nav-ind{transition:none}}

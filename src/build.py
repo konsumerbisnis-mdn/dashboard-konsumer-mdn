@@ -408,7 +408,7 @@ start = '''
 })();
 '''
 js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + P('charts.js') + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + P('rm_nett.js') + pipe + P('brispot_brs.js') + P('pipe_rep.js') + pimp + sim \
-     + P('sim_brg.js') + P('nominatif.js') + P('ker_up.js') + P('admin.js') + P('export.js') + P('router.js') + P('foto_zoom.js') + P('land_fit.js') + zoom + P('boot.js') + start + intro
+     + P('sim_brg.js') + P('nominatif.js') + P('ker_up.js') + P('admin.js') + P('export.js') + P('anim.js') + P('router.js') + P('foto_zoom.js') + P('land_fit.js') + zoom + P('boot.js') + start + intro
 # bagian bertanda data-nosec (mis. Lampiran, yang sudah punya buka-tutup per lampiran) tidak diberi tombol minimize
 js = rep(js, '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h"));''', '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h") && !x.hasAttribute("data-nosec"));''')
 open(os.path.join(ROOT, 'js', 'app.js'), 'w', encoding='utf8').write(js)

@@ -940,6 +940,10 @@ body.nav-off .content{max-width:none}
   .l-side .l-alert ul{margin:0;padding:12px 16px 16px;gap:10px}
 }
 
+/* kartu muncul bertahap (naik sedikit + memudar masuk) */
+@keyframes stgIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.stg{animation:stgIn .5s cubic-bezier(.2,.7,.2,1) both;animation-delay:var(--si,0ms)}
+@media (prefers-reduced-motion:reduce){.stg{animation:none}}
 /* ---------- tabel Nett layar penuh ---------- */
 #rNett.nett-fs{position:fixed;inset:0;z-index:90;margin:0;border-radius:0;padding:12px 16px;background:var(--surface);display:flex;flex-direction:column;gap:8px;overflow:hidden}
 #rNett.nett-fs .table-wrap{flex:1 1 auto;min-height:0;overflow:auto;max-height:none}

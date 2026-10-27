@@ -799,8 +799,7 @@ function viewKeragaan(v) {
     <section class="panel"><div class="panel-h"><h2>SML & NPL vs RKA ${yr}</h2><span class="sub">% terhadap OS, akhir bulan${+d.slice(8) < new Date(+yr, +d.slice(5, 7), 0).getDate() ? " · bulan berjalan = posisi " + tglS(d) : ""}</span></div><div class="chart"><canvas id="cKQ"></canvas></div></section>
     ${KS.kc === "ALL" && KS.area === "ALL" ? `<section class="panel"><div class="panel-h"><h2>Per area</h2><span class="sub">klik nama area untuk menyaring</span></div><div id="kAr"></div></section>` : ""}
     ${["ritel", "brg", "konsumer"].includes(KV.p) ? `<section class="panel"><div class="panel-h"><h2>Komposisi produk</h2><span class="sub">${esc(PL_)} · posisi ${tglS(d)}</span></div><div id="kKom"></div></section>` : ""}
-    <section class="panel"><div class="panel-h"><h2>${KV.ud ? "Per unit dedicated" : "Per kantor cabang"}</h2><div class="toolbar"><span class="sub">${KV.ud ? "unit Briguna Mikro dedicated" : "klik nama KC untuk detail"}</span><button class="btn" id="kExp" type="button">Ekspor CSV</button></div></div><div id="kKc"></div></section>
-    ${KV.p === "mikro" && DB.ker.udU && DB.ker.udU.length ? `<section class="panel" id="kUn"><div class="panel-h"><h2>Per unit · Briguna Mikro</h2><span class="sub">unit dedicated (Briguna Mikro D) · RKA unit dari sheet RKA · ikut saringan area & kantor cabang</span></div><div id="kUnB"></div></section>` : ""}`;
+    <section class="panel"><div class="panel-h"><h2>${KV.ud ? "Per unit dedicated" : "Per kantor cabang"}</h2><div class="toolbar"><span class="sub">${KV.ud ? "unit Briguna Mikro dedicated" : "klik nama KC untuk detail"}</span><button class="btn" id="kExp" type="button">Ekspor CSV</button></div></div><div id="kKc"></div></section>`;
 
   $("#kD").onchange = e => { KS.date = e.target.value; saveKS(); render(); };
   $("#kPr").onchange = e => { KS.prod = e.target.value; saveKS(); render(); };
@@ -816,6 +815,17 @@ function viewKeragaan(v) {
 
   // Highlight
   $("#kHl").innerHTML = KS.kpi === "ts" ? kTsTable(d, us, "sml", KS.kmode === "pct") + kTsTable(d, us, "npl", KS.kmode === "pct") : (KS.kpi === "all" ? kpiTable(d, us, "sum") + `<h3 class="k-sub" style="margin:18px 0 8px;font-size:14px">Per kantor cabang · semua KPI</h3>` : "") + kpiTable(d, us, KS.kpi, KS.kmode);
+  // Briguna Mikro: di bawah tabel per KC, tabel yang sama per unit dedicated (Desc "Briguna Mikro D"; RKA unit dari sheet RKA), mengikuti KPI terpilih
+  if (KV.p === "mikro" && DB.ker.udU && DB.ker.udU.length) {
+    const keepKV = KV; setKV("mikrod");
+    try {
+      const R2 = kRefs(d), uu = kUnits().filter(u => { const c = kSnap(R2.di, [u]); return c && c.os > 0; });
+      if (uu.length) {
+        const pctM = KS.kmode === "pct", sub = `<h3 class="k-sub" style="margin:18px 0 8px;font-size:14px">Per unit · Briguna Mikro${KS.kpi === "ts" ? "" : KS.kpi === "all" ? " · semua KPI" : ""} <small class="note">unit dedicated · RKA unit dari sheet RKA</small></h3>`;
+        $("#kHl").insertAdjacentHTML("beforeend", sub + (KS.kpi === "ts" ? (kTsTable(d, uu, "sml", pctM) + kTsTable(d, uu, "npl", pctM)).replace(/Kantor Cabang/g, "Unit") : kpiTable(d, uu, KS.kpi, KS.kmode)));
+      } else $("#kHl").insertAdjacentHTML("beforeend", `<p class="note" style="margin:14px 0 0">Tidak ada unit dedicated pada saringan ini.</p>`);
+    } finally { KV = keepKV; }
+  }
 
   // OS akhir bulan vs RKA
   const months = Array.from({ length: 12 }, (_, i) => yr + "-" + String(i + 1).padStart(2, "0"));
@@ -900,16 +910,6 @@ function viewKeragaan(v) {
       { key: "os", label: "OS (M)", r: 1, fmt: x => nf2.format(x / 1000) }, { key: "so", label: "% OS", r: 1, sortVal: r => r.os, fmt: (x, r) => pct(cur.os ? r.os / cur.os : 0, 1) },
       { key: "sml", label: "SML (M)", r: 1, fmt: x => nf2.format(x / 1000) }, { key: "psml", label: "% SML", r: 1, fmt: x => pct(x, 2) }, { key: "npl", label: "NPL (M)", r: 1, fmt: x => nf2.format(x / 1000) }, { key: "pnpl", label: "% NPL", r: 1, fmt: x => chip(pct(x, 2), nplCls(x)) }], comp,
       { sortKey: "os", foot: { p: "Total", deb: nf0.format(cur.deb), sd: "100%", os: nf2.format(cur.os / 1000), so: "100%", sml: nf2.format(cur.sml / 1000), psml: pct(cur.psml, 2), npl: nf2.format(cur.npl / 1000), pnpl: pct(cur.pnpl, 2) } });
-  }
-  if ($("#kUnB")) {
-    const keepKV = KV; setKV("mikrod");
-    try {
-      const uu = kUnits(), R2 = kRefs(d), has = u => { const c = kSnap(R2.di, [u]); return c && c.os > 0; };
-      const ru = uu.filter(has).map(u => rowOf(u.nama, [u], { boc: u.boc, area: u.area, kcb: u.kcb })), T = uu.length ? rowOf("Total", uu.filter(has)) : null;
-      table($("#kUnB"), cols({ key: "name", label: "Unit", fmt: (x, r) => `${esc(x)}<br><small class="note">${r.boc} · ${esc(kcName(r.kcb))}</small>` }), ru,
-        { sortKey: "os", foot: ru.length > 1 && T ? { name: "Total", os: nf2.format(T.os / 1000), dtd: dM(T.dtd).replace(" M", ""), mtd: dM(T.mtd).replace(" M", ""), ytd: dM(T.ytd).replace(" M", ""), prka: T.prka != null ? chip(pct(T.prka, 1), osCls(T.prka)) : "–", psml: pct(T.psml, 2), pnpl: pct(T.pnpl, 2), sml: nf2.format(T.sml / 1000), npl: nf2.format(T.npl / 1000), deb: nf0.format(T.deb), dmtd: dN(T.dmtd) } : null });
-      if (!ru.length) $("#kUnB").innerHTML = '<div class="empty">Tidak ada unit dedicated pada saringan ini.</div>';
-    } finally { KV = keepKV; }
   }
   $("#kExp").onclick = () => exportCSV("keragaan-" + KV.p + "-" + d, [["boc","BOC"],["name","Kantor Cabang"],["area","Area"],["os","OS (juta)"],["dtd","DtD"],["mtd","MtD"],["ytd","YtD"],["rka","RKA (juta)"],["prka","%RKA"],["sml","SML"],["psml","%SML"],["npl","NPL"],["pnpl","%NPL"],["deb","Debitur"],["dmtd","Deb MtD"]], kr);
 }

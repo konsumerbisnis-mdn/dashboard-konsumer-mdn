@@ -170,19 +170,20 @@ ker = rep(ker, '''  $("#kExp").onclick = () => exportCSV("keragaan-kpr-" + d,'''
   $("#kExp").onclick = () => exportCSV("keragaan-" + KV.p + "-" + d,''')
 
 # Keragaan Briguna Mikro: tabel per unit (database keragaan Desc "Briguna Mikro D", RKA unit dari sheet RKA) di bawah tabel per kantor cabang
-ker = rep(ker, """<div id="kKc"></div></section>`;""", """<div id="kKc"></div></section>
-    ${KV.p === "mikro" && DB.ker.udU && DB.ker.udU.length ? `<section class="panel" id="kUn"><div class="panel-h"><h2>Per unit · Briguna Mikro</h2><span class="sub">unit dedicated (Briguna Mikro D) · RKA unit dari sheet RKA · ikut saringan area & kantor cabang</span></div><div id="kUnB"></div></section>` : ""}`;""")
-ker = rep(ker, """  $("#kExp").onclick = () => exportCSV("keragaan-" + KV.p + "-" + d,""", """  if ($("#kUnB")) {
+ker = rep(ker, """ + kpiTable(d, us, KS.kpi, KS.kmode);
+""", """ + kpiTable(d, us, KS.kpi, KS.kmode);
+  // Briguna Mikro: di bawah tabel per KC, tabel yang sama per unit dedicated (Desc "Briguna Mikro D"; RKA unit dari sheet RKA), mengikuti KPI terpilih
+  if (KV.p === "mikro" && DB.ker.udU && DB.ker.udU.length) {
     const keepKV = KV; setKV("mikrod");
     try {
-      const uu = kUnits(), R2 = kRefs(d), has = u => { const c = kSnap(R2.di, [u]); return c && c.os > 0; };
-      const ru = uu.filter(has).map(u => rowOf(u.nama, [u], { boc: u.boc, area: u.area, kcb: u.kcb })), T = uu.length ? rowOf("Total", uu.filter(has)) : null;
-      table($("#kUnB"), cols({ key: "name", label: "Unit", fmt: (x, r) => `${esc(x)}<br><small class="note">${r.boc} · ${esc(kcName(r.kcb))}</small>` }), ru,
-        { sortKey: "os", foot: ru.length > 1 && T ? { name: "Total", os: nf2.format(T.os / 1000), dtd: dM(T.dtd).replace(" M", ""), mtd: dM(T.mtd).replace(" M", ""), ytd: dM(T.ytd).replace(" M", ""), prka: T.prka != null ? chip(pct(T.prka, 1), osCls(T.prka)) : "–", psml: pct(T.psml, 2), pnpl: pct(T.pnpl, 2), sml: nf2.format(T.sml / 1000), npl: nf2.format(T.npl / 1000), deb: nf0.format(T.deb), dmtd: dN(T.dmtd) } : null });
-      if (!ru.length) $("#kUnB").innerHTML = '<div class="empty">Tidak ada unit dedicated pada saringan ini.</div>';
+      const R2 = kRefs(d), uu = kUnits().filter(u => { const c = kSnap(R2.di, [u]); return c && c.os > 0; });
+      if (uu.length) {
+        const pctM = KS.kmode === "pct", sub = `<h3 class="k-sub" style="margin:18px 0 8px;font-size:14px">Per unit · Briguna Mikro${KS.kpi === "ts" ? "" : KS.kpi === "all" ? " · semua KPI" : ""} <small class="note">unit dedicated · RKA unit dari sheet RKA</small></h3>`;
+        $("#kHl").insertAdjacentHTML("beforeend", sub + (KS.kpi === "ts" ? (kTsTable(d, uu, "sml", pctM) + kTsTable(d, uu, "npl", pctM)).replace(/Kantor Cabang/g, "Unit") : kpiTable(d, uu, KS.kpi, KS.kmode)));
+      } else $("#kHl").insertAdjacentHTML("beforeend", `<p class="note" style="margin:14px 0 0">Tidak ada unit dedicated pada saringan ini.</p>`);
     } finally { KV = keepKV; }
   }
-  $("#kExp").onclick = () => exportCSV("keragaan-" + KV.p + "-" + d,""")
+""")
 
 kimp = cut('/* ---------- impor file Master Keragaan ---------- */', 'function parseMaster(wb) {')
 

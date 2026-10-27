@@ -289,6 +289,9 @@ rm = rep(rm, """const kOf = (rm, m) => { const r = P.months.find(x => x.ym === m
   const histChip = (rm, m) => { const r = P.months.find(x => x.ym === m && nmKey(x.rm) === nmKey(rm)), p = r && r.tDisb ? r.os / r.tDisb : null; return `<span class="rk-h" title="${ymS(m)}: ${p == null ? "tanpa target" : pct(p, 0)}"><small>${BULAN[+m.slice(5, 7) - 1]}</small>${kq(kuadOf(p))}</span>`; };
   $("#rLbS").textContent += ` · histori kuadran ${ymS(hist5[0])}–${ymS(hist5[4])}`;""")
 rm = rep(rm, """${last6.map(m => kq(kOf(x.rm, m))).join("")}""", """<span class="rk-hist">${hist5.map(m => histChip(x.rm, m)).join("")}</span>""")
+# unit mantri (segmen Mikro) pada daftar peringkat
+rm = rep(rm, """const o = { rm: l.rm, kc: l.kc, jg: l.jg, tDisb""", """const o = { rm: l.rm, kc: l.kc, unit: l.unit, jg: l.jg, tDisb""")
+rm = rep(rm, """<small>${esc(x.kc)}${x.jg ? " · " + esc(x.jg) : ""}</small>""", """<small>${esc(x.kc)}${x.unit ? " · " + esc(x.unit) : ""}${x.jg ? " · " + esc(x.jg) : ""}</small>""")
 # pencapaian per RM / cabang: rincian bulanan (grafik & tabel Jan s.d. Des, RM di cabang) disembunyikan, dibuka bila perlu
 rm = rep(rm, '''    <div class="chart"><canvas id="cRmPer"></canvas></div>
     <div id="tRmPer"></div>''', '''    <details class="rm-more" ${RS.perOpen ? "open" : ""}><summary>Rincian per bulan ${yr}${isKc ? " & RM di cabang" : ""} <small class="note">grafik & tabel Jan–Des, carry over ${coLbl}</small></summary>

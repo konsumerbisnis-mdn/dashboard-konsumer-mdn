@@ -1027,7 +1027,7 @@ function viewRM(v) {
   const coMs = Array.from({ length: coEnd }, (_, i) => yr + "-" + String(i + 1).padStart(2, "0"));
   const coRows = () => uniq(P.months.filter(x => coMs.includes(x.ym) && inScope(x) && (x.tDisb > 0 || x.os > 0)).map(x => nmKey(x.rm))).map(k => {
     const a = P.months.filter(x => coMs.includes(x.ym) && inScope(x) && nmKey(x.rm) === k), l = a[a.length - 1];
-    const o = { rm: l.rm, kc: l.kc, jg: l.jg, tDisb: sum(a, "tDisb"), tDeb: sum(a, "tDeb"), os: sum(a, "os"), deb: sum(a, "deb"), sDeb: sum(a, "sDeb"), sOs: sum(a, "sOs"), kDeb: sum(a, "kDeb"), kOs: sum(a, "kOs") };
+    const o = { rm: l.rm, kc: l.kc, unit: l.unit, jg: l.jg, tDisb: sum(a, "tDisb"), tDeb: sum(a, "tDeb"), os: sum(a, "os"), deb: sum(a, "deb"), sDeb: sum(a, "sDeb"), sOs: sum(a, "sOs"), kDeb: sum(a, "kDeb"), kOs: sum(a, "kOs") };
     o.pen = o.tDisb ? o.os / o.tDisb : null; return o; });
   const rowsRk = rkYm === ym ? rows : P.months.filter(x => x.ym === rkYm && inScope(x) && (x.tDisb > 0 || x.os > 0)).map(x => ({ ...x, pen: x.tDisb ? x.os / x.tDisb : null }));
   const lb = [...(isCo ? coRows() : rowsRk)].sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os);
@@ -1041,7 +1041,7 @@ function viewRM(v) {
   $("#rLbS").textContent += ` · histori kuadran ${ymS(hist5[0])}–${ymS(hist5[4])}`;
   $("#rLb").innerHTML = lb.length ? lb.map((x, i) => `<div class="lb-row" style="grid-template-columns:28px minmax(0,1.4fr) minmax(0,2fr) auto">
       <span class="lb-rank">${i + 1}</span>
-      <div class="lb-name wav">${rmAvatar(x.rm, 34)}<div><button class="linkish" data-rm="${esc(x.rm)}">${esc(x.rm)}</button><small>${esc(x.kc)}${x.jg ? " · " + esc(x.jg) : ""}</small></div></div>
+      <div class="lb-name wav">${rmAvatar(x.rm, 34)}<div><button class="linkish" data-rm="${esc(x.rm)}">${esc(x.rm)}</button><small>${esc(x.kc)}${x.unit ? " · " + esc(x.unit) : ""}${x.jg ? " · " + esc(x.jg) : ""}</small></div></div>
       <div class="lb-mid"><div class="lb-bar"><i style="width:${clamp((x.pen || 0) / 1.5, 0, 1) * 100}%;background:var(--${x.pen == null ? "muted" : capaiCls(x.pen)})"></i><span class="tick"></span></div>
         <div class="lb-val">${rpJ(x.os)} / ${x.tDisb ? rpJ(x.tDisb) : "tanpa target"} · ${x.deb} deb (${RL.s[0]} ${x.sDeb} · ${RL.k[0]} ${x.kDeb}) · <span class="rk-hist">${hist5.map(m => histChip(x.rm, m)).join("")}</span></div></div>
       <span style="display:flex;gap:6px;align-items:center">${x.pen != null ? chip(pct(x.pen, 0), capaiCls(x.pen)) : ""}${kq(kuadOf(x.pen))}</span></div>`).join("") : '<div class="empty">Tidak ada RM pada filter ini.</div>';
@@ -1440,10 +1440,11 @@ function renderRmNett(ctx) {
   // ---------- baris per RM / mantri ----------
   const key = r => /^pn\s*\d/i.test(r) ? "pn" + String(r).replace(/\D/g, "") : nmKey(r), meta = new Map();   // nama belum ada di list: dibedakan lewat PN-nya
   months.forEach(m => P.months.filter(x => x.ym === m && inScope(x)).forEach(x => { const k = key(x.rm), o = meta.get(k) || { rm: x.rm, kc: x.kc, jg: x.jg, area: x.area, t: 0, hasT: false };
-    o.rm = x.rm; o.kc = x.kc; o.jg = x.jg || o.jg; o.area = x.area || o.area; if (x.tDisb > 0) { o.t += x.tDisb; o.hasT = true; }
+    o.rm = x.rm; o.kc = x.kc; o.jg = x.jg || o.jg; o.area = x.area || o.area; o.unit = x.unit || o.unit; if (x.tDisb > 0) { o.t += x.tDisb; o.hasT = true; }
     if (x.pd) { o.pd = o.pd || {}; for (const pr in x.pd) { const a = o.pd[pr] || (o.pd[pr] = [0, 0, 0, 0]); x.pd[pr].forEach((v, i) => a[i] += v); } } meta.set(k, o); }));
+  const unitMap = new Map(); P.months.forEach(x => { if (x.unit) unitMap.set(key(x.rm), x.unit); });   // unit mantri dari bulan mana pun (untuk yang hanya punya transaksi)
   const tx = P.tx.filter(t => t.d >= from && t.d <= to), hasPr = P.tx.some(t => t.pr), usePd = !hasPr && !custom && P.months.some(x => x.pd), all = RS.area === "ALL" && RS.kc === "ALL", agg = new Map();
-  tx.forEach(t => { const k = key(t.rm); if (!meta.has(k)) { if (!all) return; meta.set(k, { rm: t.rm, kc: t.kc, jg: "", area: kcArea(t.kc), t: 0, hasT: false }); }
+  tx.forEach(t => { const k = key(t.rm); if (!meta.has(k)) { if (!all) return; meta.set(k, { rm: t.rm, kc: t.kc, unit: unitMap.get(k), jg: "", area: kcArea(t.kc), t: 0, hasT: false }); }
     const o = agg.get(k) || { deb: 0, os: 0, p: {} }; o.deb += t.deb; o.os += t.pl;
     if (t.pr) { const a = o.p[t.pr] || (o.p[t.pr] = [0, 0, 0, 0]), i = t.jenis === "Suplesi" ? 2 : 0; a[i] += t.deb; a[i + 1] += t.pl; } agg.set(k, o); });
   const rows = [...meta.entries()].map(([k, m]) => { const a = agg.get(k) || { deb: 0, os: 0, p: {} }, pen = m.hasT ? a.os / m.t : null;
@@ -1472,19 +1473,19 @@ function renderRmNett(ctx) {
     return { deb: sum(rs, "deb"), os, t, gap: tg.reduce((a, r) => a + r.gap, 0), pen: t ? os / t : null }; };
   const pctCell = (pen, cls) => pen == null ? `<td class="r">–</td>` : `<td class="r np ${cls}">${pct(pen, 2)}</td>`;
   const kuadCell = pen => { const k = kuadOf(pen); return k ? `<td class="nk">Kuadran ${k}</td>` : `<td class="nk">–</td>`; };
-  const sumLine = (label, rs, cls) => { const t = tot(rs); return `<tr class="${cls}"><td colspan="4"><b>${esc(label)}</b></td>${prodCells(rs)}<td class="r">${nz(t.deb)}</td><td class="r">${nz(t.os)}</td>
+  const sumLine = (label, rs, cls) => { const t = tot(rs); return `<tr class="${cls}"><td colspan="${isM ? 5 : 4}"><b>${esc(label)}</b></td>${prodCells(rs)}<td class="r">${nz(t.deb)}</td><td class="r">${nz(t.os)}</td>
     <td class="r">${nz(t.t)}</td><td class="r">${t.t ? gapF(t.gap) : "–"}</td>${pctCell(t.pen, "k" + (kuadOf(t.pen) || 0))}<td class="nk"></td></tr>`; };
   const areas = uniq(rows.map(r => r.area)).filter(Boolean).sort(), aLbl = a => String(a).split("/")[0].trim().toUpperCase();
   el.innerHTML = head + (hasPr ? "" : `<p class="note" style="margin:0"><b>Rincian produk (Karya / Pra-Purna / Purna) ${usePd ? "memakai data lama server (hanya per bulan penuh)" : "belum tersedia dari server"}.</b> Pasang Apps Script versi terbaru, lalu admin menekan <b>Sync produktivitas</b>${isM ? " (Mikro baru ada rinciannya setelah itu)" : ""}.${custom && !usePd ? " Rentang khusus butuh versi terbaru." : ""}</p>`) + `
     <div class="table-wrap"><table class="kt nett"><thead>
-      <tr><th rowspan="4">No</th><th rowspan="4">Kanca</th><th rowspan="4">Nama ${who}</th><th rowspan="4">JG</th>
+      <tr><th rowspan="4">No</th><th rowspan="4">Kanca</th>${isM ? '<th rowspan="4">Unit</th>' : ""}<th rowspan="4">Nama ${who}</th><th rowspan="4">JG</th>
         <th colspan="12" class="nt">PRODUKTIVITAS NETT ${who.toUpperCase()} BRIGUNA ${prodN} - ${periode}</th>
         <th colspan="2" rowspan="3" class="nt">TOTAL NETT DISBURSE<br>${periode}</th><th colspan="2" rowspan="2" class="nt">TARGET<br>${periode}</th><th rowspan="4" class="nt">Pencapaian<br>Target JG</th><th rowspan="4" class="nt">Kuadran</th></tr>
       <tr>${NETT_PROD.map(([, l, c]) => `<th colspan="4" class="np-${c}">${l}</th>`).join("")}</tr>
       <tr>${NETT_PROD.map(([, , c]) => ["Baru", "Suplesi"].map(j => `<th colspan="2" class="np-${c} s">${j}</th>`).join("")).join("")}
         <th rowspan="2" class="nt">Target JG</th><th rowspan="2" class="nt">GAP Target JG</th></tr>
       <tr>${NETT_PROD.map(([, , c]) => ["Deb", "OS", "Deb", "OS"].map(h => `<th class="np-${c} s">${h}</th>`).join("")).join("")}<th class="nt">Deb</th><th class="nt">Os</th></tr></thead>
-    <tbody>${rows.map((r, i) => `<tr><td class="r">${i + 1}</td><td>${esc(r.kc)}</td><td>${esc(r.rm)}</td><td class="c">${esc(r.jg || "")}</td>${prodCells(null, r)}
+    <tbody>${rows.map((r, i) => `<tr><td class="r">${i + 1}</td><td>${esc(r.kc)}</td>${isM ? `<td>${esc(r.unit || "–")}</td>` : ""}<td>${esc(r.rm)}</td><td class="c">${esc(r.jg || "")}</td>${prodCells(null, r)}
       <td class="r tb">${nz(r.deb)}</td><td class="r tb">${nz(r.os)}</td><td class="r">${r.hasT ? nz(r.t) : "–"}</td><td class="r tg">${gapF(r.gap)}</td>
       ${pctCell(r.pen ?? (r.os ? null : 0), "k" + (kuadOf(r.pen) || 4))}${kuadCell(r.pen)}</tr>`).join("")}</tbody>
     <tfoot>${sumLine("Grand Total", rows, "knv")}${areas.length > 1 ? areas.map(a => sumLine(aLbl(a), rows.filter(r => r.area === a), "knv a")).join("") : ""}</tfoot></table></div>

@@ -2,8 +2,33 @@
 // Sumber: sheet "database instansi" di Google Sheets (dibaca Apps Script saat Sync portofolio), nominal Rp juta.
 // DB.ins = { asof, cab[[kode, nama]], uker[[kode, nama, cabIdx, 0 = kantor cabang (Ritel) · 1 = unit (Mikro)]], ins[[id, nama]], rows[[ukerIdx, insIdx, deb, os, sml, npl]], pks{ rowIdx: [jenis, no, jatuhTempo, payroll, pegawai] } }
 // Batas warna % SML / NPL: hijau di bawah batas pertama, kuning sampai batas kedua, merah di atasnya; default 1% dan 2%, diubah admin (meta.cfg.insThr).
-const PFX = Object.assign({ kc: "ALL", uk: "ALL", jn: "ALL", q: "", qu: "" }, lsGet(STORE + "-pf") || {});
+const PFX = Object.assign({ kc: [], uk: [], jn: "ALL", q: "" }, lsGet(STORE + "-pf") || {});
+["kc", "uk"].forEach(k => { if (!Array.isArray(PFX[k])) PFX[k] = PFX[k] && PFX[k] !== "ALL" ? [String(PFX[k])] : []; });   // kosong = semua; nilai lama (satu pilihan) diubah jadi daftar
+delete PFX.qu;
 const savePFX = () => lsSet(STORE + "-pf", PFX);
+// dropdown pilihan ganda dengan kolom cari di dalamnya (kantor cabang / uker)
+const MSL = { open: null, q: {}, top: {} };
+const mselHtml = (id, label, items, sel, allTxt) => {
+  const txt = !sel.size ? allTxt : sel.size === 1 ? (items.find(i => sel.has(i.v)) || { l: "1 dipilih" }).l : nf0.format(sel.size) + " dipilih", qv = MSL.q[id] || "", q = qv.trim().toLowerCase();
+  return `<div class="field msel" id="${id}" style="flex:1 1 240px"><span class="note" style="font-weight:700">${label}</span>
+    <button type="button" class="ctl msel-b" aria-haspopup="listbox" aria-expanded="${MSL.open === id}">${esc(txt)}</button>
+    <div class="msel-p" ${MSL.open === id ? "" : "hidden"}><input type="search" class="ctl msel-q" placeholder="Cari…" value="${esc(qv)}" autocomplete="off">
+      <div class="msel-a"><button type="button" class="linkish" data-ma="all">Pilih semua yang tampil</button><button type="button" class="linkish" data-ma="none">Kosongkan pilihan</button></div>
+      <div class="msel-l">${items.map(i => `<label class="msel-i"${q && !(i.l + " " + (i.s || "")).toLowerCase().includes(q) ? " hidden" : ""} data-t="${esc((i.l + " " + (i.s || "")).toLowerCase())}"><input type="checkbox" value="${i.v}" ${sel.has(i.v) ? "checked" : ""}><span>${esc(i.l)}${i.s ? `<small class="note"> ${esc(i.s)}</small>` : ""}</span></label>`).join("")}</div></div></div>`;
+};
+function mselBind(id, onChange) {
+  const el = $("#" + id); if (!el) return;
+  const btn = el.querySelector(".msel-b"), pan = el.querySelector(".msel-p"), qi = el.querySelector(".msel-q"), lst = el.querySelector(".msel-l");
+  if (MSL.top[id]) lst.scrollTop = MSL.top[id];
+  const filt = () => { const q = qi.value.trim().toLowerCase(); MSL.q[id] = qi.value; lst.querySelectorAll(".msel-i").forEach(l => l.hidden = !!q && !l.dataset.t.includes(q)); };
+  btn.onclick = () => { const open = pan.hidden; document.querySelectorAll(".msel-p").forEach(p => p.hidden = true); pan.hidden = !open; MSL.open = open ? id : null; if (open) qi.focus(); };
+  qi.oninput = filt; lst.onscroll = () => MSL.top[id] = lst.scrollTop;
+  const pick = () => onChange([...lst.querySelectorAll("input:checked")].map(i => i.value));
+  lst.onchange = () => { MSL.top[id] = lst.scrollTop; pick(); };
+  el.querySelectorAll("[data-ma]").forEach(b => b.onclick = () => { lst.querySelectorAll(".msel-i").forEach(l => { if (b.dataset.ma === "none" || !l.hidden) l.querySelector("input").checked = b.dataset.ma === "all"; }); pick(); });
+  if (MSL.open === id) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
+}
+if (!window.__mselDoc) { window.__mselDoc = 1; document.addEventListener("click", e => { if (!e.target.closest(".msel")) { MSL.open = null; document.querySelectorAll(".msel-p").forEach(p => p.hidden = true); } }); }
 const insThr = () => { const c = (DB.meta && DB.meta.cfg && DB.meta.cfg.insThr) || {}; return { sml: Array.isArray(c.sml) ? c.sml : [1, 2], npl: Array.isArray(c.npl) ? c.npl : [1, 2] }; };
 const insCls = (v, th) => v == null ? "neutral" : v * 100 < th[0] ? "good" : v * 100 <= th[1] ? "warn" : "crit";
 const insChip = (v, th) => v == null ? "–" : chip(pct(v, 2), insCls(v, th));
@@ -19,29 +44,27 @@ function viewPortofolio(v) {
   const D = DB.ins;
   if (!D) { v.innerHTML = `<section class="panel"><div class="empty"><p style="font-weight:700;margin:0 0 6px">Belum ada data portofolio eksisting</p>${isAdmin() ? "Buat sheet <code>database instansi</code> di Google Sheets (dari file Database_instansi.xlsx), lalu klik <b>Sync portofolio</b> di Admin → Kelola data." : "Hubungi admin untuk memuat data portofolio."}</div></section>`; return; }
   const th = insThr(), cabs = D.cab.map((c, i) => ({ i, kode: c[0], nama: c[1] })).sort((a, b) => a.nama.localeCompare(b.nama));
-  if (PFX.kc !== "ALL" && !D.cab[+PFX.kc]) PFX.kc = "ALL";
-  const ukers = D.uker.map((u, i) => ({ i, kode: u[0], nama: u[1], cab: u[2], unit: u[3] })).filter(u => PFX.kc === "ALL" || u.cab === +PFX.kc).sort((a, b) => a.unit - b.unit || a.nama.localeCompare(b.nama));
-  if (PFX.uk !== "ALL" && !ukers.some(u => String(u.i) === PFX.uk)) PFX.uk = "ALL";
-  const qu = PFX.qu.trim().toLowerCase(), ukHit = u => !qu || (u[1] + " " + u[0] + " " + D.cab[u[2]][1]).toLowerCase().includes(qu);   // cari uker: nama uker, kode uker, atau nama cabangnya
-  const okU = D.uker.map((u, i) => (PFX.kc === "ALL" || u[2] === +PFX.kc) && (PFX.uk === "ALL" || String(i) === PFX.uk) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])) && ukHit(u));
+  PFX.kc = PFX.kc.filter(k => D.cab[+k]);
+  const kcS = new Set(PFX.kc), inKc = u => !kcS.size || kcS.has(String(u[2]));
+  const ukers = D.uker.map((u, i) => ({ i, kode: u[0], nama: u[1], cab: u[2], unit: u[3] })).filter(u => !kcS.size || kcS.has(String(u.cab))).sort((a, b) => a.unit - b.unit || a.nama.localeCompare(b.nama));
+  PFX.uk = PFX.uk.filter(k => ukers.some(u => String(u.i) === k));
+  const ukS = new Set(PFX.uk);
+  const okU = D.uker.map((u, i) => inKc(u) && (!ukS.size || ukS.has(String(i))) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])));
   const scoped = D.rows.map((r, ri) => [ri, r]).filter(([, r]) => okU[r[0]]);
   const q = PFX.q.trim().toLowerCase();
-  const insRows = pfAgg(scoped, r => r[1]).map(o => ({ ...o, id: D.ins[o.k][0], nama: D.ins[o.k][1], npks: o.ri.filter(ri => D.pks[ri]).length })).filter(o => !q || (o.nama + " " + o.id).toLowerCase().includes(q));
+  const insRows = pfAgg(scoped, r => r[1]).map(o => ({ ...o, id: D.ins[o.k][0], nama: D.ins[o.k][1], npks: o.ri.filter(ri => D.pks[ri]).length })).filter(o => !q || o.nama.toLowerCase().includes(q));
   const T = { deb: 0, os: 0, sml: 0, npl: 0 }; scoped.forEach(([, r]) => { T.deb += r[2]; T.os += r[3]; T.sml += r[4]; T.npl += r[5]; });
   const tp = { sml: T.os ? T.sml / T.os : null, npl: T.os ? T.npl / T.os : null };
-  const nUkHit = okU.filter(Boolean).length;
-  const scopeL = PFX.uk !== "ALL" ? D.uker[+PFX.uk][1] : qu ? `${nf0.format(nUkHit)} uker cocok “${PFX.qu.trim()}”` : PFX.kc !== "ALL" ? D.cab[+PFX.kc][1] : "Seluruh RO Medan";
-  const optKc = `<option value="ALL">Semua kantor cabang</option>` + cabs.map(c => `<option value="${c.i}" ${String(c.i) === PFX.kc ? "selected" : ""}>${esc(c.nama)}</option>`).join("");
-  const optUk = `<option value="ALL">Semua uker${PFX.kc !== "ALL" ? " di cabang ini" : ""}</option>` + ukers.map(u => `<option value="${u.i}" ${String(u.i) === PFX.uk ? "selected" : ""}>${u.unit ? "" : "★ "}${esc(u.nama)}${u.unit ? "" : " (kantor cabang · Ritel)"}</option>`).join("");
+  const scopeL = ukS.size ? (ukS.size === 1 ? D.uker[+PFX.uk[0]][1] : `${nf0.format(ukS.size)} uker terpilih`) : kcS.size ? (kcS.size === 1 ? D.cab[+PFX.kc[0]][1] : `${nf0.format(kcS.size)} kantor cabang terpilih`) : "Seluruh RO Medan";
+  const itKc = cabs.map(c => ({ v: String(c.i), l: c.nama, s: c.kode })), itUk = ukers.map(u => ({ v: String(u.i), l: (u.unit ? "" : "★ ") + u.nama, s: u.kode + (u.unit ? "" : " · kantor cabang (Ritel)") }));
   const rule = k => `hijau &lt; ${nfTh(th[k][0])}% · kuning ${nfTh(th[k][0])}–${nfTh(th[k][1])}% · merah &gt; ${nfTh(th[k][1])}%`;
   v.innerHTML = `
     <section class="panel" style="padding:12px 16px">
       <div class="toolbar">
-        <label class="field" style="flex:1 1 220px"><span class="note" style="font-weight:700">Kantor cabang</span><select class="ctl" id="pfKc">${optKc}</select></label>
-        <label class="field" style="flex:1 1 260px"><span class="note" style="font-weight:700">Uker</span><select class="ctl" id="pfUk">${optUk}</select></label>
-        <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">Cari uker</span><input class="ctl" type="search" id="pfQu" value="${esc(PFX.qu)}" placeholder="nama atau kode uker"></label>
+        ${mselHtml("pfKc", "Kantor cabang", itKc, kcS, "Semua kantor cabang")}
+        ${mselHtml("pfUk", "Uker", itUk, ukS, "Semua uker" + (kcS.size ? " di cabang terpilih" : ""))}
         <label class="field" style="flex:1 1 190px"><span class="note" style="font-weight:700">Jenis</span><select class="ctl" id="pfJn"><option value="ALL">Briguna Ritel + Mikro</option><option value="ritel" ${PFX.jn === "ritel" ? "selected" : ""}>Briguna Ritel (kantor cabang)</option><option value="mikro" ${PFX.jn === "mikro" ? "selected" : ""}>Briguna Mikro (unit)</option></select></label>
-        <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">Cari instansi</span><input class="ctl" type="search" id="pfQ" value="${esc(PFX.q)}" placeholder="nama atau ID instansi"></label>
+        <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">Cari instansi</span><input class="ctl" type="search" id="pfQ" value="${esc(PFX.q)}" placeholder="nama instansi"></label>
       </div>
       <p class="note" style="margin:0">${esc(scopeL)} · posisi ${D.asof ? perL(D.asof) : "–"} · nominal Rp juta · % kualitas = SML (atau NPL) ÷ OS instansi ·
         <b>%SML</b>: ${rule("sml")} · <b>%NPL</b>: ${rule("npl")}${isAdmin() ? ` · <button type="button" class="linkish" id="pfThr">Atur batas warna</button>` : ""}</p>
@@ -56,22 +79,21 @@ function viewPortofolio(v) {
     <section class="panel"><div class="panel-h"><h2>Kualitas per uker</h2><span class="sub">klik nama uker untuk melihat instansinya</span></div><div id="pfUkT"></div></section>
     <section class="panel"><div class="panel-h"><h2>Instansi di ${esc(scopeL)}</h2><span class="sub">warna mengikuti batas % SML / NPL · tombol PKS menampilkan data kerja sama</span></div><div id="pfInT"></div></section>`;
   const go = () => { savePFX(); render(); };
-  $("#pfKc").onchange = e => { PFX.kc = e.target.value; PFX.uk = "ALL"; go(); };
-  $("#pfUk").onchange = e => { PFX.uk = e.target.value; if (PFX.uk !== "ALL") PFX.qu = ""; go(); };
+  mselBind("pfKc", a => { PFX.kc = a; go(); });
+  mselBind("pfUk", a => { PFX.uk = a; go(); });
   $("#pfJn").onchange = e => { PFX.jn = e.target.value; go(); };
   let qt; $("#pfQ").oninput = e => { clearTimeout(qt); qt = setTimeout(() => { PFX.q = e.target.value; savePFX(); render(); const el = $("#pfQ"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 350); };
-  let qut; $("#pfQu").oninput = e => { clearTimeout(qut); qut = setTimeout(() => { PFX.qu = e.target.value; PFX.uk = "ALL"; if (PFX.qu.trim()) PFX.kc = "ALL"; savePFX(); render(); const el = $("#pfQu"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 350); };
   if ($("#pfThr")) $("#pfThr").onclick = openInsThr;
   // per uker (semua uker dalam cakupan kantor cabang / jenis terpilih, tanpa menyaring uker)
-  const scopedU = D.rows.map((r, ri) => [ri, r]).filter(([, r]) => { const u = D.uker[r[0]]; return (PFX.kc === "ALL" || u[2] === +PFX.kc) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])) && ukHit(u); });
+  const scopedU = D.rows.map((r, ri) => [ri, r]).filter(([, r]) => { const u = D.uker[r[0]]; return inKc(u) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])); });
   const ukRows = pfAgg(scopedU, r => r[0]).map(o => ({ ...o, nama: D.uker[o.k][1], kode: D.uker[o.k][0], unit: D.uker[o.k][3], kc: D.cab[D.uker[o.k][2]][1], nIns: new Set(o.ri.map(ri => D.rows[ri][1])).size }));
-  table($("#pfUkT"), [{ key: "nama", label: "Uker", fmt: (x, r) => `<button class="linkish" data-uk="${r.k}">${esc(x)}</button><br><small class="note">${r.kode} · ${esc(jenisUker(D.uker[r.k]))}${PFX.kc === "ALL" ? " · " + esc(r.kc) : ""}</small>` },
+  table($("#pfUkT"), [{ key: "nama", label: "Uker", fmt: (x, r) => `<button class="linkish" data-uk="${r.k}">${esc(x)}</button><br><small class="note">${r.kode} · ${esc(jenisUker(D.uker[r.k]))}${kcS.size !== 1 ? " · " + esc(r.kc) : ""}</small>` },
     { key: "nIns", label: "Instansi", r: 1, fmt: x => nf0.format(x) }, { key: "deb", label: "Debitur", r: 1, fmt: x => nf0.format(x) }, { key: "os", label: "OS (Rp juta)", r: 1, fmt: x => nf0.format(x) },
     { key: "psml", label: "% SML", r: 1, sortVal: r => r.psml ?? -1, fmt: x => insChip(x, th.sml) }, { key: "pnpl", label: "% NPL", r: 1, sortVal: r => r.pnpl ?? -1, fmt: x => insChip(x, th.npl) },
     { key: "sml", label: "SML (Rp juta)", r: 1, fmt: x => nf0.format(x) }, { key: "npl", label: "NPL (Rp juta)", r: 1, fmt: x => nf0.format(x) }], ukRows,
-    { sortKey: "os", page: 15, after: el => el.querySelectorAll("[data-uk]").forEach(b => b.onclick = () => { PFX.uk = b.dataset.uk; PFX.qu = ""; PFX.kc = String(D.uker[+b.dataset.uk][2]); go(); window.scrollTo(0, 0); }) });
+    { sortKey: "os", page: 15, after: el => el.querySelectorAll("[data-uk]").forEach(b => b.onclick = () => { PFX.uk = [b.dataset.uk]; PFX.kc = [String(D.uker[+b.dataset.uk][2])]; MSL.open = null; go(); window.scrollTo(0, 0); }) });
   // instansi
-  table($("#pfInT"), [{ key: "nama", label: "Instansi", fmt: (x, r) => `<b>${esc(x)}</b>${r.id ? `<br><small class="note">${esc(r.id)}</small>` : ""}` },
+  table($("#pfInT"), [{ key: "nama", label: "Instansi", fmt: (x, r) => `<b>${esc(x)}</b>` },
     { key: "deb", label: "Debitur", r: 1, fmt: x => nf0.format(x) }, { key: "os", label: "OS (Rp juta)", r: 1, fmt: x => nf0.format(x) }, { key: "sh", label: "% dari OS", r: 1, sortVal: r => r.os, fmt: (x, r) => pct(T.os ? r.os / T.os : 0, 1) },
     { key: "psml", label: "% SML", r: 1, sortVal: r => r.psml ?? -1, fmt: x => insChip(x, th.sml) }, { key: "pnpl", label: "% NPL", r: 1, sortVal: r => r.pnpl ?? -1, fmt: x => insChip(x, th.npl) },
     { key: "sml", label: "SML (Rp juta)", r: 1, fmt: x => nf0.format(x) }, { key: "npl", label: "NPL (Rp juta)", r: 1, fmt: x => nf0.format(x) },
@@ -86,7 +108,7 @@ function openPks(ii, scoped) {
   const dueCls = t => { if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return ""; const d = (new Date(t) - new Date(new Date().toISOString().slice(0, 10))) / 864e5; return d < 0 ? "crit" : d <= 90 ? "warn" : "good"; };
   const tg = t => /^\d{4}-\d{2}-\d{2}$/.test(t) ? tglS(t) : (t || "–");
   $("#dlgTitle").textContent = "PKS · " + D.ins[ii][1];
-  $("#dlgBody").innerHTML = `<p class="note" style="margin:0 0 8px">${esc(D.ins[ii][0] || "")}${D.ins[ii][0] ? " · " : ""}${nf0.format(mine.length)} uker memiliki debitur instansi ini · ${nf0.format(withP.length)} uker ada data PKS${inScope.size && withP.some(([ri]) => inScope.has(ri)) ? " · uker dalam cakupan terpilih ditampilkan lebih dulu" : ""}</p>
+  $("#dlgBody").innerHTML = `<p class="note" style="margin:0 0 8px">${nf0.format(mine.length)} uker memiliki debitur instansi ini · ${nf0.format(withP.length)} uker ada data PKS${inScope.size && withP.some(([ri]) => inScope.has(ri)) ? " · uker dalam cakupan terpilih ditampilkan lebih dulu" : ""}</p>
     ${withP.length ? `<div class="table-wrap"><table class="kt"><thead><tr><th>Uker</th><th>Jenis PKS</th><th>No PKS</th><th>Tanggal jatuh tempo</th><th>Payroll / Non-Payroll</th><th class="r">Jumlah pegawai</th><th class="r">Debitur</th><th class="r">Penetrasi</th></tr></thead>
       <tbody>${withP.map(([ri, r]) => { const p = D.pks[ri], u = D.uker[r[0]], pen = p[4] ? r[2] / p[4] : null; return `<tr${inScope.has(ri) ? "" : ' style="opacity:.75"'}><td>${esc(u[1])}<br><small class="note">${esc(D.cab[u[2]][1])}</small></td><td>${esc(p[0] || "–")}</td><td>${esc(p[1] || "–")}</td>
         <td>${dueCls(p[2]) ? chip(tg(p[2]), dueCls(p[2])) : esc(tg(p[2]))}</td><td>${esc(p[3] || "–")}</td><td class="r">${p[4] == null ? "–" : nf0.format(p[4])}</td><td class="r">${nf0.format(r[2])}</td><td class="r">${pen == null ? "–" : pct(pen, 1)}</td></tr>`; }).join("")}</tbody></table></div>

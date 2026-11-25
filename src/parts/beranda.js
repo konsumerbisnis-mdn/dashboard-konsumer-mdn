@@ -101,6 +101,8 @@ function viewBeranda(v) {
   const rsAsof = Object.values(rsum).map(x => x.asof).sort().pop(), psAsof = Object.values(psum).map(x => x.asof).sort().pop();
   const lwAsof = Object.values(lsum).map(x => x.asof).sort().pop(), gsAsof = Object.values(gs).map(x => x.asof).sort().pop();
   const canNom = Auth.can("nominatif");
+  const msq = DB.ms ? (() => { const i = DB.ms.per.findIndex(p => p.k === DB.ms.asof), f = k => { const b = DB.ms.biz[k], r = b && b.rows.find(x => x.t === "ro"); return r && r.i[i] && r.b[i] != null ? r.b[i] / r.i[i] : null; }; return { k: f("konsumer"), b: f("briguna"), p: f("kpr") }; })() : null;
+  const MS_ICO = '<svg viewBox="0 0 24 24"><path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/></svg>';
   v.innerHTML = `
     <div class="l-bg" aria-hidden="true"><i class="lb1"></i><i class="lb2"></i><span class="l-grid"></span><span class="l-vig"></span><canvas id="lPart"></canvas></div>
     <div class="l-top">
@@ -125,6 +127,8 @@ function viewBeranda(v) {
           : card("kualitas", ICON.kualitas, "Kualitas Kredit", "SML & NPL, pergerakan DG / UG dibanding bulan lalu", ld(LOADING.core, "Perlu LW321 bulan ini & bulan lalu"), "warn")}
         ${psAsof ? card("pipeline", ICON.pipeline, "Pipeline Brispot RM", ["B", "K"].filter(s => psum[s]).map(s => `${s === "B" ? "Briguna" : "KPR"} ${rpJ(psum[s].pl)} · ${nf0.format(psum[s].n)} deb`).join(" · "), "Tersedia · posisi " + tglS(psAsof))
           : card("pipeline", ICON.pipeline, "Pipeline Brispot RM", "Funnel, jadwal akad, TAT & rencana realisasi RM", ld(PIPE_LOADING, "Belum ada data"), "warn")}
+        ${msq ? card("marketshare", MS_ICO, "Marketshare Konsumer", `Konsumer ${msq.k == null ? "–" : pct(msq.k, 2)} · Briguna ${msq.b == null ? "–" : pct(msq.b, 2)} · KPR ${msq.p == null ? "–" : pct(msq.p, 2)}`, "Tersedia · posisi " + perL(DB.ms.asof))
+          : card("marketshare", MS_ICO, "Marketshare Konsumer", "Posisi industri vs BRI dan % marketshare per bisnis & KC", "Belum ada data", "warn")}
         ${card("simulasi", ICON.simulasi, "Simulasi Suku Bunga", `Briguna (max plafond & angsuran) · KPR ${DB.rate ? uniq(DB.rate.rows.map(x => x.prog)).length + " program" : ""}`, DB.rate ? (String(DB.rate.title || "").replace(/^.*PROGRAM\s*/i, "Program ") || "Tersedia") : "Tersedia")}
       </nav>${alerts.length ? `<div class="l-side"><details class="l-alert"><summary><span class="l-badge red">${alerts.length}</span> Catatan perlu perhatian</summary>
         <ul>${alerts.map(a => `<li><span class="l-badge ${a[0]}">${a[1]}</span><span>${a[2]}</span></li>`).join("")}</ul></details></div>` : ""}</div>

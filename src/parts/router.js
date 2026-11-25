@@ -6,6 +6,7 @@ const VIEWS = {
   nominatif: ["Nominatif Portofolio", "Menu 3", viewNom],
   kualitas: ["Kualitas Kredit", "Menu 4", viewKual],
   pipeline: ["Pipeline Brispot RM", "Menu 5", viewPipeline],
+  marketshare: ["Marketshare Konsumer", "Menu 7", viewMarketshare],
   simulasi: ["Simulasi Suku Bunga", "Menu 6", viewSimAll],
   admin: ["Admin", "Admin", viewAdmin]
 };

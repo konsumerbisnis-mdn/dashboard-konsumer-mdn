@@ -169,6 +169,11 @@ ker = rep(ker, '''  $("#kExp").onclick = () => exportCSV("keragaan-kpr-" + d,'''
   }
   $("#kExp").onclick = () => exportCSV("keragaan-" + KV.p + "-" + d,''')
 
+# Posisi (tanggal) di Keragaan: kalender, hanya tanggal yang ada datanya yang bisa dipilih
+ker = rep(ker, """<select class="ctl" id="kD">${optsD}</select>""", """${calField("kD", d, { enabled: new Set(ds), min: ds[0], max: ds[ds.length - 1] })}""")
+# Produk Mikro Unit Dedicated: penjelasan bahwa angkanya hanya unit Briguna dedicated
+ker = rep(ker, """ hanya tersedia untuk OS" : ""}</p>""", """ hanya tersedia untuk OS" : ""}</p>
+      ${KV.ud ? `<p class="note ud-info" role="note"><b>Mikro Unit Dedicated</b> hanya memuat <b>unit Briguna dedicated</b> (database keragaan Desc "Briguna Mikro D", ${nf0.format(K.units.length)} unit), bukan seluruh unit Briguna Mikro. Untuk angka Briguna Mikro seluruh unit per kantor cabang, pilih Produk <b>Briguna Mikro</b>.</p>` : ""}""")
 # Keragaan Briguna Mikro: tabel per unit (database keragaan Desc "Briguna Mikro D", RKA unit dari sheet RKA) di bawah tabel per kantor cabang
 ker = rep(ker, """ + kpiTable(d, us, KS.kpi, KS.kmode);
 """, """ + kpiTable(d, us, KS.kpi, KS.kmode);
@@ -178,7 +183,7 @@ ker = rep(ker, """ + kpiTable(d, us, KS.kpi, KS.kmode);
     try {
       const R2 = kRefs(d), uu = kUnits().filter(u => { const c = kSnap(R2.di, [u]); return c && c.os > 0; });
       if (uu.length) {
-        const pctM = KS.kmode === "pct", sub = `<h3 class="k-sub" style="margin:18px 0 8px;font-size:14px">Per unit · Briguna Mikro${KS.kpi === "ts" ? "" : KS.kpi === "all" ? " · semua KPI" : ""} <small class="note">unit dedicated · RKA unit dari sheet RKA</small></h3>`;
+        const pctM = KS.kmode === "pct", sub = `<h3 class="k-sub" style="margin:18px 0 8px;font-size:14px">Per unit · Briguna Mikro${KS.kpi === "ts" ? "" : KS.kpi === "all" ? " · semua KPI" : ""} <small class="note">hanya unit Briguna dedicated (bukan seluruh unit Mikro) · RKA unit dari sheet RKA</small></h3>`;
         $("#kHl").insertAdjacentHTML("beforeend", sub + (KS.kpi === "ts" ? (kTsTable(d, uu, "sml", pctM) + kTsTable(d, uu, "npl", pctM)).replace(/Kantor Cabang/g, "Unit") : kpiTable(d, uu, KS.kpi, KS.kmode)));
       } else $("#kHl").insertAdjacentHTML("beforeend", `<p class="note" style="margin:14px 0 0">Tidak ada unit dedicated pada saringan ini.</p>`);
     } finally { KV = keepKV; }
@@ -426,8 +431,8 @@ start = '''
   window.__appReady = true;
 })();
 '''
-js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + chart + P('charts.js') + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + P('rm_nett.js') + pipe + P('brispot_brs.js') + P('pipe_rep.js') + pimp + sim \
-     + P('sim_brg.js') + P('nominatif.js') + P('ker_up.js') + P('admin.js') + P('export.js') + P('anim.js') + P('router.js') + P('foto_zoom.js') + P('land_fit.js') + zoom + P('boot.js') + start + intro
+js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + P('cal.js') + chart + P('charts.js') + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + P('rm_nett.js') + pipe + P('brispot_brs.js') + P('pipe_rep.js') + pimp + sim \
+     + P('sim_brg.js') + P('nominatif.js') + P('ker_up.js') + P('admin.js') + P('feedback.js') + P('export.js') + P('anim.js') + P('router.js') + P('foto_zoom.js') + P('land_fit.js') + zoom + P('boot.js') + start + intro
 # bagian bertanda data-nosec (mis. Lampiran, yang sudah punya buka-tutup per lampiran) tidak diberi tombol minimize
 js = rep(js, '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h"));''', '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h") && !x.hasAttribute("data-nosec"));''')
 open(os.path.join(ROOT, 'js', 'app.js'), 'w', encoding='utf8').write(js)

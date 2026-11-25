@@ -90,6 +90,76 @@ const LWL = { B: { key: "B", seg: "Briguna Ritel & Mikro" }, K: { key: "K", seg:
 const isMidMonth = d => +d.slice(8) < new Date(+d.slice(0, 4), +d.slice(5, 7), 0).getDate();
 const role = () => (Auth.user || {}).role || "guest";
 const isAdmin = () => role() === "admin";
+/* ================= pemilih tanggal berbentuk kalender (satu tanggal atau beberapa tanggal) ================= */
+// calField(id, nilai, opsi) → tombol kalender + <input type="hidden" id> (handler "change" lama pada id itu tetap bekerja).
+// opsi: min / max (yyyy-mm-dd), enabled (Set tanggal yang boleh dipilih), clear (boleh dikosongkan), placeholder,
+//       multi + get() / set(arr) / label() / marks {tanggal: jumlah} untuk pilihan beberapa tanggal.
+const CAL_BLN = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+const CAL_HR = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"];
+const CAL_ICO = '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+const CALS = {};
+let CAL_OPEN = null;
+const calIso = (y, m, d) => y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+const calLabel = id => { const c = CALS[id] || {}, v = $("#" + id) ? $("#" + id).value : ""; return c.multi ? c.label() : v ? tglS(v) : (c.placeholder || "Pilih tanggal"); };
+function calField(id, value, cfg = {}) {
+  CALS[id] = cfg;
+  return `<span class="calf"><input type="hidden" id="${id}" value="${esc(value || "")}"><button type="button" class="ctl cal-btn" data-cal="${id}" aria-haspopup="dialog"><span>${value ? tglS(value) : esc(cfg.placeholder || "Pilih tanggal")}</span>${CAL_ICO}</button></span>`;
+}
+function calClose() { if (CAL_OPEN) { CAL_OPEN.pop.remove(); CAL_OPEN = null; } }
+function calOpen(btn) {
+  const id = btn.dataset.cal, cfg = CALS[id]; if (!cfg) return;
+  if (CAL_OPEN && CAL_OPEN.id === id) { calClose(); return; }
+  calClose();
+  const inp = $("#" + id), today = (() => { const t = new Date(); return calIso(t.getFullYear(), t.getMonth(), t.getDate()); })();
+  const selOf = () => cfg.multi ? cfg.get() : (inp && inp.value ? [inp.value] : []);
+  const base = selOf().slice().sort().pop() || cfg.max || today;
+  let y = +base.slice(0, 4), m = +base.slice(5, 7) - 1;
+  const minY = cfg.min ? +cfg.min.slice(0, 4) : y - 5, maxY = cfg.max ? +cfg.max.slice(0, 4) : y + 1;
+  const pop = document.createElement("div"); pop.className = "cal-pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Pilih tanggal");
+  const ok = iso => (!cfg.min || iso >= cfg.min) && (!cfg.max || iso <= cfg.max) && (!cfg.enabled || cfg.enabled.has(iso));
+  const setLabel = () => { const s = btn.querySelector("span"); if (s) s.textContent = calLabel(id); };
+  const pick = iso => {
+    if (cfg.multi) { const a = cfg.get().slice(), i = a.indexOf(iso); i >= 0 ? a.splice(i, 1) : a.push(iso); cfg.set(a.sort()); setLabel(); draw(); return; }
+    inp.value = iso; setLabel(); inp.dispatchEvent(new Event("change", { bubbles: true })); calClose();
+  };
+  function draw() {
+    const sel = new Set(selOf()), first = new Date(y, m, 1), off = (first.getDay() + 6) % 7, dim = new Date(y, m + 1, 0).getDate();
+    const yrs = []; for (let k = Math.min(minY, y); k <= Math.max(maxY, y); k++) yrs.push(k);
+    let cells = ""; for (let i = 0; i < off; i++) cells += '<span class="cal-e"></span>';
+    for (let d = 1; d <= dim; d++) { const iso = calIso(y, m, d), on = ok(iso), n = cfg.marks && cfg.marks[iso];
+      cells += `<button type="button" class="cal-d${on ? "" : " off"}${sel.has(iso) ? " sel" : ""}${iso === today ? " today" : ""}${n ? " has" : ""}" data-iso="${iso}" ${on ? "" : "disabled"} ${n ? `title="${n} debitur"` : ""}>${d}${n ? `<i>${n}</i>` : ""}</button>`; }
+    const prevOk = !cfg.min || calIso(y, m, 1) > cfg.min, nextOk = !cfg.max || calIso(y, m + 1, 1) <= cfg.max;
+    pop.innerHTML = `<div class="cal-h"><button type="button" class="cal-nav" data-nav="-1" aria-label="Bulan sebelumnya" ${prevOk ? "" : "disabled"}>‹</button>
+        <select class="cal-m" aria-label="Bulan">${CAL_BLN.map((b, i) => `<option value="${i}" ${i === m ? "selected" : ""}>${b}</option>`).join("")}</select>
+        <select class="cal-y" aria-label="Tahun">${yrs.map(k => `<option ${k === y ? "selected" : ""}>${k}</option>`).join("")}</select>
+        <button type="button" class="cal-nav" data-nav="1" aria-label="Bulan berikutnya" ${nextOk ? "" : "disabled"}>›</button></div>
+      <div class="cal-w">${CAL_HR.map(h => `<span>${h}</span>`).join("")}</div><div class="cal-g">${cells}</div>
+      <div class="cal-f">${cfg.multi ? `<button type="button" data-act="all">Pilih semua</button><button type="button" data-act="none">Hapus pilihan</button>`
+        : `${cfg.max ? `<button type="button" data-act="last">Terbaru</button>` : ""}${ok(today) ? `<button type="button" data-act="today">Hari ini</button>` : ""}${cfg.clear ? `<button type="button" data-act="clear">Hapus</button>` : ""}`}
+        <button type="button" data-act="close">Tutup</button></div>`;
+    pop.querySelectorAll("[data-nav]").forEach(b => b.onclick = () => { m += +b.dataset.nav; if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } draw(); });
+    pop.querySelector(".cal-m").onchange = e => { m = +e.target.value; draw(); };
+    pop.querySelector(".cal-y").onchange = e => { y = +e.target.value; draw(); };
+    pop.querySelectorAll("[data-iso]").forEach(b => b.onclick = () => pick(b.dataset.iso));
+    pop.querySelectorAll("[data-act]").forEach(b => b.onclick = () => { const a = b.dataset.act;
+      if (a === "close") return calClose();
+      if (a === "today") return pick(today);
+      if (a === "last") return pick(cfg.max);
+      if (a === "clear") { inp.value = ""; setLabel(); inp.dispatchEvent(new Event("change", { bubbles: true })); return calClose(); }
+      if (a === "all") { cfg.set([...cfg.enabled].filter(ok).sort()); setLabel(); draw(); }
+      if (a === "none") { cfg.set([]); setLabel(); draw(); } });
+  }
+  draw();
+  (document.fullscreenElement || document.body).appendChild(pop);
+  const r = btn.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let top = r.bottom + 6; if (top + ph > innerHeight - 8 && r.top - ph - 6 > 8) top = r.top - ph - 6;
+  pop.style.left = Math.max(8, Math.min(innerWidth - pw - 8, r.left)) + "px"; pop.style.top = Math.max(8, top) + "px";
+  CAL_OPEN = { id, pop, y0: scrollY };
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-cal]"); if (b) { e.preventDefault(); calOpen(b); return; } if (CAL_OPEN && !e.target.closest(".cal-pop")) calClose(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && CAL_OPEN) calClose(); });
+// halaman digulir jauh dari tombolnya: tutup (resize tidak menutup agar tidak hilang saat bilah alamat HP bergeser)
+addEventListener("scroll", () => { if (CAL_OPEN && Math.abs(scrollY - CAL_OPEN.y0) > 140) calClose(); }, { passive: true });
 /* ================= chart helpers ================= */
 const charts = {};
 const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -532,7 +602,7 @@ function viewBeranda(v) {
 // Desc → produk. Briguna Ritel = Karya + Purna + Pra-Purna (anti double-count; "Pra0Purna" = Pra-Purna). Konsumer = Briguna Ritel + Mikro + KPR.
 const KER_M = ["os", "sml", "npl", "deb", "dsml", "dnpl"];
 const PRODS = [["konsumer", "Konsumer (Briguna + KPR)", "Konsumer"], ["ritel", "Briguna Ritel", "Briguna Ritel"], ["mikro", "Briguna Mikro", "Briguna Mikro"], ["kpr", "KPR", "KPR"],
-  ["brg", "Briguna Ritel + Mikro", "Briguna"], ["karya", "Briguna Karya", "Karya"], ["purna", "Briguna Purna", "Purna"], ["prapurna", "Briguna Pra-Purna", "Pra-Purna"], ["mikrod", "Mikro Unit Dedicated", "Mikro D"]];
+  ["brg", "Briguna Ritel + Mikro", "Briguna"], ["karya", "Briguna Karya", "Karya"], ["purna", "Briguna Purna", "Purna"], ["prapurna", "Briguna Pra-Purna", "Pra-Purna"], ["mikrod", "Mikro Unit Dedicated (khusus unit dedicated)", "Mikro D"]];
 const prodL = p => (PRODS.find(x => x[0] === p) || PRODS[0])[1], prodS = p => (PRODS.find(x => x[0] === p) || PRODS[0])[2];
 const addMat = (a, b) => a.map((row, i) => row.map((v, j) => Math.round(((v || 0) + (b && b[i] ? b[i][j] || 0 : 0)) * 10) / 10));
 function prepKer() {
@@ -617,7 +687,7 @@ const saveKS = () => lsSet(STORE + "-ker", KS);
 const rpM = j => (j < 0 ? "−" : "") + "Rp " + nf2.format(Math.abs(j) / 1000) + " M";
 const dM = j => (j >= 0 ? "+" : "−") + nf2.format(Math.abs(j) / 1000) + " M";
 const dN = j => (j >= 0 ? "+" : "−") + nf0.format(Math.abs(j));
-const dPP = v => (v >= 0 ? "+" : "−") + nf2.format(Math.abs(v) * 100) + " pp";
+const dPP = v => (v >= 0 ? "+" : "−") + nf2.format(Math.abs(v) * 100) + "%";
 const tglS = d => d ? `${+d.slice(8)} ${BULAN[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}` : "–";
 const blnS = ym => BULAN[+ym.slice(5, 7) - 1] + "'" + ym.slice(2, 4);
 const areaS = a => String(a || "").replace(/^AREA\s*(\d+)\s*\/\s*/i, "Area $1 · ").replace(/\b([A-Z])([A-Z]+)\b/g, (m, a, b) => a + b.toLowerCase());
@@ -681,8 +751,8 @@ function kpiTable(d, us, kpi, kmode) {
   const pctMode = (kpi === "sml" || kpi === "npl") && kmode === "pct";
   const metric = kpi === "all" ? null : { k: pctMode ? "p" + kpi : kpi, up: kpi === "os" || kpi === "deb", p: pctMode, n: kpi === "deb" };
   const fv = (x, m) => x == null ? "–" : m.p ? pct(x, 2) : !x ? "-" : nf0.format(x);
-  const fd = (x, m) => { if (x == null || Math.abs(x) < 1e-9) return "-"; const bad = m.up ? x < 0 : x > 0, t = m.p ? nf2.format(Math.abs(x) * 100) + " pp" : nf0.format(Math.abs(x)); return `<span class="${bad ? "bad" : ""}">${x < 0 ? "(" + t + ")" : t}</span>`; };
-  const fy = (x, m) => { if (x == null) return "-"; const bad = m.up ? x < 0 : x > 0, t = m.p ? nf2.format(Math.abs(x) * 100) + " pp" : nf2.format(Math.abs(x) * 100) + "%"; return `<span class="${bad ? "bad" : ""}">${x < 0 ? "(" + t + ")" : t}</span>`; };
+  const fd = (x, m) => { if (x == null || Math.abs(x) < 1e-9) return "-"; const bad = m.up ? x < 0 : x > 0, t = m.p ? nf2.format(Math.abs(x) * 100) + "%" : nf0.format(Math.abs(x)); return `<span class="${bad ? "bad" : ""}">${x < 0 ? "(" + t + ")" : t}</span>`; };
+  const fy = (x, m) => { if (x == null) return "-"; const bad = m.up ? x < 0 : x > 0, t = m.p ? nf2.format(Math.abs(x) * 100) + "%" : nf2.format(Math.abs(x) * 100) + "%"; return `<span class="${bad ? "bad" : ""}">${x < 0 ? "(" + t + ")" : t}</span>`; };
   const pc = v => v == null ? `<td class="kp">–</td>` : `<td class="kp ${osCls(v)}">${pct(v, 2)}</td>`;
   const calc = uu => {
     const sn = hist.map(([, i]) => kSnap(i, uu)), cur = sn[4] || { os: 0, sml: 0, npl: 0, deb: 0, psml: 0, pnpl: 0 };
@@ -706,7 +776,7 @@ function kpiTable(d, us, kpi, kmode) {
   if (kpi === "sum") {
     const PS_ = prodS(KV.p), c = calc(us), L = [["OS " + PS_, "os", 1, 0, 0], ["SML " + PS_, "sml", 0, 0, 0], ["% SML", "psml", 0, 1, 0], ["NPL " + PS_, "npl", 0, 0, 0], ["% NPL", "pnpl", 0, 1, 0], ["Debitur", "deb", 1, 0, 1]];
     return `<div class="table-wrap"><table class="kt"><thead>${histHead("Indikator")}</thead><tbody>${L.map(([l, k, up, p, n]) => `<tr><td class="sk1" style="left:0"><b>${l}</b></td>${cellsM(c, { k, up: !!up, p: !!p, n: !!n })}</tr>`).join("")}</tbody></table></div>
-      <p class="note" style="margin:8px 0 0">Nominal dalam Rp juta · rasio terhadap OS, delta rasio dalam pp · angka dalam kurung = minus · %Penc SML & NPL = RKA ÷ aktual (maks. 120%).</p>`;
+      <p class="note" style="margin:8px 0 0">Nominal dalam Rp juta · rasio terhadap OS, delta rasio dalam % · angka dalam kurung = minus · %Penc SML & NPL = RKA ÷ aktual (maks. 120%).</p>`;
   }
   const cells = metric ? c => cellsM(c, metric) : c => {
     const os = { up: true }, lo = { up: false }, nd = { up: true }, cu = c.cur, rk = c.rk || {};
@@ -725,7 +795,7 @@ function kpiTable(d, us, kpi, kmode) {
   const row = x => `<tr><td class="sk0">${++no}</td><td class="sk1">${esc(x.u.nama)}</td>${narrow ? "" : `<td>${esc(areaS(x.u.area))}</td>`}${cells(x.c)}</tr>`;
   const body = g1.map(row).join("") + (g2.length ? (g1.length ? `<tr class="kgrp"><td class="sk0"></td><td class="sk1" colspan="${AC}">KC NON RM ${grpL()}</td><td colspan="${nCols - 3}"></td></tr>` : "") + g2.map(row).join("") : "")
     + subs.map(x => `<tr class="${x.cls}"><td class="sk0"></td><td class="sk1" colspan="${AC}">${esc(x.name === "TOTAL" ? "TOTAL" : String(x.name).toUpperCase())}</td>${cells(x.c)}</tr>`).join("");
-  const unit = metric ? (metric.p ? "rasio terhadap OS, delta dalam pp" : metric.n ? "jumlah debitur" : "nominal dalam Rp juta") : "nominal dalam Rp juta";
+  const unit = metric ? (metric.p ? "rasio terhadap OS, delta dalam %" : metric.n ? "jumlah debitur" : "nominal dalam Rp juta") : "nominal dalam Rp juta";
   return `<div class="table-wrap"><table class="kt"><thead>${head}</thead><tbody>${body}</tbody></table></div>
     <p class="note" style="margin:8px 0 0">${unit} · urut %Penc ${metric ? KPI_L[kpi] : "OS"} ${mon} · angka dalam kurung = minus · warna %Penc: hijau ≥100%, kuning 95–100%, merah &lt;95%.</p>`;
 }
@@ -740,7 +810,7 @@ function kTsTable(d, us, k, asPct) {
   const calc = uu => { const v = cols.map(c => { const sn = kSnap(c.i, uu); return sn ? sn[kk] : null; }), p = v.slice(1, 4).filter(x => x != null);
     const rt = p.length === 3 ? (p[0] + p[1] + p[2]) / 3 : null; return { v, rt, gap: rt == null || v[4] == null ? null : v[4] - rt }; };
   const fv = x => x == null ? "–" : asPct ? pct(x, 2) : Math.abs(x) < .5 ? "-" : nf0.format(x);
-  const fg = x => { if (x == null || Math.abs(x) < (asPct ? 1e-6 : .5)) return "-"; const t = asPct ? nf2.format(Math.abs(x) * 100) + " pp" : nf0.format(Math.abs(x)); return x < 0 ? `<span class="good">(${t})</span>` : `<span class="bad">${t}</span>`; };
+  const fg = x => { if (x == null || Math.abs(x) < (asPct ? 1e-6 : .5)) return "-"; const t = asPct ? nf2.format(Math.abs(x) * 100) + "%" : nf0.format(Math.abs(x)); return x < 0 ? `<span class="good">(${t})</span>` : `<span class="bad">${t}</span>`; };
   const rmSet = kRmSet(ym), isRO = u => /^RO\b/i.test(u.nama);
   const rows = us.map(u => ({ u, c: calc([u]) })), srt = a => a.sort((x, y) => isRO(x.u) - isRO(y.u) || (y.c.gap ?? -1e15) - (x.c.gap ?? -1e15) || (y.c.v[4] || 0) - (x.c.v[4] || 0));
   const g1 = srt(rows.filter(x => rmSet.has(normKey(x.u.nama)))), g2 = srt(rows.filter(x => !rmSet.has(normKey(x.u.nama))));
@@ -750,7 +820,7 @@ function kTsTable(d, us, k, asPct) {
   return `<h3 style="font-size:14px;margin:4px 0 8px">Time Series ${L}${asPct ? " (rasio)" : ""}</h3>
     <div class="table-wrap" style="margin-bottom:18px"><table class="kt ts"><thead><tr><th rowspan="2" class="sk1" style="left:0">Kantor Cabang</th><th colspan="5">Time Series ${L}</th><th rowspan="2" class="or">RATAS<br>3 BLN</th><th rowspan="2" class="or">GAP thd<br>RATAS</th></tr>
       <tr>${cols.map(c => `<th>${c.lbl}</th>`).join("")}</tr></thead>
-      <tbody>${g2.length ? grp("KC RM " + grpL(), g1) + grp("KC NON RM " + grpL(), g2) : g1.map(x => tr(esc(x.u.nama), x.c)).join("")}${us.length > 1 ? tr("TOTAL", calc(us.filter(u => !isRO(u))), "ktot") : ""}</tbody></table></div>${k === "npl" ? `<p class="note" style="margin:-10px 0 0">${asPct ? "Rasio terhadap OS, gap dalam pp" : "Nominal dalam Rp juta"} · RATAS = rata-rata 3 bulan sebelumnya pada tanggal yang sama · TOTAL tanpa RO Medan · gap hijau dalam kurung = turun dari RATAS (membaik).</p>` : ""}`;
+      <tbody>${g2.length ? grp("KC RM " + grpL(), g1) + grp("KC NON RM " + grpL(), g2) : g1.map(x => tr(esc(x.u.nama), x.c)).join("")}${us.length > 1 ? tr("TOTAL", calc(us.filter(u => !isRO(u))), "ktot") : ""}</tbody></table></div>${k === "npl" ? `<p class="note" style="margin:-10px 0 0">${asPct ? "Rasio terhadap OS, gap dalam %" : "Nominal dalam Rp juta"} · RATAS = rata-rata 3 bulan sebelumnya pada tanggal yang sama · TOTAL tanpa RO Medan · gap hijau dalam kurung = turun dari RATAS (membaik).</p>` : ""}`;
 }
 function viewKeragaan(v) {
   if (!DB.ker && KER_LOADING) { v.innerHTML = `<section class="panel"><div class="empty">Memuat data keragaan…</div></section>`; return; }
@@ -772,12 +842,13 @@ function viewKeragaan(v) {
     <section class="panel" style="padding:12px 16px">
       <div class="toolbar">
         <label class="field" style="flex:1 1 170px"><span class="note" style="font-weight:700">Produk</span><select class="ctl" id="kPr">${PRODS.map(([k, l]) => `<option value="${k}" ${KS.prod === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-        <label class="field" style="flex:1 1 150px"><span class="note" style="font-weight:700">Posisi</span><select class="ctl" id="kD">${optsD}</select></label>
+        <label class="field" style="flex:1 1 150px"><span class="note" style="font-weight:700">Posisi</span>${calField("kD", d, { enabled: new Set(ds), min: ds[0], max: ds[ds.length - 1] })}</label>
         <label class="field" style="flex:1 1 170px"><span class="note" style="font-weight:700">Area</span><select class="ctl" id="kA"><option value="ALL">Semua area</option>${areas.map(a => `<option value="${esc(a)}" ${a === KS.area ? "selected" : ""}>${esc(areaS(a))}</option>`).join("")}</select></label>
         <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">Kantor Cabang</span><select class="ctl" id="kK"><option value="ALL">Semua KC</option>${kcList.map(u => `<option value="${u.boc}" ${String(u.boc) === KS.kc ? "selected" : ""}>${esc(u.nama)}</option>`).join("")}</select></label>
         <label class="field" style="flex:1 1 130px"><span class="note" style="font-weight:700">KPI</span><select class="ctl" id="kP">${Object.entries(KPI_L).map(([k, l]) => `<option value="${k}" ${KS.kpi === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
       </div>
       <p class="note" style="margin:0">${scope} · posisi ${tglS(d)} · kartu ringkasan dalam Rp miliar (M), tabel dalam Rp juta${isMidMonth(d) && isBrgProd(KV.p) ? " · <b>posisi bulan berjalan:</b> SML Briguna mengikuti tanggal gajian, bandingkan dengan tanggal yang sama bulan lalu" : ""}${KV.rka && !(KV.rka.has.sml || (KV.rka.T.sml && KV.rka.T.sml.some(x => x != null))) ? " · RKA " + esc(PSn) + " hanya tersedia untuk OS" : ""}</p>
+      ${KV.ud ? `<p class="note ud-info" role="note"><b>Mikro Unit Dedicated</b> hanya memuat <b>unit Briguna dedicated</b> (database keragaan Desc "Briguna Mikro D", ${nf0.format(K.units.length)} unit), bukan seluruh unit Briguna Mikro. Untuk angka Briguna Mikro seluruh unit per kantor cabang, pilih Produk <b>Briguna Mikro</b>.</p>` : ""}
     </section>
     <div class="grid tiles">
       ${tile({ label: "OS " + esc(PSn), value: rpM(cur.os), sub: rk && rk.os ? `${pct(cur.os / rk.os, 2)} dari RKA ${blnS(ym)} ${rpM(rk.os)}` : "RKA bulan ini belum ada", meter: rk && rk.os ? cur.os / rk.os : null })}
@@ -821,7 +892,7 @@ function viewKeragaan(v) {
     try {
       const R2 = kRefs(d), uu = kUnits().filter(u => { const c = kSnap(R2.di, [u]); return c && c.os > 0; });
       if (uu.length) {
-        const pctM = KS.kmode === "pct", sub = `<h3 class="k-sub" style="margin:18px 0 8px;font-size:14px">Per unit · Briguna Mikro${KS.kpi === "ts" ? "" : KS.kpi === "all" ? " · semua KPI" : ""} <small class="note">unit dedicated · RKA unit dari sheet RKA</small></h3>`;
+        const pctM = KS.kmode === "pct", sub = `<h3 class="k-sub" style="margin:18px 0 8px;font-size:14px">Per unit · Briguna Mikro${KS.kpi === "ts" ? "" : KS.kpi === "all" ? " · semua KPI" : ""} <small class="note">hanya unit Briguna dedicated (bukan seluruh unit Mikro) · RKA unit dari sheet RKA</small></h3>`;
         $("#kHl").insertAdjacentHTML("beforeend", sub + (KS.kpi === "ts" ? (kTsTable(d, uu, "sml", pctM) + kTsTable(d, uu, "npl", pctM)).replace(/Kantor Cabang/g, "Unit") : kpiTable(d, uu, KS.kpi, KS.kmode)));
       } else $("#kHl").insertAdjacentHTML("beforeend", `<p class="note" style="margin:14px 0 0">Tidak ada unit dedicated pada saringan ini.</p>`);
     } finally { KV = keepKV; }
@@ -1463,14 +1534,12 @@ function renderRmNett(ctx) {
     .sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os || a.rm.localeCompare(b.rm));
   // ---------- kepala + kalender ----------
   const head = `<div class="panel-h"><h2>Produktivitas Nett ${who} Briguna ${isM ? "Mikro" : "Ritel"}</h2><div class="toolbar nrange">
-      <label>Dari <input class="ctl" type="date" id="nFrom" value="${from}" min="${dMin}" max="${dMax}"></label><label>Sampai <input class="ctl" type="date" id="nTo" value="${to}" min="${dMin}" max="${dMax}"></label>
+      <label>Dari ${calField("nFrom", from, { min: dMin, max: dMax })}</label><label>Sampai ${calField("nTo", to, { min: dMin, max: dMax })}</label>
       <button class="btn" type="button" data-np="mon">Bulan terpilih</button><button class="btn" type="button" data-np="7">7 hari</button><button class="btn" type="button" data-np="30">30 hari</button>
       <button class="btn" type="button" id="nFs" title="Tampilkan tabel selayar penuh (Esc untuk keluar)">${NETT_FS_ICO}<span>${el.classList.contains("nett-fs") ? "Keluar layar penuh" : "Layar penuh"}</span></button>
       <span class="sub">${periode} · Rp juta${custom ? " · rentang khusus" : ""}</span></div></div>`;
   const bind = () => {
     const set = (f, t) => { RS.nFrom = f; RS.nTo = t; saveRS(); renderRmNett(ctx); Exp.decorate(el.parentElement); };
-    // klik di mana pun pada kolom tanggal langsung membuka kalender (bukan hanya ikon kecilnya)
-    ["#nFrom", "#nTo"].forEach(q => { $(q).onclick = e => { try { e.currentTarget.showPicker(); } catch {} }; });
     $("#nFrom").onchange = e => set(e.target.value || null, RS.nTo || to); $("#nTo").onchange = e => set(RS.nFrom || from, e.target.value || null);
     $("#nFs").onclick = () => nettFullscreen(el, !el.classList.contains("nett-fs"));
     el.querySelectorAll("[data-np]").forEach(b => b.onclick = () => { const k = b.dataset.np, end = dMax < to ? to : dMax;
@@ -1924,6 +1993,13 @@ function pipeKcRekap(el, aktif) {
 // pilihan ceklis (bisa lebih dari satu): PS[key] = nilai terpilih; kosong = semua. opts = [[nilai, label, jumlah deb]]
 function msPicker(el, key, opts, allLbl, short, onChange) {
   const lbl = () => { const v = PS[key]; return !v.length ? allLbl : v.length <= 2 ? v.map(x => short(x)).join(", ") : v.length + " dipilih"; };
+  if (key === "akad") {   // tanggal: pilihan berbentuk kalender (boleh beberapa tanggal); angka kecil = jumlah debitur pada tanggal itu
+    const marks = {}; opts.forEach(([v, , n]) => { if (n != null) marks[v] = n; });
+    const ds = opts.map(o => o[0]).sort();
+    CALS.pAkadCal = { multi: true, enabled: new Set(ds), min: ds[0], max: ds[ds.length - 1], marks, get: () => PS[key], set: v => { PS[key] = v; onChange(); }, label: () => lbl() };
+    el.innerHTML = `<button type="button" class="ctl cal-btn" data-cal="pAkadCal" aria-haspopup="dialog"><span>${esc(lbl())}</span>${CAL_ICO}</button>`;
+    return;
+  }
   el.innerHTML = `<details class="ms"><summary class="ctl">${esc(lbl())}</summary><div class="ms-pop">
     ${opts.length ? opts.map(([v, l, n]) => `<label class="check"><input type="checkbox" value="${esc(v)}" ${PS[key].includes(v) ? "checked" : ""}> ${l}${n != null ? ` <small class="note">${nf0.format(n)} deb</small>` : ""}</label>`).join("") : '<span class="note">Belum ada pilihan.</span>'}
     <div class="toolbar"><button class="btn" type="button" data-ms="all">Pilih semua</button><button class="btn" type="button" data-ms="clr">Hapus pilihan</button></div></div></details>`;
@@ -2801,7 +2877,7 @@ function openDeb(key) {
     ${sib.length ? `<div><h3 style="font-size:13px;margin-bottom:6px">Rekening lain a.n. CIF ini</h3><div id="debSib"></div></div>` : ""}
     <form class="dsec" id="noteForm" data-key="${esc(key)}"><h3>Tindak lanjut</h3>
       <div class="form"><div class="field"><label for="nSt">Status</label><select class="ctl" id="nSt">${RTL_ST.map(s => `<option value="${s}" ${s === (n.status || "") ? "selected" : ""}>${s || "— pilih —"}</option>`).join("")}</select></div>
-        <div class="field"><label for="nJj">Tanggal janji / tindak lanjut</label><input class="ctl" id="nJj" type="date" value="${esc(n.janji || "")}"></div>
+        <div class="field"><label for="nJj">Tanggal janji / tindak lanjut</label>${calField("nJj", n.janji || "", { clear: true, placeholder: "Pilih tanggal" })}</div>
         <div class="field full"><label for="nTx">Catatan</label><textarea class="ctl" id="nTx" rows="3" maxlength="500" placeholder="Hasil kontak, kondisi debitur…" style="height:auto;padding:8px 10px"></textarea></div></div>
       <div class="toolbar"><button class="btn primary" type="submit">Simpan catatan</button>${NOTES[key] ? `<button class="btn" type="button" id="nDel">Hapus catatan</button>` : ""}</div>
       ${hist.map(h => `<div class="ds"><b>${esc(h.status || "Catatan")}${h.janji ? " · " + esc(tglS(h.janji)) : ""}</b>${h.text ? `<br>${esc(h.text)}` : ""}<br><small class="note">${esc(h.at)}</small></div>`).join("")}</form>`;
@@ -3081,13 +3157,14 @@ async function doSyncPart(btn) {
 const AD = { tab: lsGet(STORE + "-adtab") || "data" };
 function viewAdmin(v) {
   if (!isAdmin()) { v.innerHTML = `<section class="panel"><div class="empty">Menu ini khusus admin.</div></section>`; return; }
-  v.innerHTML = `<nav class="ptabs" role="tablist">${[["data", "Kelola data"], ["users", "User"], ["log", "Access log"]].map(([k, l]) => `<button type="button" role="tab" data-at="${k}" aria-selected="${AD.tab === k}">${l}</button>`).join("")}</nav><div id="adBody" class="grid"></div>`;
+  v.innerHTML = `<nav class="ptabs" role="tablist">${[["data", "Kelola data"], ["users", "User"], ["fb", "Feedback"], ["log", "Access log"]].map(([k, l]) => `<button type="button" role="tab" data-at="${k}" aria-selected="${AD.tab === k}">${l}</button>`).join("")}</nav><div id="adBody" class="grid"></div>`;
   v.querySelectorAll("[data-at]").forEach(b => b.onclick = () => { AD.tab = b.dataset.at; lsSet(STORE + "-adtab", AD.tab); v.querySelectorAll("[data-at]").forEach(x => x.setAttribute("aria-selected", x === b)); renderAdminTab(); });
   renderAdminTab();
 }
 function renderAdminTab() {
   const el = $("#adBody"); if (!el) return;
   if (AD.tab === "users") return adUsers(el);
+  if (AD.tab === "fb") return adFeedback(el);
   if (AD.tab === "log") return adLog(el);
   el.innerHTML = `<section class="panel"><div class="panel-h"><h2>Kelola data</h2><span class="sub">khusus admin</span></div>${dataCards()}</section>`; bindDataCards(el);
 }
@@ -3148,6 +3225,48 @@ function openPw() {
   $("#pwF").onsubmit = async e => { e.preventDefault(); const m = $("#pwM"), a = $("#pw1").value;
     if (a.length < 8) { m.hidden = false; m.textContent = "Password baru minimal 8 karakter."; return; } if (a !== $("#pw2").value) { m.hidden = false; m.textContent = "Ulangan password tidak sama."; return; }
     try { await Auth.changePassword($("#pw0").value, a); $("#dlg").close(); toast("Password diganti."); } catch (er) { m.hidden = false; m.textContent = er.message; } };
+}
+/* ================= feedback pengguna: tombol "Beri feedback" di menu atas + daftar feedback untuk admin ================= */
+// Dikirim lewat action "feedback" ke Apps Script (sheet "feedback"); admin membacanya di Admin → Feedback (action "feedbackList").
+const FB_KAT = ["Saran fitur / perbaikan", "Laporkan masalah (error)", "Angka / data tidak sesuai", "Tampilan / kemudahan pakai", "Lainnya"];
+const FB_MAX = 1500;
+const fbStars = n => "★".repeat(n) + "☆".repeat(Math.max(0, 5 - n));
+function openFeedback() {
+  const k = curView(), menu = (VIEWS[k] || [])[0] || "Menu utama";
+  $("#dlgTitle").textContent = "Beri feedback";
+  $("#dlgBody").innerHTML = `<form id="fbForm" class="form" novalidate>
+    <p class="note full" style="margin:0">Masukan Anda membantu kami memperbaiki dashboard. Feedback dikirim bersama nama akun dan menu yang sedang dibuka (<b>${esc(menu)}</b>).</p>
+    <div class="field full"><label id="fbRL">Penilaian dashboard <small class="note">(opsional)</small></label><div class="fb-stars" id="fbStars" role="radiogroup" aria-labelledby="fbRL">${[1, 2, 3, 4, 5].map(i => `<button type="button" role="radio" aria-checked="false" data-s="${i}" aria-label="${i} dari 5">★</button>`).join("")}</div></div>
+    <div class="field full"><label for="fbKat">Jenis feedback</label><select class="ctl" id="fbKat">${FB_KAT.map(x => `<option>${x}</option>`).join("")}</select></div>
+    <div class="field full"><label for="fbMsg">Pesan</label><textarea class="ctl" id="fbMsg" rows="5" maxlength="${FB_MAX}" placeholder="Tulis saran, kendala, atau hal yang menurut Anda perlu diperbaiki…" required></textarea><small class="note" id="fbCnt">0 / ${FB_MAX}</small></div>
+    <div class="toolbar full"><button class="btn primary" type="submit" id="fbSend">Kirim feedback</button><button class="btn" type="button" data-close>Batal</button></div><p id="fbErr" class="lg-msg full" hidden></p></form>`;
+  let rating = 0;
+  const paint = () => $("#fbStars").querySelectorAll("button").forEach(b => { const on = +b.dataset.s <= rating; b.classList.toggle("on", on); b.setAttribute("aria-checked", String(+b.dataset.s === rating)); });
+  $("#fbStars").querySelectorAll("button").forEach(b => b.onclick = () => { rating = rating === +b.dataset.s ? 0 : +b.dataset.s; paint(); });
+  $("#fbMsg").oninput = e => { $("#fbCnt").textContent = e.target.value.length + " / " + FB_MAX; };
+  $("#fbForm").onsubmit = async e => {
+    e.preventDefault(); const err = $("#fbErr"), msg = $("#fbMsg").value.replace(/\s+\n/g, "\n").trim();
+    if (msg.length < 5) { err.hidden = false; err.textContent = "Tulis pesan feedback minimal 5 karakter."; return; }
+    const btn = $("#fbSend"); btn.disabled = true; btn.textContent = "Mengirim…"; err.hidden = true;
+    try { await Auth.call("feedback", { rating, kategori: $("#fbKat").value, menu, pesan: msg.slice(0, FB_MAX) }); $("#dlg").close(); toast("Terima kasih! Feedback Anda sudah terkirim."); }
+    catch (er) { err.hidden = false; err.textContent = /tidak dikenal/i.test(er.message) ? "Fitur feedback belum aktif di server. Minta admin memasang Apps Script versi terbaru." : er.message; btn.disabled = false; btn.textContent = "Kirim feedback"; }
+  };
+  $("#dlg").showModal(); setTimeout(() => { const m = $("#fbMsg"); if (m) m.focus(); }, 60);
+}
+document.addEventListener("click", e => { if (e.target.closest("#btnFb, #btnFbHome")) openFeedback(); });
+
+// admin: daftar feedback yang masuk
+async function adFeedback(el) {
+  el.innerHTML = `<section class="panel"><div class="empty">Memuat feedback…</div></section>`;
+  let j; try { j = await Auth.call("feedbackList", { limit: 500 }); } catch (er) { el.innerHTML = `<section class="panel"><div class="empty">${esc(/tidak dikenal/i.test(er.message) ? "Fitur feedback belum aktif di server: pasang Apps Script versi terbaru." : er.message)}</div></section>`; return; }
+  const rows = (j.rows || []).map(r => ({ t: r[0], u: r[1], nm: r[2], ro: r[3], mn: r[4], st: +r[5] || 0, kt: r[6], ps: r[7] }));
+  const rated = rows.filter(r => r.st > 0), avg = rated.length ? rated.reduce((a, r) => a + r.st, 0) / rated.length : null;
+  el.innerHTML = `<div class="grid tiles">${tile({ label: "Feedback masuk", value: nf0.format(rows.length), sub: "500 terbaru" })}${tile({ label: "Rata-rata penilaian", value: avg == null ? "–" : nf1.format(avg) + " / 5", sub: rated.length ? nf0.format(rated.length) + " memberi bintang" : "belum ada penilaian" })}</div>
+    <section class="panel"><div class="panel-h"><h2>Feedback pengguna</h2><span class="sub">terbaru di atas</span></div><input class="ctl" type="search" id="fbQ" placeholder="Cari pesan, user, menu, jenis"><div id="fbT"></div></section>`;
+  const draw = q => table($("#fbT"), [{ key: "t", label: "Waktu", fmt: x => new Date(x).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" }) }, { key: "u", label: "User", fmt: (x, r) => `${esc(r.nm || x)}<br><small class="note">${esc(x)} · ${esc(r.ro)}</small>` },
+    { key: "mn", label: "Menu", fmt: x => esc(x) }, { key: "st", label: "Nilai", fmt: x => x ? `<span class="fb-st">${fbStars(x)}</span>` : "–" }, { key: "kt", label: "Jenis", fmt: x => esc(x) }, { key: "ps", label: "Pesan", fmt: x => `<div class="fb-ps">${esc(x)}</div>` }],
+    q ? rows.filter(r => (r.ps + " " + r.u + " " + r.nm + " " + r.mn + " " + r.kt).toLowerCase().includes(q)) : rows, { sortKey: "t", page: 30 });
+  draw(""); let qt; $("#fbQ").oninput = e => { clearTimeout(qt); qt = setTimeout(() => draw(e.target.value.trim().toLowerCase()), 200); };
 }
 /* ================= unduh tabel / grafik: Excel, CSV, PDF, gambar (PNG) ================= */
 // Tiap section yang berisi tabel atau grafik mendapat tombol "Unduh". Excel/CSV = data tabel (semua baris, bukan hanya yang tampil);

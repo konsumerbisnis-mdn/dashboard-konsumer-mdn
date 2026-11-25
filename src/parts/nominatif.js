@@ -511,7 +511,7 @@ function openDeb(key) {
     ${sib.length ? `<div><h3 style="font-size:13px;margin-bottom:6px">Rekening lain a.n. CIF ini</h3><div id="debSib"></div></div>` : ""}
     <form class="dsec" id="noteForm" data-key="${esc(key)}"><h3>Tindak lanjut</h3>
       <div class="form"><div class="field"><label for="nSt">Status</label><select class="ctl" id="nSt">${RTL_ST.map(s => `<option value="${s}" ${s === (n.status || "") ? "selected" : ""}>${s || "— pilih —"}</option>`).join("")}</select></div>
-        <div class="field"><label for="nJj">Tanggal janji / tindak lanjut</label><input class="ctl" id="nJj" type="date" value="${esc(n.janji || "")}"></div>
+        <div class="field"><label for="nJj">Tanggal janji / tindak lanjut</label>${calField("nJj", n.janji || "", { clear: true, placeholder: "Pilih tanggal" })}</div>
         <div class="field full"><label for="nTx">Catatan</label><textarea class="ctl" id="nTx" rows="3" maxlength="500" placeholder="Hasil kontak, kondisi debitur…" style="height:auto;padding:8px 10px"></textarea></div></div>
       <div class="toolbar"><button class="btn primary" type="submit">Simpan catatan</button>${NOTES[key] ? `<button class="btn" type="button" id="nDel">Hapus catatan</button>` : ""}</div>
       ${hist.map(h => `<div class="ds"><b>${esc(h.status || "Catatan")}${h.janji ? " · " + esc(tglS(h.janji)) : ""}</b>${h.text ? `<br>${esc(h.text)}` : ""}<br><small class="note">${esc(h.at)}</small></div>`).join("")}</form>`;

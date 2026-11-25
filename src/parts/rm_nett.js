@@ -42,14 +42,12 @@ function renderRmNett(ctx) {
     .sort((a, b) => (b.pen ?? -1) - (a.pen ?? -1) || b.os - a.os || a.rm.localeCompare(b.rm));
   // ---------- kepala + kalender ----------
   const head = `<div class="panel-h"><h2>Produktivitas Nett ${who} Briguna ${isM ? "Mikro" : "Ritel"}</h2><div class="toolbar nrange">
-      <label>Dari <input class="ctl" type="date" id="nFrom" value="${from}" min="${dMin}" max="${dMax}"></label><label>Sampai <input class="ctl" type="date" id="nTo" value="${to}" min="${dMin}" max="${dMax}"></label>
+      <label>Dari ${calField("nFrom", from, { min: dMin, max: dMax })}</label><label>Sampai ${calField("nTo", to, { min: dMin, max: dMax })}</label>
       <button class="btn" type="button" data-np="mon">Bulan terpilih</button><button class="btn" type="button" data-np="7">7 hari</button><button class="btn" type="button" data-np="30">30 hari</button>
       <button class="btn" type="button" id="nFs" title="Tampilkan tabel selayar penuh (Esc untuk keluar)">${NETT_FS_ICO}<span>${el.classList.contains("nett-fs") ? "Keluar layar penuh" : "Layar penuh"}</span></button>
       <span class="sub">${periode} · Rp juta${custom ? " · rentang khusus" : ""}</span></div></div>`;
   const bind = () => {
     const set = (f, t) => { RS.nFrom = f; RS.nTo = t; saveRS(); renderRmNett(ctx); Exp.decorate(el.parentElement); };
-    // klik di mana pun pada kolom tanggal langsung membuka kalender (bukan hanya ikon kecilnya)
-    ["#nFrom", "#nTo"].forEach(q => { $(q).onclick = e => { try { e.currentTarget.showPicker(); } catch {} }; });
     $("#nFrom").onchange = e => set(e.target.value || null, RS.nTo || to); $("#nTo").onchange = e => set(RS.nFrom || from, e.target.value || null);
     $("#nFs").onclick = () => nettFullscreen(el, !el.classList.contains("nett-fs"));
     el.querySelectorAll("[data-np]").forEach(b => b.onclick = () => { const k = b.dataset.np, end = dMax < to ? to : dMax;

@@ -2,7 +2,7 @@
 // Desc → produk. Briguna Ritel = Karya + Purna + Pra-Purna (anti double-count; "Pra0Purna" = Pra-Purna). Konsumer = Briguna Ritel + Mikro + KPR.
 const KER_M = ["os", "sml", "npl", "deb", "dsml", "dnpl"];
 const PRODS = [["konsumer", "Konsumer (Briguna + KPR)", "Konsumer"], ["ritel", "Briguna Ritel", "Briguna Ritel"], ["mikro", "Briguna Mikro", "Briguna Mikro"], ["kpr", "KPR", "KPR"],
-  ["brg", "Briguna Ritel + Mikro", "Briguna"], ["karya", "Briguna Karya", "Karya"], ["purna", "Briguna Purna", "Purna"], ["prapurna", "Briguna Pra-Purna", "Pra-Purna"], ["mikrod", "Mikro Unit Dedicated", "Mikro D"]];
+  ["brg", "Briguna Ritel + Mikro", "Briguna"], ["karya", "Briguna Karya", "Karya"], ["purna", "Briguna Purna", "Purna"], ["prapurna", "Briguna Pra-Purna", "Pra-Purna"], ["mikrod", "Mikro Unit Dedicated (khusus unit dedicated)", "Mikro D"]];
 const prodL = p => (PRODS.find(x => x[0] === p) || PRODS[0])[1], prodS = p => (PRODS.find(x => x[0] === p) || PRODS[0])[2];
 const addMat = (a, b) => a.map((row, i) => row.map((v, j) => Math.round(((v || 0) + (b && b[i] ? b[i][j] || 0 : 0)) * 10) / 10));
 function prepKer() {

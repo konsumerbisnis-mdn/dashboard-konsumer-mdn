@@ -545,7 +545,9 @@ function viewBeranda(v) {
   const lwAsof = Object.values(lsum).map(x => x.asof).sort().pop(), gsAsof = Object.values(gs).map(x => x.asof).sort().pop();
   const canNom = Auth.can("nominatif");
   const msq = DB.ms ? (() => { const i = DB.ms.per.findIndex(p => p.k === DB.ms.asof), f = k => { const b = DB.ms.biz[k], r = b && b.rows.find(x => x.t === "ro"); return r && r.i[i] && r.b[i] != null ? r.b[i] / r.i[i] : null; }; return { k: f("konsumer"), b: f("briguna"), p: f("kpr") }; })() : null;
-  const MS_ICO = '<svg viewBox="0 0 24 24"><path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/></svg>';
+  const pfq = DB.ins ? (() => { let os = 0, sm = 0, np = 0; DB.ins.rows.forEach(r => { os += r[3]; sm += r[4]; np += r[5]; }); return { n: DB.ins.ins.length, sml: os ? sm / os : null, npl: os ? np / os : null }; })() : null;
+  const PF_ICO = '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg>';
+  const MS_ICO ='<svg viewBox="0 0 24 24"><path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/></svg>';
   v.innerHTML = `
     <div class="l-bg" aria-hidden="true"><i class="lb1"></i><i class="lb2"></i><span class="l-grid"></span><span class="l-vig"></span><canvas id="lPart"></canvas></div>
     <div class="l-top">
@@ -570,6 +572,8 @@ function viewBeranda(v) {
           : card("kualitas", ICON.kualitas, "Kualitas Kredit", "SML & NPL, pergerakan DG / UG dibanding bulan lalu", ld(LOADING.core, "Perlu LW321 bulan ini & bulan lalu"), "warn")}
         ${psAsof ? card("pipeline", ICON.pipeline, "Pipeline Brispot RM", ["B", "K"].filter(s => psum[s]).map(s => `${s === "B" ? "Briguna" : "KPR"} ${rpJ(psum[s].pl)} · ${nf0.format(psum[s].n)} deb`).join(" · "), "Tersedia · posisi " + tglS(psAsof))
           : card("pipeline", ICON.pipeline, "Pipeline Brispot RM", "Funnel, jadwal akad, TAT & rencana realisasi RM", ld(PIPE_LOADING, "Belum ada data"), "warn")}
+        ${pfq ? card("portofolio", PF_ICO, "Portofolio Eksisting", `${nf0.format(pfq.n)} instansi · SML ${pfq.sml == null ? "–" : pct(pfq.sml, 2)} · NPL ${pfq.npl == null ? "–" : pct(pfq.npl, 2)}`, "Tersedia · posisi " + perL(DB.ins.asof))
+          : card("portofolio", PF_ICO, "Portofolio Eksisting", "Instansi per uker, % SML & NPL berwarna, dan data PKS", "Belum ada data", "warn")}
         ${msq ? card("marketshare", MS_ICO, "Marketshare Konsumer", `Konsumer ${msq.k == null ? "–" : pct(msq.k, 2)} · Briguna ${msq.b == null ? "–" : pct(msq.b, 2)} · KPR ${msq.p == null ? "–" : pct(msq.p, 2)}`, "Tersedia · posisi " + perL(DB.ms.asof))
           : card("marketshare", MS_ICO, "Marketshare Konsumer", "Posisi industri vs BRI dan % marketshare per bisnis & KC", "Belum ada data", "warn")}
         ${card("simulasi", ICON.simulasi, "Simulasi Suku Bunga", `Briguna (max plafond & angsuran) · KPR ${DB.rate ? uniq(DB.rate.rows.map(x => x.prog)).length + " program" : ""}`, DB.rate ? (String(DB.rate.title || "").replace(/^.*PROGRAM\s*/i, "Program ") || "Tersedia") : "Tersedia")}
@@ -2927,6 +2931,7 @@ function dataCards() {
   const pSt = s => { const x = M["pipe_" + s]; return x ? `<b>${nf0.format(x.n)} berkas</b> + ${nf0.format(x.oh)} on hand, posisi <b>${tglS(x.asof)}</b> · diunggah ${updS(x.updated)}` : "belum ada data"; };
   const bSt = () => { const x = M.brs_B; return x ? `posisi <b>${tglS(x.asof)}</b>${x.jam ? " pukul <b>" + esc(x.jam) + "</b>" : ""} · ${nf0.format(x.n)} RM &amp; mantri · diunggah ${updS(x.updated)}` : "belum ada data"; };
   const mSt = () => { const x = M.ms_K; return x ? `posisi <b>${perL(x.asof)}</b> · ${nf0.format(x.n)} bisnis · disinkronkan ${updS(x.updated)}` : DB.ms ? `posisi <b>${perL(DB.ms.asof)}</b>` : "belum ada data"; };
+  const iSt = () => { const x = M.ins_B; return x ? `posisi <b>${perL(x.asof)}</b> · ${nf0.format(x.n)} baris · disinkronkan ${updS(x.updated)}` : DB.ins ? `posisi <b>${perL(DB.ins.asof)}</b>` : "belum ada data"; };
   const card = (k, ico, title, st, note, body) => `<section class="dcard" data-k="${k}"><div class="dc-h">${ico}<div><h3>${title}</h3><p class="dc-st">${st}</p></div></div><p class="note">${note}</p>${body}<p class="note dc-prog" id="pr_${k}" hidden></p></section>`;
   const file = (k, accept = ".xlsx,.xlsm,.xls,.csv", multi = false, lbl = "Upload") => `<label class="btn" for="f_${k}">${ICO_UP}${lbl}</label><input type="file" id="f_${k}" data-up="${k}" accept="${accept}" ${multi ? "multiple" : ""} hidden>`;
   const lwBody = s => `<div class="toolbar"><select class="ctl" id="m_lw${s}" style="flex:1 1 180px"><option value="cur">Posisi terkini</option><option value="prev">Bulan lalu (pembanding DG/UG)</option></select>${file("lw" + s, undefined, true)}</div><p class="note" style="margin:6px 0 0">Bisa pilih 2 file sekaligus (posisi terkini &amp; bulan lalu): yang tanggalnya lebih baru otomatis jadi posisi terkini.</p><div id="i_lw${s}"></div>`;
@@ -2949,6 +2954,9 @@ function dataCards() {
       ${card("msK", dIco('<path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/>'), "Marketshare Konsumer", mSt(),
         "Dibaca dari sheet <b>marketshare</b> di Google Sheets (format ke bawah: Kode KC, Kanca, Tanggal, Segmen Bisnis, Jenis, OS). Data baru: tambahkan baris di bawah, lalu klik <b>Sync marketshare</b>. Tampil di menu Marketshare untuk semua pengguna.",
         `<button class="btn primary" type="button" id="btnSyncMs">Sync marketshare</button>`)}
+      ${card("insB", dIco('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>'), "Portofolio Eksisting (instansi)", iSt(),
+        "Dibaca dari sheet <b>database instansi</b> di Google Sheets (kolom: PERIODE, KODE CABANG, CABANG, KODE UNIT, UNIT, INSTANSI, DEB, OS, SML (Rp), SML (%), NPL (Rp), NPL (%), Jenis PKS, No PKS, Tanggal Jatuh Tempo PKS, Payroll/Non Payroll, Jumlah Pegawai, ID INSTANSI). Data baru: ganti isi sheet, lalu klik <b>Sync portofolio</b>.",
+        `<button class="btn primary" type="button" id="btnSyncIns">Sync portofolio</button>`)}
       ${card("pipeK", dIco('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'), "Pipeline Brispot KPR", pSt("K"),
         "File Pipeline BRISPOT KPR (sheet Pipeline, OnHand, Ref_Batal, Rencana Realisasi RM). Menggantikan data sebelumnya.", file("pipeK"))}
       ${card("rate", dIco('<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h4"/>'), "Tabel suku bunga KPR",
@@ -2964,6 +2972,7 @@ function bindDataCards(root) {
   const b = root.querySelector("#btnSyncF"); if (b) b.onclick = () => doSync(true, b);
   const br = root.querySelector("#btnSyncR"); if (br) br.onclick = () => doSyncRmk(br);
   const bm = root.querySelector("#btnSyncMs"); if (bm) bm.onclick = () => doSyncMs(bm);
+  const bi = root.querySelector("#btnSyncIns"); if (bi) bi.onclick = () => doSyncIns(bi);
   root.querySelectorAll("input[type=file][data-up]").forEach(inp => inp.addEventListener("change", e => {
     const k = inp.dataset.up, files = [...e.target.files]; if (!files.length) return;
     (k === "kerDb" ? upKer(files[0], inp) : k === "brsB" ? upBrs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
@@ -3143,9 +3152,9 @@ async function doSyncRmk(btn) {
 }
 
 // sync per menu (admin): tiap menu hanya membangun ulang datanya sendiri lewat action syncParts, tanpa menunggu sync penuh
-const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG", ms: "marketshare" };
-const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"], ms: ["ms_K"] };
-const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : k === "marketshare" ? ["ms"] : [];
+const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG", ms: "marketshare", ins: "portofolio instansi" };
+const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"], ms: ["ms_K"], ins: ["ins_B"] };
+const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : k === "marketshare" ? ["ms"] : k === "portofolio" ? ["ins"] : [];
 function updateSyncPart(k) {
   const b = $("#btnSyncPart"); if (!b) return; const p = syncPartsOf(k); b.hidden = !(isAdmin() && p.length); b.dataset.p = p.join(",");
   const sp = b.querySelector("span"); if (sp) sp.textContent = "Sync " + (p.length ? SP_LBL[p[0]] : "menu ini"); b.title = "Sync hanya " + (p.length ? SP_LBL[p[0]] : "data menu ini") + " (admin)";
@@ -3162,6 +3171,16 @@ async function doSyncPart(btn) {
   btn.disabled = false; sp.textContent = old;
 }
 
+// sync portofolio eksisting dari sheet "database instansi"
+async function doSyncIns(btn) {
+  btn.disabled = true; const old = btn.textContent; btn.textContent = "Menyinkronkan…";
+  try {
+    const j = await Auth.call("syncParts", { parts: ["ins"] }); await loadParts(["meta", "ins_B"], null, true);
+    const st = j.stats || {}; if (typeof st.ins === "string") throw new Error(st.ins[0].toUpperCase() + st.ins.slice(1) + ". Buat sheet bernama database instansi lalu isi dengan format yang ditentukan.");
+    toast(`✓ Portofolio diperbarui · ${nf0.format(st.insRows || 0)} baris${DB.ins ? " · posisi " + perL(DB.ins.asof) : ""}`); render(); refreshDataUI();
+  } catch (er) { toast("Sync portofolio gagal: " + er.message); }
+  btn.disabled = false; btn.textContent = old;
+}
 // sync marketshare dari sheet "marketshare" (format ke bawah)
 async function doSyncMs(btn) {
   btn.disabled = true; const old = btn.textContent; btn.textContent = "Menyinkronkan…";
@@ -3367,6 +3386,115 @@ function viewMarketshare(v) {
   mkChart("cMsKc", { type: "bar", data: { labels: kb.map(r => r.n), datasets: [{ label: "% marketshare", data: kb.map(r => r.ms), backgroundColor: s1, borderRadius: 3, maxBarThickness: 16 }] },
     options: baseOpts({ indexAxis: "y", plugins: { ...baseOpts().plugins, legend: { display: false }, tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => ` ${pct(c.parsed.x, 2)} · BRI ${rpM(kb[c.dataIndex].bri)} dari industri ${rpM(kb[c.dataIndex].ind)}` } } },
       scales: { x: { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x * 100) + "%" } }, y: { ...baseOpts().scales.x, ticks: { ...baseOpts().scales.x.ticks, color: ink2, font: { size: 11 } } } } }) });
+}
+/* ================= Portofolio Eksisting Briguna (Ritel + Mikro): instansi per uker, % kualitas SML & NPL berwarna, tombol PKS ================= */
+// Sumber: sheet "database instansi" di Google Sheets (dibaca Apps Script saat Sync portofolio), nominal Rp juta.
+// DB.ins = { asof, cab[[kode, nama]], uker[[kode, nama, cabIdx, 0 = kantor cabang (Ritel) · 1 = unit (Mikro)]], ins[[id, nama]], rows[[ukerIdx, insIdx, deb, os, sml, npl]], pks{ rowIdx: [jenis, no, jatuhTempo, payroll, pegawai] } }
+// Batas warna % SML / NPL: hijau di bawah batas pertama, kuning sampai batas kedua, merah di atasnya; default 1% dan 2%, diubah admin (meta.cfg.insThr).
+const PFX = Object.assign({ kc: "ALL", uk: "ALL", jn: "ALL", q: "" }, lsGet(STORE + "-pf") || {});
+const savePFX = () => lsSet(STORE + "-pf", PFX);
+const insThr = () => { const c = (DB.meta && DB.meta.cfg && DB.meta.cfg.insThr) || {}; return { sml: Array.isArray(c.sml) ? c.sml : [1, 2], npl: Array.isArray(c.npl) ? c.npl : [1, 2] }; };
+const insCls = (v, th) => v == null ? "neutral" : v * 100 < th[0] ? "good" : v * 100 <= th[1] ? "warn" : "crit";
+const insChip = (v, th) => v == null ? "–" : chip(pct(v, 2), insCls(v, th));
+const nfTh = x => nf2.format(x).replace(/,00$/, "").replace(/(,\d)0$/, "$1");
+const jenisUker = u => u[3] ? "Mikro (unit)" : "Ritel (kantor cabang)";
+
+function pfAgg(rows, keyOf) {   // jumlahkan baris per kunci (instansi atau uker)
+  const m = new Map();
+  rows.forEach(([ri, r]) => { const k = keyOf(r), o = m.get(k) || { k, deb: 0, os: 0, sml: 0, npl: 0, ri: [] }; o.deb += r[2]; o.os += r[3]; o.sml += r[4]; o.npl += r[5]; o.ri.push(ri); m.set(k, o); });
+  return [...m.values()].map(o => ({ ...o, psml: o.os ? o.sml / o.os : null, pnpl: o.os ? o.npl / o.os : null }));
+}
+function viewPortofolio(v) {
+  const D = DB.ins;
+  if (!D) { v.innerHTML = `<section class="panel"><div class="empty"><p style="font-weight:700;margin:0 0 6px">Belum ada data portofolio eksisting</p>${isAdmin() ? "Buat sheet <code>database instansi</code> di Google Sheets (dari file Database_instansi.xlsx), lalu klik <b>Sync portofolio</b> di Admin → Kelola data." : "Hubungi admin untuk memuat data portofolio."}</div></section>`; return; }
+  const th = insThr(), cabs = D.cab.map((c, i) => ({ i, kode: c[0], nama: c[1] })).sort((a, b) => a.nama.localeCompare(b.nama));
+  if (PFX.kc !== "ALL" && !D.cab[+PFX.kc]) PFX.kc = "ALL";
+  const ukers = D.uker.map((u, i) => ({ i, kode: u[0], nama: u[1], cab: u[2], unit: u[3] })).filter(u => PFX.kc === "ALL" || u.cab === +PFX.kc).sort((a, b) => a.unit - b.unit || a.nama.localeCompare(b.nama));
+  if (PFX.uk !== "ALL" && !ukers.some(u => String(u.i) === PFX.uk)) PFX.uk = "ALL";
+  const okU = D.uker.map((u, i) => (PFX.kc === "ALL" || u[2] === +PFX.kc) && (PFX.uk === "ALL" || String(i) === PFX.uk) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])));
+  const scoped = D.rows.map((r, ri) => [ri, r]).filter(([, r]) => okU[r[0]]);
+  const q = PFX.q.trim().toLowerCase();
+  const insRows = pfAgg(scoped, r => r[1]).map(o => ({ ...o, id: D.ins[o.k][0], nama: D.ins[o.k][1], npks: o.ri.filter(ri => D.pks[ri]).length })).filter(o => !q || (o.nama + " " + o.id).toLowerCase().includes(q));
+  const T = { deb: 0, os: 0, sml: 0, npl: 0 }; scoped.forEach(([, r]) => { T.deb += r[2]; T.os += r[3]; T.sml += r[4]; T.npl += r[5]; });
+  const tp = { sml: T.os ? T.sml / T.os : null, npl: T.os ? T.npl / T.os : null };
+  const scopeL = PFX.uk !== "ALL" ? D.uker[+PFX.uk][1] : PFX.kc !== "ALL" ? D.cab[+PFX.kc][1] : "Seluruh RO Medan";
+  const optKc = `<option value="ALL">Semua kantor cabang</option>` + cabs.map(c => `<option value="${c.i}" ${String(c.i) === PFX.kc ? "selected" : ""}>${esc(c.nama)}</option>`).join("");
+  const optUk = `<option value="ALL">Semua uker${PFX.kc !== "ALL" ? " di cabang ini" : ""}</option>` + ukers.map(u => `<option value="${u.i}" ${String(u.i) === PFX.uk ? "selected" : ""}>${u.unit ? "" : "★ "}${esc(u.nama)}${u.unit ? "" : " (kantor cabang · Ritel)"}</option>`).join("");
+  const rule = k => `hijau &lt; ${nfTh(th[k][0])}% · kuning ${nfTh(th[k][0])}–${nfTh(th[k][1])}% · merah &gt; ${nfTh(th[k][1])}%`;
+  v.innerHTML = `
+    <section class="panel" style="padding:12px 16px">
+      <div class="toolbar">
+        <label class="field" style="flex:1 1 220px"><span class="note" style="font-weight:700">Kantor cabang</span><select class="ctl" id="pfKc">${optKc}</select></label>
+        <label class="field" style="flex:1 1 260px"><span class="note" style="font-weight:700">Uker</span><select class="ctl" id="pfUk">${optUk}</select></label>
+        <label class="field" style="flex:1 1 190px"><span class="note" style="font-weight:700">Jenis</span><select class="ctl" id="pfJn"><option value="ALL">Briguna Ritel + Mikro</option><option value="ritel" ${PFX.jn === "ritel" ? "selected" : ""}>Briguna Ritel (kantor cabang)</option><option value="mikro" ${PFX.jn === "mikro" ? "selected" : ""}>Briguna Mikro (unit)</option></select></label>
+        <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">Cari instansi</span><input class="ctl" type="search" id="pfQ" value="${esc(PFX.q)}" placeholder="nama atau ID instansi"></label>
+      </div>
+      <p class="note" style="margin:0">${esc(scopeL)} · posisi ${D.asof ? perL(D.asof) : "–"} · nominal Rp juta · % kualitas = SML (atau NPL) ÷ OS instansi ·
+        <b>%SML</b>: ${rule("sml")} · <b>%NPL</b>: ${rule("npl")}${isAdmin() ? ` · <button type="button" class="linkish" id="pfThr">Atur batas warna</button>` : ""}</p>
+    </section>
+    <div class="grid tiles">
+      ${tile({ label: "Instansi", value: nf0.format(insRows.length), sub: q ? "hasil pencarian" : "dalam cakupan terpilih" })}
+      ${tile({ label: "Debitur", value: nf0.format(T.deb), sub: "Briguna " + (PFX.jn === "ritel" ? "Ritel" : PFX.jn === "mikro" ? "Mikro" : "Ritel + Mikro") })}
+      ${tile({ label: "OS", value: rpM(T.os), sub: "baki debet" })}
+      ${tile({ label: "% SML", value: insChip(tp.sml, th.sml), sub: `${rpM(T.sml)} dari OS` })}
+      ${tile({ label: "% NPL", value: insChip(tp.npl, th.npl), sub: `${rpM(T.npl)} dari OS` })}
+    </div>
+    <section class="panel"><div class="panel-h"><h2>Kualitas per uker</h2><span class="sub">klik nama uker untuk melihat instansinya</span></div><div id="pfUkT"></div></section>
+    <section class="panel"><div class="panel-h"><h2>Instansi di ${esc(scopeL)}</h2><span class="sub">warna mengikuti batas % SML / NPL · tombol PKS menampilkan data kerja sama</span></div><div id="pfInT"></div></section>`;
+  const go = () => { savePFX(); render(); };
+  $("#pfKc").onchange = e => { PFX.kc = e.target.value; PFX.uk = "ALL"; go(); };
+  $("#pfUk").onchange = e => { PFX.uk = e.target.value; go(); };
+  $("#pfJn").onchange = e => { PFX.jn = e.target.value; go(); };
+  let qt; $("#pfQ").oninput = e => { clearTimeout(qt); qt = setTimeout(() => { PFX.q = e.target.value; savePFX(); render(); const el = $("#pfQ"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 350); };
+  if ($("#pfThr")) $("#pfThr").onclick = openInsThr;
+  // per uker (semua uker dalam cakupan kantor cabang / jenis terpilih, tanpa menyaring uker)
+  const scopedU = D.rows.map((r, ri) => [ri, r]).filter(([, r]) => { const u = D.uker[r[0]]; return (PFX.kc === "ALL" || u[2] === +PFX.kc) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])); });
+  const ukRows = pfAgg(scopedU, r => r[0]).map(o => ({ ...o, nama: D.uker[o.k][1], kode: D.uker[o.k][0], unit: D.uker[o.k][3], kc: D.cab[D.uker[o.k][2]][1], nIns: new Set(o.ri.map(ri => D.rows[ri][1])).size }));
+  table($("#pfUkT"), [{ key: "nama", label: "Uker", fmt: (x, r) => `<button class="linkish" data-uk="${r.k}">${esc(x)}</button><br><small class="note">${r.kode} · ${esc(jenisUker(D.uker[r.k]))}${PFX.kc === "ALL" ? " · " + esc(r.kc) : ""}</small>` },
+    { key: "nIns", label: "Instansi", r: 1, fmt: x => nf0.format(x) }, { key: "deb", label: "Debitur", r: 1, fmt: x => nf0.format(x) }, { key: "os", label: "OS (Rp juta)", r: 1, fmt: x => nf0.format(x) },
+    { key: "psml", label: "% SML", r: 1, sortVal: r => r.psml ?? -1, fmt: x => insChip(x, th.sml) }, { key: "pnpl", label: "% NPL", r: 1, sortVal: r => r.pnpl ?? -1, fmt: x => insChip(x, th.npl) },
+    { key: "sml", label: "SML (Rp juta)", r: 1, fmt: x => nf0.format(x) }, { key: "npl", label: "NPL (Rp juta)", r: 1, fmt: x => nf0.format(x) }], ukRows,
+    { sortKey: "os", page: 15, after: el => el.querySelectorAll("[data-uk]").forEach(b => b.onclick = () => { PFX.uk = b.dataset.uk; PFX.kc = String(D.uker[+b.dataset.uk][2]); go(); window.scrollTo(0, 0); }) });
+  // instansi
+  table($("#pfInT"), [{ key: "nama", label: "Instansi", fmt: (x, r) => `<b>${esc(x)}</b>${r.id ? `<br><small class="note">${esc(r.id)}</small>` : ""}` },
+    { key: "deb", label: "Debitur", r: 1, fmt: x => nf0.format(x) }, { key: "os", label: "OS (Rp juta)", r: 1, fmt: x => nf0.format(x) }, { key: "sh", label: "% dari OS", r: 1, sortVal: r => r.os, fmt: (x, r) => pct(T.os ? r.os / T.os : 0, 1) },
+    { key: "psml", label: "% SML", r: 1, sortVal: r => r.psml ?? -1, fmt: x => insChip(x, th.sml) }, { key: "pnpl", label: "% NPL", r: 1, sortVal: r => r.pnpl ?? -1, fmt: x => insChip(x, th.npl) },
+    { key: "sml", label: "SML (Rp juta)", r: 1, fmt: x => nf0.format(x) }, { key: "npl", label: "NPL (Rp juta)", r: 1, fmt: x => nf0.format(x) },
+    { key: "npks", label: "PKS", nosort: 1, fmt: (x, r) => `<button class="btn" type="button" data-pks="${r.k}">PKS${x ? ` <small>(${x})</small>` : ""}</button>` }], insRows,
+    { sortKey: "os", page: 25, foot: insRows.length > 1 ? { nama: "Total", deb: nf0.format(T.deb), os: nf0.format(T.os), sh: "100%", psml: insChip(tp.sml, th.sml), pnpl: insChip(tp.npl, th.npl), sml: nf0.format(T.sml), npl: nf0.format(T.npl), npks: "" } : null,
+      after: el => el.querySelectorAll("[data-pks]").forEach(b => b.onclick = () => openPks(+b.dataset.pks, scoped)) });
+}
+// PKS instansi: kolom Jenis PKS, No PKS, Tanggal Jatuh Tempo, Payroll / Non-Payroll, Jumlah Pegawai (+ penetrasi debitur terhadap pegawai) per uker
+function openPks(ii, scoped) {
+  const D = DB.ins, inScope = new Set(scoped.map(([ri]) => ri)), mine = D.rows.map((r, ri) => [ri, r]).filter(([, r]) => r[1] === ii);
+  const withP = mine.filter(([ri]) => D.pks[ri]).sort((a, b) => (inScope.has(b[0]) ? 1 : 0) - (inScope.has(a[0]) ? 1 : 0) || D.uker[a[1][0]][1].localeCompare(D.uker[b[1][0]][1]));
+  const dueCls = t => { if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return ""; const d = (new Date(t) - new Date(new Date().toISOString().slice(0, 10))) / 864e5; return d < 0 ? "crit" : d <= 90 ? "warn" : "good"; };
+  const tg = t => /^\d{4}-\d{2}-\d{2}$/.test(t) ? tglS(t) : (t || "–");
+  $("#dlgTitle").textContent = "PKS · " + D.ins[ii][1];
+  $("#dlgBody").innerHTML = `<p class="note" style="margin:0 0 8px">${esc(D.ins[ii][0] || "")}${D.ins[ii][0] ? " · " : ""}${nf0.format(mine.length)} uker memiliki debitur instansi ini · ${nf0.format(withP.length)} uker ada data PKS${inScope.size && withP.some(([ri]) => inScope.has(ri)) ? " · uker dalam cakupan terpilih ditampilkan lebih dulu" : ""}</p>
+    ${withP.length ? `<div class="table-wrap"><table class="kt"><thead><tr><th>Uker</th><th>Jenis PKS</th><th>No PKS</th><th>Tanggal jatuh tempo</th><th>Payroll / Non-Payroll</th><th class="r">Jumlah pegawai</th><th class="r">Debitur</th><th class="r">Penetrasi</th></tr></thead>
+      <tbody>${withP.map(([ri, r]) => { const p = D.pks[ri], u = D.uker[r[0]], pen = p[4] ? r[2] / p[4] : null; return `<tr${inScope.has(ri) ? "" : ' style="opacity:.75"'}><td>${esc(u[1])}<br><small class="note">${esc(D.cab[u[2]][1])}</small></td><td>${esc(p[0] || "–")}</td><td>${esc(p[1] || "–")}</td>
+        <td>${dueCls(p[2]) ? chip(tg(p[2]), dueCls(p[2])) : esc(tg(p[2]))}</td><td>${esc(p[3] || "–")}</td><td class="r">${p[4] == null ? "–" : nf0.format(p[4])}</td><td class="r">${nf0.format(r[2])}</td><td class="r">${pen == null ? "–" : pct(pen, 1)}</td></tr>`; }).join("")}</tbody></table></div>
+      <p class="note" style="margin:8px 0 0">Penetrasi = debitur Briguna ÷ jumlah pegawai · tanggal jatuh tempo: merah = sudah lewat, kuning = ≤ 90 hari.</p>`
+      : `<div class="empty"><p style="font-weight:700;margin:0 0 6px">Belum ada data PKS untuk instansi ini</p>Isi kolom <b>Jenis PKS, No PKS, Tanggal Jatuh Tempo PKS, Payroll/Non Payroll, Jumlah Pegawai</b> pada sheet <code>database instansi</code>, lalu klik Sync portofolio.</div>`}
+    <div class="toolbar"><button class="btn" type="button" data-close>Tutup</button></div>`;
+  $("#dlg").showModal();
+}
+// admin: atur batas warna % SML dan % NPL
+function openInsThr() {
+  const th = insThr(); $("#dlgTitle").textContent = "Batas warna % kualitas";
+  const f = (id, l, val) => `<div class="field"><label for="${id}">${l}</label><input class="ctl" id="${id}" type="number" step="0.1" min="0" max="100" value="${val}"></div>`;
+  $("#dlgBody").innerHTML = `<form id="thrForm" class="form" novalidate><p class="note full" style="margin:0">Hijau bila persentase di bawah batas pertama, kuning sampai batas kedua (termasuk), merah di atas batas kedua. Berlaku untuk semua pengguna.</p>
+    ${f("thSa", "%SML hijau di bawah (%)", th.sml[0])}${f("thSb", "%SML merah di atas (%)", th.sml[1])}${f("thNa", "%NPL hijau di bawah (%)", th.npl[0])}${f("thNb", "%NPL merah di atas (%)", th.npl[1])}
+    <div class="toolbar full"><button class="btn primary" type="submit">Simpan</button><button class="btn" type="button" id="thDef">Kembalikan 1% / 2%</button><button class="btn" type="button" data-close>Batal</button></div><p id="thErr" class="lg-msg full" hidden></p></form>`;
+  $("#thDef").onclick = () => { ["thSa", "thNa"].forEach(i => $("#" + i).value = 1); ["thSb", "thNb"].forEach(i => $("#" + i).value = 2); };
+  $("#thrForm").onsubmit = async e => {
+    e.preventDefault(); const n = i => parseFloat(String($("#" + i).value).replace(",", ".")), v = { sml: [n("thSa"), n("thSb")], npl: [n("thNa"), n("thNb")] }, err = $("#thErr");
+    if ([...v.sml, ...v.npl].some(x => !isFinite(x) || x < 0 || x > 100) || v.sml[0] > v.sml[1] || v.npl[0] > v.npl[1]) { err.hidden = false; err.textContent = "Isi angka 0–100 dan batas hijau tidak boleh lebih besar dari batas merah."; return; }
+    try { await Auth.call("configSave", { key: "insThr", value: v }); await loadParts(["meta"], null, true); $("#dlg").close(); toast("Batas warna disimpan."); render(); }
+    catch (er) { err.hidden = false; err.textContent = /tidak dikenal/i.test(er.message) ? "Server belum mendukung pengaturan ini. Pasang Apps Script versi terbaru." : er.message; }
+  };
+  $("#dlg").showModal();
 }
 /* ================= unduh tabel / grafik: Excel, CSV, PDF, gambar (PNG) ================= */
 // Tiap section yang berisi tabel atau grafik mendapat tombol "Unduh". Excel/CSV = data tabel (semua baris, bukan hanya yang tampil);
@@ -3647,6 +3775,7 @@ const VIEWS = {
   produktivitas: ["Produktivitas RM", "Menu 2", viewRM],
   nominatif: ["Nominatif Portofolio", "Menu 3", viewNom],
   kualitas: ["Kualitas Kredit", "Menu 4", viewKual],
+  portofolio: ["Portofolio Eksisting", "Menu 8", viewPortofolio],
   pipeline: ["Pipeline Brispot RM", "Menu 5", viewPipeline],
   marketshare: ["Marketshare Konsumer", "Menu 7", viewMarketshare],
   simulasi: ["Simulasi Suku Bunga", "Menu 6", viewSimAll],
@@ -3839,6 +3968,7 @@ function applyPart(p, o) {
   else if (p === "rate") DB.rate = o && o.rows ? o : null;
   else if (p === "brs_B") DB.brs = o && o.rm ? o : null;
   else if (p === "ms_K") DB.ms = o && o.biz ? msPrep(o) : null;
+  else if (p === "ins_B") DB.ins = o && o.rows ? o : null;
 }
 // soft = true: satu bagian data yang gagal / lambat tidak menggagalkan bagian lain; yang gagal dikembalikan sebagai [[nama, pesan], ...]
 async function loadParts(parts, onEach, soft) {
@@ -3874,7 +4004,7 @@ async function loadAll(silent) {
   LOADING.core = false; KER_LOADING = RM_LOADING = PIPE_LOADING = RATE_LOADING = false; bootMsg("");
   KS.date = KS.date || null; render();
   // laporan Brispot Warm/Hot dimuat terpisah: tidak menahan data inti dan boleh gagal tanpa mengganggu
-  loadParts(["brs_B", "ms_K"], null, true).then(() => { if (seq === LOAD_SEQ && ["pipeline", "marketshare", "beranda"].includes(curView())) render(); }).catch(() => {});
+  loadParts(["brs_B", "ms_K", "ins_B"], null, true).then(() => { if (seq === LOAD_SEQ && ["pipeline", "marketshare", "portofolio", "beranda"].includes(curView())) render(); }).catch(() => {});
   if (Auth.can("detail")) { try { await loadParts(["lw_B", "lw_K"]); } catch (er) { toast("LW321: " + er.message); } }
   if (seq !== LOAD_SEQ) return;
   LOADING.lw = false;
@@ -3904,7 +4034,7 @@ $("#loginForm").addEventListener("submit", async e => {
 });
 $("#lgEye").onclick = () => { const i = $("#lgPass"); i.type = i.type === "password" ? "text" : "password"; $("#lgEye").setAttribute("aria-label", i.type === "password" ? "Tampilkan password" : "Sembunyikan password"); };
 function resetData() {
-  ++LOAD_SEQ; Object.assign(DB, { meta: null, ker: null, rmk: null, pipe: null, lw: null, rate: null, brs: null, ms: null, rmkSets: {}, pipeSets: {}, lwSets: {}, gerak: {}, foto: { rm: {}, kc: {} } });
+  ++LOAD_SEQ; Object.assign(DB, { meta: null, ker: null, rmk: null, pipe: null, lw: null, rate: null, brs: null, ms: null, ins: null, rmkSets: {}, pipeSets: {}, lwSets: {}, gerak: {}, foto: { rm: {}, kc: {} } });
   LWR = []; LWK = new Map(); LWCIF = new Map(); LWPK = new Map(); LWPCIF = new Map(); KV = null;
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; }); $("#view").innerHTML = ""; $("#landing").innerHTML = "";
   document.querySelectorAll("dialog[open]").forEach(d => d.close());

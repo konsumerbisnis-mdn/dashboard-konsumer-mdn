@@ -16,7 +16,7 @@
 <meta name="apple-mobile-web-app-title" content="Konsumer MDN">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
-<link rel="stylesheet" href="css/app.css?v=06d940f6">
+<link rel="stylesheet" href="css/app.css?v=5e0b4e1c">
 <script src="js/diag.js"></script>
 <script src="js/pwa.js" defer></script>
 </head>
@@ -74,6 +74,7 @@
 </section>
 
 <section class="landing" id="landing" hidden></section>
+<button class="btn fb-btn fb-home" id="btnFbHome" type="button" title="Beri feedback untuk dashboard ini"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg><span>Beri feedback</span></button>
 <div class="zoomctl" id="zoomCtl" role="group" aria-label="Perbesar tabel">
   <button type="button" data-z="-1" aria-label="Perkecil"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M8 11h6M20 20l-3.5-3.5"/></svg></button>
   <button type="button" data-z="0" class="zv" aria-label="Ukuran normal">100%</button>
@@ -108,6 +109,7 @@
       </div>
       <div class="filters">
         <span class="sync-st" id="syncSt"></span>
+        <button class="btn fb-btn" id="btnFb" type="button" title="Beri feedback untuk dashboard ini"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg><span>Beri feedback</span></button>
         <button class="btn" id="btnPdf" type="button" title="Cetak menu ini ke PDF" hidden><svg viewBox="0 0 24 24"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></svg><span>PDF</span></button>
         <button class="btn" id="btnSync" type="button" title="Ambil data terbaru dari Google Sheets"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/></svg><span>Sync</span></button>
         <button class="btn" id="btnSyncPart" type="button" hidden title="Sync hanya data menu ini (admin)"><svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 0 1-13.7 5.7M4 12a8 8 0 0 1 13.7-5.7"/><path d="M18 2v4.5h-4.5M6 22v-4.5h4.5"/></svg><span>Sync menu ini</span></button>
@@ -152,6 +154,6 @@
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/sfx.js"></script>
-<script src="js/app.js?v=c7164b5c"></script>
+<script src="js/app.js?v=ebaa9c0e"></script>
 </body>
 </html>

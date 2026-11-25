@@ -413,7 +413,7 @@ const saveKS = () => lsSet(STORE + "-ker", KS);
 const rpM = j => (j < 0 ? "−" : "") + "Rp " + nf2.format(Math.abs(j) / 1000) + " M";
 const dM = j => (j >= 0 ? "+" : "−") + nf2.format(Math.abs(j) / 1000) + " M";
 const dN = j => (j >= 0 ? "+" : "−") + nf0.format(Math.abs(j));
-const dPP = v => (v >= 0 ? "+" : "−") + nf2.format(Math.abs(v) * 100) + " pp";
+const dPP = v => (v >= 0 ? "+" : "−") + nf2.format(Math.abs(v) * 100) + "%";
 const tglS = d => d ? `${+d.slice(8)} ${BULAN[+d.slice(5, 7) - 1]} ${d.slice(0, 4)}` : "–";
 const blnS = ym => BULAN[+ym.slice(5, 7) - 1] + "'" + ym.slice(2, 4);
 const areaS = a => String(a || "").replace(/^AREA\s*(\d+)\s*\/\s*/i, "Area $1 · ").replace(/\b([A-Z])([A-Z]+)\b/g, (m, a, b) => a + b.toLowerCase());
@@ -465,8 +465,8 @@ function kpiTable(d, us, kpi, kmode) {
   const pctMode = (kpi === "sml" || kpi === "npl") && kmode === "pct";
   const metric = kpi === "all" ? null : { k: pctMode ? "p" + kpi : kpi, up: kpi === "os" || kpi === "deb", p: pctMode, n: kpi === "deb" };
   const fv = (x, m) => x == null ? "–" : m.p ? pct(x, 2) : !x ? "-" : nf0.format(x);
-  const fd = (x, m) => { if (x == null || Math.abs(x) < 1e-9) return "-"; const bad = m.up ? x < 0 : x > 0, t = m.p ? nf2.format(Math.abs(x) * 100) + " pp" : nf0.format(Math.abs(x)); return `<span class="${bad ? "bad" : ""}">${x < 0 ? "(" + t + ")" : t}</span>`; };
-  const fy = (x, m) => { if (x == null) return "-"; const bad = m.up ? x < 0 : x > 0, t = m.p ? nf2.format(Math.abs(x) * 100) + " pp" : nf2.format(Math.abs(x) * 100) + "%"; return `<span class="${bad ? "bad" : ""}">${x < 0 ? "(" + t + ")" : t}</span>`; };
+  const fd = (x, m) => { if (x == null || Math.abs(x) < 1e-9) return "-"; const bad = m.up ? x < 0 : x > 0, t = m.p ? nf2.format(Math.abs(x) * 100) + "%" : nf0.format(Math.abs(x)); return `<span class="${bad ? "bad" : ""}">${x < 0 ? "(" + t + ")" : t}</span>`; };
+  const fy = (x, m) => { if (x == null) return "-"; const bad = m.up ? x < 0 : x > 0, t = m.p ? nf2.format(Math.abs(x) * 100) + "%" : nf2.format(Math.abs(x) * 100) + "%"; return `<span class="${bad ? "bad" : ""}">${x < 0 ? "(" + t + ")" : t}</span>`; };
   const pc = v => `<td class="kp ${osCls(v)}">${pct(v, 2)}</td>`;
   const calc = uu => {
     const sn = hist.map(([, i]) => kSnap(i, uu)), cur = sn[4] || { os: 0, sml: 0, npl: 0, deb: 0, psml: 0, pnpl: 0 };
@@ -490,7 +490,7 @@ function kpiTable(d, us, kpi, kmode) {
   if (kpi === "sum") {
     const c = calc(us), L = [["OS KPR", "os", 1, 0, 0], ["SML KPR", "sml", 0, 0, 0], ["% SML", "psml", 0, 1, 0], ["NPL KPR", "npl", 0, 0, 0], ["% NPL", "pnpl", 0, 1, 0], ["Debitur", "deb", 1, 0, 1]];
     return `<div class="table-wrap"><table class="kt"><thead>${histHead("Indikator")}</thead><tbody>${L.map(([l, k, up, p, n]) => `<tr><td class="sk1" style="left:0"><b>${l}</b></td>${cellsM(c, { k, up: !!up, p: !!p, n: !!n })}</tr>`).join("")}</tbody></table></div>
-      <p class="note" style="margin:8px 0 0">Nominal dalam Rp juta · rasio terhadap OS, delta rasio dalam pp · angka dalam kurung = minus · %Penc SML & NPL = RKA ÷ aktual (maks. 120%).</p>`;
+      <p class="note" style="margin:8px 0 0">Nominal dalam Rp juta · rasio terhadap OS, delta rasio dalam % · angka dalam kurung = minus · %Penc SML & NPL = RKA ÷ aktual (maks. 120%).</p>`;
   }
   const cells = metric ? c => cellsM(c, metric) : c => {
     const os = { up: true }, lo = { up: false }, nd = { up: true }, cu = c.cur, rk = c.rk || {};
@@ -509,7 +509,7 @@ function kpiTable(d, us, kpi, kmode) {
   const row = x => `<tr><td class="sk0">${++no}</td><td class="sk1">${esc(x.u.nama)}</td>${narrow ? "" : `<td>${esc(areaS(x.u.area))}</td>`}${cells(x.c)}</tr>`;
   const body = g1.map(row).join("") + (g2.length ? (g1.length ? `<tr class="kgrp"><td class="sk0"></td><td class="sk1" colspan="${AC}">KC NON RM KPR</td><td colspan="${nCols - 3}"></td></tr>` : "") + g2.map(row).join("") : "")
     + subs.map(x => `<tr class="${x.cls}"><td class="sk0"></td><td class="sk1" colspan="${AC}">${esc(x.name === "TOTAL" ? "TOTAL" : String(x.name).toUpperCase())}</td>${cells(x.c)}</tr>`).join("");
-  const unit = metric ? (metric.p ? "rasio terhadap OS, delta dalam pp" : metric.n ? "jumlah debitur" : "nominal dalam Rp juta") : "nominal dalam Rp juta";
+  const unit = metric ? (metric.p ? "rasio terhadap OS, delta dalam %" : metric.n ? "jumlah debitur" : "nominal dalam Rp juta") : "nominal dalam Rp juta";
   return `<div class="table-wrap"><table class="kt"><thead>${head}</thead><tbody>${body}</tbody></table></div>
     <p class="note" style="margin:8px 0 0">${unit} · urut %Penc ${metric ? KPI_L[kpi] : "OS"} ${mon} · angka dalam kurung = minus · warna %Penc: hijau ≥100%, kuning 95–100%, merah &lt;95%.</p>`;
 }
@@ -524,7 +524,7 @@ function kTsTable(d, us, k, asPct) {
   const calc = uu => { const v = cols.map(c => { const sn = kSnap(c.i, uu); return sn ? sn[kk] : null; }), p = v.slice(1, 4).filter(x => x != null);
     const rt = p.length === 3 ? (p[0] + p[1] + p[2]) / 3 : null; return { v, rt, gap: rt == null || v[4] == null ? null : v[4] - rt }; };
   const fv = x => x == null ? "–" : asPct ? pct(x, 2) : Math.abs(x) < .5 ? "-" : nf0.format(x);
-  const fg = x => { if (x == null || Math.abs(x) < (asPct ? 1e-6 : .5)) return "-"; const t = asPct ? nf2.format(Math.abs(x) * 100) + " pp" : nf0.format(Math.abs(x)); return x < 0 ? `<span class="good">(${t})</span>` : `<span class="bad">${t}</span>`; };
+  const fg = x => { if (x == null || Math.abs(x) < (asPct ? 1e-6 : .5)) return "-"; const t = asPct ? nf2.format(Math.abs(x) * 100) + "%" : nf0.format(Math.abs(x)); return x < 0 ? `<span class="good">(${t})</span>` : `<span class="bad">${t}</span>`; };
   const rmSet = kRmSet(ym), isRO = u => /^RO\b/i.test(u.nama);
   const rows = us.map(u => ({ u, c: calc([u]) })), srt = a => a.sort((x, y) => isRO(x.u) - isRO(y.u) || (y.c.gap ?? -1e15) - (x.c.gap ?? -1e15) || (y.c.v[4] || 0) - (x.c.v[4] || 0));
   const g1 = srt(rows.filter(x => rmSet.has(normKey(x.u.nama)))), g2 = srt(rows.filter(x => !rmSet.has(normKey(x.u.nama))));
@@ -534,7 +534,7 @@ function kTsTable(d, us, k, asPct) {
   return `<h3 style="font-size:14px;margin:4px 0 8px">Time Series ${L} KPR${asPct ? " (rasio)" : ""}</h3>
     <div class="table-wrap" style="margin-bottom:18px"><table class="kt ts"><thead><tr><th rowspan="2" class="sk1" style="left:0">Kantor Cabang</th><th colspan="5">Time Series ${L} KPR</th><th rowspan="2" class="or">RATAS<br>3 BLN</th><th rowspan="2" class="or">GAP thd<br>RATAS</th></tr>
       <tr>${cols.map(c => `<th>${c.lbl}</th>`).join("")}</tr></thead>
-      <tbody>${grp("KC RM KPR", g1)}${grp("KC NON RM KPR", g2)}${us.length > 1 ? tr("TOTAL", calc(us.filter(u => !isRO(u))), "ktot") : ""}</tbody></table></div>${k === "npl" ? `<p class="note" style="margin:-10px 0 0">${asPct ? "Rasio terhadap OS, gap dalam pp" : "Nominal dalam Rp juta"} · RATAS = rata-rata 3 bulan sebelumnya pada tanggal yang sama · TOTAL tanpa RO Medan · gap hijau dalam kurung = turun dari RATAS (membaik).</p>` : ""}`;
+      <tbody>${grp("KC RM KPR", g1)}${grp("KC NON RM KPR", g2)}${us.length > 1 ? tr("TOTAL", calc(us.filter(u => !isRO(u))), "ktot") : ""}</tbody></table></div>${k === "npl" ? `<p class="note" style="margin:-10px 0 0">${asPct ? "Rasio terhadap OS, gap dalam %" : "Nominal dalam Rp juta"} · RATAS = rata-rata 3 bulan sebelumnya pada tanggal yang sama · TOTAL tanpa RO Medan · gap hijau dalam kurung = turun dari RATAS (membaik).</p>` : ""}`;
 }
 function viewKeragaan(v) {
   if (!DB.ker && KER_LOADING) { v.innerHTML = `<section class="panel"><div class="empty">Memuat data keragaan…</div></section>`; return; }

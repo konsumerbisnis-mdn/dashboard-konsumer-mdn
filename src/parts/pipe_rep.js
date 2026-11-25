@@ -48,6 +48,13 @@ function pipeKcRekap(el, aktif) {
 // pilihan ceklis (bisa lebih dari satu): PS[key] = nilai terpilih; kosong = semua. opts = [[nilai, label, jumlah deb]]
 function msPicker(el, key, opts, allLbl, short, onChange) {
   const lbl = () => { const v = PS[key]; return !v.length ? allLbl : v.length <= 2 ? v.map(x => short(x)).join(", ") : v.length + " dipilih"; };
+  if (key === "akad") {   // tanggal: pilihan berbentuk kalender (boleh beberapa tanggal); angka kecil = jumlah debitur pada tanggal itu
+    const marks = {}; opts.forEach(([v, , n]) => { if (n != null) marks[v] = n; });
+    const ds = opts.map(o => o[0]).sort();
+    CALS.pAkadCal = { multi: true, enabled: new Set(ds), min: ds[0], max: ds[ds.length - 1], marks, get: () => PS[key], set: v => { PS[key] = v; onChange(); }, label: () => lbl() };
+    el.innerHTML = `<button type="button" class="ctl cal-btn" data-cal="pAkadCal" aria-haspopup="dialog"><span>${esc(lbl())}</span>${CAL_ICO}</button>`;
+    return;
+  }
   el.innerHTML = `<details class="ms"><summary class="ctl">${esc(lbl())}</summary><div class="ms-pop">
     ${opts.length ? opts.map(([v, l, n]) => `<label class="check"><input type="checkbox" value="${esc(v)}" ${PS[key].includes(v) ? "checked" : ""}> ${l}${n != null ? ` <small class="note">${nf0.format(n)} deb</small>` : ""}</label>`).join("") : '<span class="note">Belum ada pilihan.</span>'}
     <div class="toolbar"><button class="btn" type="button" data-ms="all">Pilih semua</button><button class="btn" type="button" data-ms="clr">Hapus pilihan</button></div></div></details>`;

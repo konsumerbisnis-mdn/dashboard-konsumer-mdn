@@ -243,13 +243,14 @@ async function doSyncPart(btn) {
 const AD = { tab: lsGet(STORE + "-adtab") || "data" };
 function viewAdmin(v) {
   if (!isAdmin()) { v.innerHTML = `<section class="panel"><div class="empty">Menu ini khusus admin.</div></section>`; return; }
-  v.innerHTML = `<nav class="ptabs" role="tablist">${[["data", "Kelola data"], ["users", "User"], ["log", "Access log"]].map(([k, l]) => `<button type="button" role="tab" data-at="${k}" aria-selected="${AD.tab === k}">${l}</button>`).join("")}</nav><div id="adBody" class="grid"></div>`;
+  v.innerHTML = `<nav class="ptabs" role="tablist">${[["data", "Kelola data"], ["users", "User"], ["fb", "Feedback"], ["log", "Access log"]].map(([k, l]) => `<button type="button" role="tab" data-at="${k}" aria-selected="${AD.tab === k}">${l}</button>`).join("")}</nav><div id="adBody" class="grid"></div>`;
   v.querySelectorAll("[data-at]").forEach(b => b.onclick = () => { AD.tab = b.dataset.at; lsSet(STORE + "-adtab", AD.tab); v.querySelectorAll("[data-at]").forEach(x => x.setAttribute("aria-selected", x === b)); renderAdminTab(); });
   renderAdminTab();
 }
 function renderAdminTab() {
   const el = $("#adBody"); if (!el) return;
   if (AD.tab === "users") return adUsers(el);
+  if (AD.tab === "fb") return adFeedback(el);
   if (AD.tab === "log") return adLog(el);
   el.innerHTML = `<section class="panel"><div class="panel-h"><h2>Kelola data</h2><span class="sub">khusus admin</span></div>${dataCards()}</section>`; bindDataCards(el);
 }

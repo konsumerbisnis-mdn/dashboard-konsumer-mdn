@@ -29,6 +29,10 @@ function viewMarketshare(v) {
   const dl = x => x == null ? "–" : `<span class="delta ${dCls(x)}">${dPP(x)}</span>`;
   const bn = x => x == null ? "–" : nf0.format(x / 1000);   // Rp miliar
   const opts = [...per].reverse().filter(p => B.rows.some(r => r.b[per.indexOf(p)] != null)).map(p => `<option value="${p.k}" ${p.k === per[pi].k ? "selected" : ""}>${perL(p.k)}</option>`).join("");
+  const okP = per.map((p, i) => B.rows.some(r => r.b[i] != null && r.i[i] != null));
+  let ga = per.findIndex(p => p.k === MSX.ga); if (ga < 0 || !okP[ga]) ga = yI >= 0 && okP[yI] ? yI : okP.indexOf(true);
+  let gb = per.findIndex(p => p.k === MSX.gb); if (gb < 0 || !okP[gb]) gb = pi;
+  const gopt = sel => per.map((p, i) => okP[i] ? `<option value="${p.k}" ${i === sel ? "selected" : ""}>${perL(p.k)}</option>` : "").reverse().join("");
   v.innerHTML = `
     <section class="panel" style="padding:12px 16px">
       <div class="seg" role="tablist" aria-label="Bisnis">${MS_BIZ.map(([k, l]) => `<button type="button" role="tab" data-msb="${k}" aria-selected="${k === MSX.biz}">${l}</button>`).join("")}</div>
@@ -44,10 +48,25 @@ function viewMarketshare(v) {
     </div>` : ""}
     <section class="panel"><div class="panel-h"><h2>Tren % marketshare</h2><span class="sub">RO Medan: BRI vs kelompok bank lain</span></div><div class="chart" style="height:340px"><canvas id="cMsTr"></canvas></div></section>
     <section class="panel"><div class="panel-h"><h2>Marketshare ${esc(bl[1])} per kantor cabang</h2><span class="sub">Rp miliar · MtD, YtD, YoY = selisih %marketshare vs bulan lalu, Desember tahun lalu, dan bulan sama tahun lalu · klik judul kolom untuk mengurutkan</span></div><div id="msKc"></div></section>
+    <section class="panel"><div class="panel-h"><h2>Growth BRI vs industri</h2><span class="sub">pilih bulan awal dan bulan akhir · growth = posisi bulan akhir ÷ posisi bulan awal − 1</span></div>
+      <div class="toolbar"><label class="field" style="flex:1 1 170px"><span class="note" style="font-weight:700">Dari bulan</span><select class="ctl" id="msGa">${gopt(ga)}</select></label>
+        <label class="field" style="flex:1 1 170px"><span class="note" style="font-weight:700">Sampai bulan</span><select class="ctl" id="msGb">${gopt(gb)}</select></label></div>
+      <div id="msGr"></div></section>
     <section class="panel"><div class="panel-h"><h2>Per wilayah &amp; klaster</h2><span class="sub">urban / rural dan klaster Kanwil</span></div><div id="msZn"></div></section>
     <section class="panel"><div class="panel-h"><h2>Posisi industri: BRI dan bank lain</h2><span class="sub">pangsa tiap kelompok bank terhadap industri RO Medan</span></div><div id="msPr"></div></section>`;
   v.querySelectorAll("[data-msb]").forEach(b => b.onclick = () => { MSX.biz = b.dataset.msb; saveMSX(); render(); });
   $("#msP").onchange = e => { MSX.per = e.target.value; saveMSX(); render(); };
+  $("#msGa").onchange = e => { MSX.ga = e.target.value; saveMSX(); render(); };
+  $("#msGb").onchange = e => { MSX.gb = e.target.value; saveMSX(); render(); };
+  const gm = r => { const gI = grOf(r.i, gb, ga), gB = grOf(r.b, gb, ga); return { ...r, iA: r.i[ga], iB: r.i[gb], bA: r.b[ga], bB: r.b[gb], gI, gB, gap: gI != null && gB != null ? gB - gI : null }; };
+  const gRows = B.rows.filter(r => r.t === "kc").map(gm), gRo = ro ? gm(ro) : null;
+  table($("#msGr"), [{ key: "n", label: "Kanca", fmt: (x, r) => `${esc(x)}<br><small class="note">${r.kduk}</small>` },
+    { key: "iA", label: "Industri " + perL(per[ga].k), r: 1, fmt: bn }, { key: "iB", label: "Industri " + perL(per[gb].k), r: 1, fmt: bn },
+    { key: "gI", label: "Growth industri", r: 1, sortVal: r => r.gI ?? -9, fmt: x => sg(x) },
+    { key: "bA", label: "BRI " + perL(per[ga].k), r: 1, fmt: bn }, { key: "bB", label: "BRI " + perL(per[gb].k), r: 1, fmt: bn },
+    { key: "gB", label: "Growth BRI", r: 1, sortVal: r => r.gB ?? -9, fmt: x => sg(x) },
+    { key: "gap", label: "BRI − industri", r: 1, sortVal: r => r.gap ?? -9, fmt: dl }], gRows,
+    { sortKey: "gap", foot: gRo ? { n: "RO Medan (BRI)", iA: bn(gRo.iA), iB: bn(gRo.iB), gI: sg(gRo.gI), bA: bn(gRo.bA), bB: bn(gRo.bB), gB: sg(gRo.gB), gap: dl(gRo.gap) } : null });
   const cols = (first, withKd) => [first,
     { key: "ind", label: "Industri", r: 1, fmt: bn }, { key: "bri", label: "BRI", r: 1, fmt: bn },
     { key: "ms", label: "% Marketshare", r: 1, sortVal: r => r.ms ?? -1, fmt: x => x == null ? "–" : `<b>${pct(x, 2)}</b>` },

@@ -3360,7 +3360,8 @@ function viewMarketshare(v) {
     <section class="panel"><div class="panel-h"><h2>Growth BRI vs industri</h2><span class="sub">pilih bulan awal dan bulan akhir · growth = posisi bulan akhir ÷ posisi bulan awal − 1</span></div>
       <div class="toolbar"><label class="field" style="flex:1 1 170px"><span class="note" style="font-weight:700">Dari bulan</span><select class="ctl" id="msGa">${gopt(ga)}</select></label>
         <label class="field" style="flex:1 1 170px"><span class="note" style="font-weight:700">Sampai bulan</span><select class="ctl" id="msGb">${gopt(gb)}</select></label></div>
-      <div id="msGr"></div></section>
+      <div id="msGr"></div>
+      <h3 style="margin:16px 0 4px;font-size:14px">Growth per tahun · RO Medan</h3><p class="note" style="margin:0 0 6px" id="msGyN"></p><div class="chart" style="height:280px"><canvas id="cMsGy"></canvas></div></section>
     <section class="panel"><div class="panel-h"><h2>Per wilayah &amp; klaster</h2><span class="sub">urban / rural dan klaster Kanwil</span></div><div id="msZn"></div></section>
     <section class="panel"><div class="panel-h"><h2>Posisi industri: BRI dan bank lain</h2><span class="sub">pangsa tiap kelompok bank terhadap industri RO Medan</span></div><div id="msPr"></div></section>`;
   v.querySelectorAll("[data-msb]").forEach(b => b.onclick = () => { MSX.biz = b.dataset.msb; saveMSX(); render(); });
@@ -3400,6 +3401,16 @@ function viewMarketshare(v) {
   const peer = nm => peers.find(p => p.n === nm), ds = [];
   if (ro) ds.push(line(ro, "BRI", s1));
     [["Bank BUMN & BUMD (Excl. BRI)", "BUMN & BUMD (tanpa BRI)", "#e8590c"], ["Bank Swasta Nasional", "Swasta nasional", "#2f9e44"], ["Bank Lainnya", "Lainnya", "#8e44ad"]].forEach(([nm, l, c]) => { const p = peer(nm); if (p) ds.push(line(p, l, c)); });
+  // growth per tahun: posisi akhir tahun (Des; tahun berjalan = bulan terakhir yang sudah terisi) ÷ posisi Des tahun sebelumnya − 1
+  if (ro) {
+    const yrs = [...new Set(per.map(p => +p.k.slice(0, 4)))].sort(), pts = [];
+    yrs.forEach(y => { const di = idxOf(y - 1, 12); if (di < 0 || ro.i[di] == null) return; let ei = -1; per.forEach((p, i) => { if (+p.k.slice(0, 4) === y && okP[i] && ro.i[i] != null && ro.b[i] != null) ei = i; }); if (ei < 0) return;
+      pts.push({ y: y + (per[ei].k.slice(5) === "12" ? "" : " (" + BULAN[+per[ei].k.slice(5) - 1] + ")"), gI: grOf(ro.i, ei, di), gB: grOf(ro.b, ei, di) }); });
+    $("#msGyN").textContent = pts.length ? "Pertumbuhan posisi akhir tahun terhadap Desember tahun sebelumnya; tahun berjalan sampai bulan terakhir yang sudah terupdate." : "Belum cukup data (butuh posisi Desember tahun sebelumnya).";
+    const gl = (label, key, col) => ({ type: "line", label, data: pts.map(p => p[key]), borderColor: col, backgroundColor: col, borderWidth: 2.4, pointRadius: 4, tension: .2 });
+    mkChart("cMsGy", { type: "line", data: { labels: pts.map(p => p.y), datasets: [gl("BRI", "gB", s1), gl("Industri", "gI", "#e8590c")] },
+      options: baseOpts({ plugins: { ...baseOpts().plugins, tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => c.parsed.y == null ? "" : ` ${c.dataset.label}: ${sg(c.parsed.y, 2)}` } } }, scales: { ...baseOpts().scales, y: { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x * 100) + "%" } } } }) });
+  }
   const pctY = { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x * 100) + "%" } };
   mkChart("cMsTr", { type: "line", data: { labels: per.map(p => p.l), datasets: ds }, options: baseOpts({ plugins: { ...baseOpts().plugins, tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => c.parsed.y == null ? "" : ` ${c.dataset.label}: ${pct(c.parsed.y, 2)}` } } }, scales: { ...baseOpts().scales, y: pctY } }) });
 }

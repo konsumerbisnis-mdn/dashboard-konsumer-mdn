@@ -33,7 +33,7 @@ function dataCards() {
         "Dibaca dari sheet <b>marketshare</b> di Google Sheets (format ke bawah: Kode KC, Kanca, Tanggal, Segmen Bisnis, Jenis, OS). Data baru: tambahkan baris di bawah, lalu klik <b>Sync marketshare</b>. Tampil di menu Marketshare untuk semua pengguna.",
         `<button class="btn primary" type="button" id="btnSyncMs">Sync marketshare</button>`)}
       ${card("insB", dIco('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>'), "Portofolio Eksisting (instansi)", iSt(),
-        "Dibaca dari sheet <b>database instansi</b> di Google Sheets (kolom: PERIODE, KODE CABANG, CABANG, KODE UNIT, UNIT, INSTANSI, DEB, OS, SML (Rp), SML (%), NPL (Rp), NPL (%), Jenis PKS, No PKS, Tanggal Jatuh Tempo PKS, Payroll/Non Payroll, Jumlah Pegawai, ID INSTANSI). Data baru: ganti isi sheet, lalu klik <b>Sync portofolio</b>.",
+        "Dibaca dari sheet <b>database instansi</b> di Google Sheets (kolom: PERIODE, KODE CABANG, CABANG, KODE UNIT, UNIT, INSTANSI, DEB, OS, SML (Rp), SML (%), NPL (Rp), NPL (%), Jenis PKS, No PKS, Tanggal Jatuh Tempo PKS, Payroll/Non Payroll, Jumlah Pegawai, ID INSTANSI). Portofolio per RM dibaca dari sheet <b>database debitur briguna</b> (satu baris per debitur: PN PENGELOLA1, KOL ADK, BAKI DEBET, KODE UNIT, ID INSTANSI, dst.; nama debitur tidak dikirim ke browser). Data baru: ganti isi sheet, lalu klik <b>Sync portofolio</b>.",
         `<button class="btn primary" type="button" id="btnSyncIns">Sync portofolio</button>`)}
       ${card("pipeK", dIco('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'), "Pipeline Brispot KPR", pSt("K"),
         "File Pipeline BRISPOT KPR (sheet Pipeline, OnHand, Ref_Batal, Rencana Realisasi RM). Menggantikan data sebelumnya.", file("pipeK"))}
@@ -230,12 +230,12 @@ async function doSyncRmk(btn) {
 }
 
 // sync per menu (admin): tiap menu hanya membangun ulang datanya sendiri lewat action syncParts, tanpa menunggu sync penuh
-const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG", ms: "marketshare", ins: "portofolio instansi" };
-const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"], ms: ["ms_K"], ins: ["ins_B"] };
-const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : k === "marketshare" ? ["ms"] : k === "portofolio" ? ["ins"] : [];
+const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG", ms: "marketshare", ins: "portofolio instansi", deb: "portofolio per RM" };
+const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"], ms: ["ms_K"], ins: ["ins_B"], deb: ["deb_B"] };
+const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : k === "marketshare" ? ["ms"] : k === "portofolio" ? ["ins", "deb"] : [];
 function updateSyncPart(k) {
   const b = $("#btnSyncPart"); if (!b) return; const p = syncPartsOf(k); b.hidden = !(isAdmin() && p.length); b.dataset.p = p.join(",");
-  const sp = b.querySelector("span"); if (sp) sp.textContent = "Sync " + (p.length ? SP_LBL[p[0]] : "menu ini"); b.title = "Sync hanya " + (p.length ? SP_LBL[p[0]] : "data menu ini") + " (admin)";
+  const sp = b.querySelector("span"), lb = k === "portofolio" ? "portofolio" : p.length ? SP_LBL[p[0]] : ""; if (sp) sp.textContent = "Sync " + (lb || "menu ini"); b.title = "Sync hanya " + (lb || "data menu ini") + " (admin)";
 }
 async function doSyncPart(btn) {
   const parts = (btn.dataset.p || "").split(",").filter(Boolean); if (!parts.length) return;
@@ -253,9 +253,9 @@ async function doSyncPart(btn) {
 async function doSyncIns(btn) {
   btn.disabled = true; const old = btn.textContent; btn.textContent = "Menyinkronkan…";
   try {
-    const j = await Auth.call("syncParts", { parts: ["ins"] }); await loadParts(["meta", "ins_B"], null, true);
+    const j = await Auth.call("syncParts", { parts: ["ins", "deb"] }); await loadParts(["meta", "ins_B", "deb_B"], null, true);
     const st = j.stats || {}; if (typeof st.ins === "string") throw new Error(st.ins[0].toUpperCase() + st.ins.slice(1) + ". Buat sheet bernama database instansi lalu isi dengan format yang ditentukan.");
-    toast(`✓ Portofolio diperbarui · ${nf0.format(st.insRows || 0)} baris${DB.ins ? " · posisi " + perL(DB.ins.asof) : ""}`); render(); refreshDataUI();
+    toast(`✓ Portofolio diperbarui · ${nf0.format(st.insRows || 0)} baris instansi${st.debRm ? " · " + nf0.format(st.debRm) + " RM" : typeof st.deb === "string" ? " · per RM belum: " + st.deb : ""}${DB.ins ? " · posisi " + perL(DB.ins.asof) : ""}`); render(); refreshDataUI();
   } catch (er) { toast("Sync portofolio gagal: " + er.message); }
   btn.disabled = false; btn.textContent = old;
 }

@@ -126,3 +126,5 @@ Seluruh menu **mengikuti pola menu dashboard KPR** (filter, kartu, panel buka/tu
 
 ## Sub-ketentuan terkait
 [16](16_database_dashboard_briguna_gsheet.md) · [11](11_database_kinerja_keragaan_dan_rka.md) · [12](12_database_disburse_dan_rm.md) · [09](09_pergerakan_dg_ug_historis_prognosa.md) · [10](10_format_kpi_kinerja_prognosa.md) · [13](13_master_kanca_area_unit_dedicated.md) · [01](01_dasar_definisi_kolom_dan_sumber_data.md) · [18](18_brispot_warm_hot_leads.md)
+
+- **Portofolio per RM**: sheet database debitur briguna (satu baris per debitur) diringkas Apps Script per RM × uker × instansi (bagian deb_B, tanpa nama debitur). SML = kolektibilitas 2, NPL = kolektibilitas 3–5 (cocok dengan sheet database instansi). Klik nama RM di tabel/grafik menu mana pun membuka portofolio kelolaannya (OS, SML, NPL dalam Rp dan %).

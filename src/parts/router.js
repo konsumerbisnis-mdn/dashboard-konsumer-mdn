@@ -5,6 +5,7 @@ const VIEWS = {
   produktivitas: ["Produktivitas RM", "Menu 2", viewRM],
   nominatif: ["Nominatif Portofolio", "Menu 3", viewNom],
   kualitas: ["Kualitas Kredit", "Menu 4", viewKual],
+  portofolio: ["Portofolio Eksisting", "Menu 8", viewPortofolio],
   pipeline: ["Pipeline Brispot RM", "Menu 5", viewPipeline],
   marketshare: ["Marketshare Konsumer", "Menu 7", viewMarketshare],
   simulasi: ["Simulasi Suku Bunga", "Menu 6", viewSimAll],

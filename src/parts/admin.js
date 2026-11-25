@@ -9,6 +9,7 @@ function dataCards() {
   const pSt = s => { const x = M["pipe_" + s]; return x ? `<b>${nf0.format(x.n)} berkas</b> + ${nf0.format(x.oh)} on hand, posisi <b>${tglS(x.asof)}</b> · diunggah ${updS(x.updated)}` : "belum ada data"; };
   const bSt = () => { const x = M.brs_B; return x ? `posisi <b>${tglS(x.asof)}</b>${x.jam ? " pukul <b>" + esc(x.jam) + "</b>" : ""} · ${nf0.format(x.n)} RM &amp; mantri · diunggah ${updS(x.updated)}` : "belum ada data"; };
   const mSt = () => { const x = M.ms_K; return x ? `posisi <b>${perL(x.asof)}</b> · ${nf0.format(x.n)} bisnis · disinkronkan ${updS(x.updated)}` : DB.ms ? `posisi <b>${perL(DB.ms.asof)}</b>` : "belum ada data"; };
+  const iSt = () => { const x = M.ins_B; return x ? `posisi <b>${perL(x.asof)}</b> · ${nf0.format(x.n)} baris · disinkronkan ${updS(x.updated)}` : DB.ins ? `posisi <b>${perL(DB.ins.asof)}</b>` : "belum ada data"; };
   const card = (k, ico, title, st, note, body) => `<section class="dcard" data-k="${k}"><div class="dc-h">${ico}<div><h3>${title}</h3><p class="dc-st">${st}</p></div></div><p class="note">${note}</p>${body}<p class="note dc-prog" id="pr_${k}" hidden></p></section>`;
   const file = (k, accept = ".xlsx,.xlsm,.xls,.csv", multi = false, lbl = "Upload") => `<label class="btn" for="f_${k}">${ICO_UP}${lbl}</label><input type="file" id="f_${k}" data-up="${k}" accept="${accept}" ${multi ? "multiple" : ""} hidden>`;
   const lwBody = s => `<div class="toolbar"><select class="ctl" id="m_lw${s}" style="flex:1 1 180px"><option value="cur">Posisi terkini</option><option value="prev">Bulan lalu (pembanding DG/UG)</option></select>${file("lw" + s, undefined, true)}</div><p class="note" style="margin:6px 0 0">Bisa pilih 2 file sekaligus (posisi terkini &amp; bulan lalu): yang tanggalnya lebih baru otomatis jadi posisi terkini.</p><div id="i_lw${s}"></div>`;
@@ -31,6 +32,9 @@ function dataCards() {
       ${card("msK", dIco('<path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/>'), "Marketshare Konsumer", mSt(),
         "Dibaca dari sheet <b>marketshare</b> di Google Sheets (format ke bawah: Kode KC, Kanca, Tanggal, Segmen Bisnis, Jenis, OS). Data baru: tambahkan baris di bawah, lalu klik <b>Sync marketshare</b>. Tampil di menu Marketshare untuk semua pengguna.",
         `<button class="btn primary" type="button" id="btnSyncMs">Sync marketshare</button>`)}
+      ${card("insB", dIco('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>'), "Portofolio Eksisting (instansi)", iSt(),
+        "Dibaca dari sheet <b>database instansi</b> di Google Sheets (kolom: PERIODE, KODE CABANG, CABANG, KODE UNIT, UNIT, INSTANSI, DEB, OS, SML (Rp), SML (%), NPL (Rp), NPL (%), Jenis PKS, No PKS, Tanggal Jatuh Tempo PKS, Payroll/Non Payroll, Jumlah Pegawai, ID INSTANSI). Data baru: ganti isi sheet, lalu klik <b>Sync portofolio</b>.",
+        `<button class="btn primary" type="button" id="btnSyncIns">Sync portofolio</button>`)}
       ${card("pipeK", dIco('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'), "Pipeline Brispot KPR", pSt("K"),
         "File Pipeline BRISPOT KPR (sheet Pipeline, OnHand, Ref_Batal, Rencana Realisasi RM). Menggantikan data sebelumnya.", file("pipeK"))}
       ${card("rate", dIco('<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h4"/>'), "Tabel suku bunga KPR",
@@ -46,6 +50,7 @@ function bindDataCards(root) {
   const b = root.querySelector("#btnSyncF"); if (b) b.onclick = () => doSync(true, b);
   const br = root.querySelector("#btnSyncR"); if (br) br.onclick = () => doSyncRmk(br);
   const bm = root.querySelector("#btnSyncMs"); if (bm) bm.onclick = () => doSyncMs(bm);
+  const bi = root.querySelector("#btnSyncIns"); if (bi) bi.onclick = () => doSyncIns(bi);
   root.querySelectorAll("input[type=file][data-up]").forEach(inp => inp.addEventListener("change", e => {
     const k = inp.dataset.up, files = [...e.target.files]; if (!files.length) return;
     (k === "kerDb" ? upKer(files[0], inp) : k === "brsB" ? upBrs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
@@ -225,9 +230,9 @@ async function doSyncRmk(btn) {
 }
 
 // sync per menu (admin): tiap menu hanya membangun ulang datanya sendiri lewat action syncParts, tanpa menunggu sync penuh
-const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG", ms: "marketshare" };
-const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"], ms: ["ms_K"] };
-const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : k === "marketshare" ? ["ms"] : [];
+const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG", ms: "marketshare", ins: "portofolio instansi" };
+const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"], ms: ["ms_K"], ins: ["ins_B"] };
+const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : k === "marketshare" ? ["ms"] : k === "portofolio" ? ["ins"] : [];
 function updateSyncPart(k) {
   const b = $("#btnSyncPart"); if (!b) return; const p = syncPartsOf(k); b.hidden = !(isAdmin() && p.length); b.dataset.p = p.join(",");
   const sp = b.querySelector("span"); if (sp) sp.textContent = "Sync " + (p.length ? SP_LBL[p[0]] : "menu ini"); b.title = "Sync hanya " + (p.length ? SP_LBL[p[0]] : "data menu ini") + " (admin)";
@@ -244,6 +249,16 @@ async function doSyncPart(btn) {
   btn.disabled = false; sp.textContent = old;
 }
 
+// sync portofolio eksisting dari sheet "database instansi"
+async function doSyncIns(btn) {
+  btn.disabled = true; const old = btn.textContent; btn.textContent = "Menyinkronkan…";
+  try {
+    const j = await Auth.call("syncParts", { parts: ["ins"] }); await loadParts(["meta", "ins_B"], null, true);
+    const st = j.stats || {}; if (typeof st.ins === "string") throw new Error(st.ins[0].toUpperCase() + st.ins.slice(1) + ". Buat sheet bernama database instansi lalu isi dengan format yang ditentukan.");
+    toast(`✓ Portofolio diperbarui · ${nf0.format(st.insRows || 0)} baris${DB.ins ? " · posisi " + perL(DB.ins.asof) : ""}`); render(); refreshDataUI();
+  } catch (er) { toast("Sync portofolio gagal: " + er.message); }
+  btn.disabled = false; btn.textContent = old;
+}
 // sync marketshare dari sheet "marketshare" (format ke bawah)
 async function doSyncMs(btn) {
   btn.disabled = true; const old = btn.textContent; btn.textContent = "Menyinkronkan…";

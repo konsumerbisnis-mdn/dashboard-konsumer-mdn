@@ -106,7 +106,7 @@
   /* ---------- RBAC (tampilan) ---------- */
   const PERM = {
     beranda: ["admin", "rm", "guest"], keragaan: ["admin", "rm", "guest"], produktivitas: ["admin", "rm", "guest"],
-    nominatif: ["admin", "rm"], kualitas: ["admin", "rm", "guest"], pipeline: ["admin", "rm", "guest"], marketshare: ["admin", "rm", "guest"], simulasi: ["admin", "rm", "guest"],
+    nominatif: ["admin", "rm"], kualitas: ["admin", "rm", "guest"], pipeline: ["admin", "rm", "guest"], marketshare: ["admin", "rm", "guest"], portofolio: ["admin", "rm", "guest"], simulasi: ["admin", "rm", "guest"],
     detail: ["admin", "rm"], admin: ["admin"]
   };
   const can = feature => !!(SESSION && PERM[feature] && PERM[feature].includes(SESSION.user.role));

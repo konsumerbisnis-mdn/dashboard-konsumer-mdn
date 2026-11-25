@@ -102,7 +102,9 @@ function viewBeranda(v) {
   const lwAsof = Object.values(lsum).map(x => x.asof).sort().pop(), gsAsof = Object.values(gs).map(x => x.asof).sort().pop();
   const canNom = Auth.can("nominatif");
   const msq = DB.ms ? (() => { const i = DB.ms.per.findIndex(p => p.k === DB.ms.asof), f = k => { const b = DB.ms.biz[k], r = b && b.rows.find(x => x.t === "ro"); return r && r.i[i] && r.b[i] != null ? r.b[i] / r.i[i] : null; }; return { k: f("konsumer"), b: f("briguna"), p: f("kpr") }; })() : null;
-  const MS_ICO = '<svg viewBox="0 0 24 24"><path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/></svg>';
+  const pfq = DB.ins ? (() => { let os = 0, sm = 0, np = 0; DB.ins.rows.forEach(r => { os += r[3]; sm += r[4]; np += r[5]; }); return { n: DB.ins.ins.length, sml: os ? sm / os : null, npl: os ? np / os : null }; })() : null;
+  const PF_ICO = '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/></svg>';
+  const MS_ICO ='<svg viewBox="0 0 24 24"><path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/></svg>';
   v.innerHTML = `
     <div class="l-bg" aria-hidden="true"><i class="lb1"></i><i class="lb2"></i><span class="l-grid"></span><span class="l-vig"></span><canvas id="lPart"></canvas></div>
     <div class="l-top">
@@ -127,6 +129,8 @@ function viewBeranda(v) {
           : card("kualitas", ICON.kualitas, "Kualitas Kredit", "SML & NPL, pergerakan DG / UG dibanding bulan lalu", ld(LOADING.core, "Perlu LW321 bulan ini & bulan lalu"), "warn")}
         ${psAsof ? card("pipeline", ICON.pipeline, "Pipeline Brispot RM", ["B", "K"].filter(s => psum[s]).map(s => `${s === "B" ? "Briguna" : "KPR"} ${rpJ(psum[s].pl)} · ${nf0.format(psum[s].n)} deb`).join(" · "), "Tersedia · posisi " + tglS(psAsof))
           : card("pipeline", ICON.pipeline, "Pipeline Brispot RM", "Funnel, jadwal akad, TAT & rencana realisasi RM", ld(PIPE_LOADING, "Belum ada data"), "warn")}
+        ${pfq ? card("portofolio", PF_ICO, "Portofolio Eksisting", `${nf0.format(pfq.n)} instansi · SML ${pfq.sml == null ? "–" : pct(pfq.sml, 2)} · NPL ${pfq.npl == null ? "–" : pct(pfq.npl, 2)}`, "Tersedia · posisi " + perL(DB.ins.asof))
+          : card("portofolio", PF_ICO, "Portofolio Eksisting", "Instansi per uker, % SML & NPL berwarna, dan data PKS", "Belum ada data", "warn")}
         ${msq ? card("marketshare", MS_ICO, "Marketshare Konsumer", `Konsumer ${msq.k == null ? "–" : pct(msq.k, 2)} · Briguna ${msq.b == null ? "–" : pct(msq.b, 2)} · KPR ${msq.p == null ? "–" : pct(msq.p, 2)}`, "Tersedia · posisi " + perL(DB.ms.asof))
           : card("marketshare", MS_ICO, "Marketshare Konsumer", "Posisi industri vs BRI dan % marketshare per bisnis & KC", "Belum ada data", "warn")}
         ${card("simulasi", ICON.simulasi, "Simulasi Suku Bunga", `Briguna (max plafond & angsuran) · KPR ${DB.rate ? uniq(DB.rate.rows.map(x => x.prog)).length + " program" : ""}`, DB.rate ? (String(DB.rate.title || "").replace(/^.*PROGRAM\s*/i, "Program ") || "Tersedia") : "Tersedia")}

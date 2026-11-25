@@ -9,7 +9,7 @@ function applyPart(p, o) {
   else if (p === "foto") DB.foto = o && o.rm ? o : { rm: {}, kc: {} };
   else if (p === "rate") DB.rate = o && o.rows ? o : null;
   else if (p === "brs_B") DB.brs = o && o.rm ? o : null;
-  else if (p === "ms_K") DB.ms = o && o.biz ? o : null;
+  else if (p === "ms_K") DB.ms = o && o.biz ? msPrep(o) : null;
 }
 // soft = true: satu bagian data yang gagal / lambat tidak menggagalkan bagian lain; yang gagal dikembalikan sebagai [[nama, pesan], ...]
 async function loadParts(parts, onEach, soft) {

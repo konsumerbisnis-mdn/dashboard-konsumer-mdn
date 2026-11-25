@@ -2926,7 +2926,7 @@ function dataCards() {
   const lwSt = s => { const x = lw[s]; return x ? `<b>${nf0.format(x.n)} rekening</b>, posisi <b>${nS(x.asof)}</b>${x.prev ? " · pembanding " + nS(x.prev) : " · <span class='bad'>belum ada bulan lalu</span>"}` : "belum ada data"; };
   const pSt = s => { const x = M["pipe_" + s]; return x ? `<b>${nf0.format(x.n)} berkas</b> + ${nf0.format(x.oh)} on hand, posisi <b>${tglS(x.asof)}</b> · diunggah ${updS(x.updated)}` : "belum ada data"; };
   const bSt = () => { const x = M.brs_B; return x ? `posisi <b>${tglS(x.asof)}</b>${x.jam ? " pukul <b>" + esc(x.jam) + "</b>" : ""} · ${nf0.format(x.n)} RM &amp; mantri · diunggah ${updS(x.updated)}` : "belum ada data"; };
-  const mSt = () => { const x = M.ms_K; return x ? `posisi <b>${perL(x.asof)}</b> · ${nf0.format(x.n)} bisnis · diunggah ${updS(x.updated)}` : DB.ms ? `posisi <b>${perL(DB.ms.asof)}</b>` : "belum ada data"; };
+  const mSt = () => { const x = M.ms_K; return x ? `posisi <b>${perL(x.asof)}</b> · ${nf0.format(x.n)} bisnis · disinkronkan ${updS(x.updated)}` : DB.ms ? `posisi <b>${perL(DB.ms.asof)}</b>` : "belum ada data"; };
   const card = (k, ico, title, st, note, body) => `<section class="dcard" data-k="${k}"><div class="dc-h">${ico}<div><h3>${title}</h3><p class="dc-st">${st}</p></div></div><p class="note">${note}</p>${body}<p class="note dc-prog" id="pr_${k}" hidden></p></section>`;
   const file = (k, accept = ".xlsx,.xlsm,.xls,.csv", multi = false, lbl = "Upload") => `<label class="btn" for="f_${k}">${ICO_UP}${lbl}</label><input type="file" id="f_${k}" data-up="${k}" accept="${accept}" ${multi ? "multiple" : ""} hidden>`;
   const lwBody = s => `<div class="toolbar"><select class="ctl" id="m_lw${s}" style="flex:1 1 180px"><option value="cur">Posisi terkini</option><option value="prev">Bulan lalu (pembanding DG/UG)</option></select>${file("lw" + s, undefined, true)}</div><p class="note" style="margin:6px 0 0">Bisa pilih 2 file sekaligus (posisi terkini &amp; bulan lalu): yang tanggalnya lebih baru otomatis jadi posisi terkini.</p><div id="i_lw${s}"></div>`;
@@ -2947,7 +2947,8 @@ function dataCards() {
       ${card("brsB", dIco('<path d="M4 6h16M4 12h10M4 18h7"/><path d="M16 16l2.2 2.2L22 14"/>'), "Brispot Briguna · Warm / Hot Leads", bSt(),
         "File <b>Brispot Briguna</b> per jam (sheet Nominatif, Rule, RM BGRITEL, Mantri BGMIKRO, KC BGRITEL, Unit BGMIKRO). Dihitung otomatis menjadi tabel Warm / Hot Leads &amp; Pencairan Sukses per RM, KC, Mantri dan Unit di menu Pipeline Brispot. Menggantikan data sebelumnya.", file("brsB"))}
       ${card("msK", dIco('<path d="M12 3v9h9"/><path d="M20.5 15A9 9 0 1 1 9 3.5"/>'), "Marketshare Konsumer", mSt(),
-        "File <b>Marketshare Konsumer</b> (.xlsx): hanya sheet <b>tanpa RO Medan</b> yang dibaca (blok Konsumer Total, SBL Ritel + Mikro, SBL Ritel, SBL Mikro, KPR; posisi industri &amp; BRI per bulan). Tampil di menu Marketshare untuk semua pengguna. Menggantikan data sebelumnya.", file("msK"))}
+        "Dibaca dari sheet <b>marketshare</b> di Google Sheets (format ke bawah: Kode KC, Kanca, Tanggal, Segmen Bisnis, Jenis, OS). Data baru: tambahkan baris di bawah, lalu klik <b>Sync marketshare</b>. Tampil di menu Marketshare untuk semua pengguna.",
+        `<button class="btn primary" type="button" id="btnSyncMs">Sync marketshare</button>`)}
       ${card("pipeK", dIco('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'), "Pipeline Brispot KPR", pSt("K"),
         "File Pipeline BRISPOT KPR (sheet Pipeline, OnHand, Ref_Batal, Rencana Realisasi RM). Menggantikan data sebelumnya.", file("pipeK"))}
       ${card("rate", dIco('<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M8 6.5h8M8 11h.01M12 11h.01M16 11h.01M8 14.5h.01M12 14.5h.01M16 14.5h.01M8 18h.01M12 18h4"/>'), "Tabel suku bunga KPR",
@@ -2962,9 +2963,10 @@ function dataCards() {
 function bindDataCards(root) {
   const b = root.querySelector("#btnSyncF"); if (b) b.onclick = () => doSync(true, b);
   const br = root.querySelector("#btnSyncR"); if (br) br.onclick = () => doSyncRmk(br);
+  const bm = root.querySelector("#btnSyncMs"); if (bm) bm.onclick = () => doSyncMs(bm);
   root.querySelectorAll("input[type=file][data-up]").forEach(inp => inp.addEventListener("change", e => {
     const k = inp.dataset.up, files = [...e.target.files]; if (!files.length) return;
-    (k === "kerDb" ? upKer(files[0], inp) : k === "brsB" ? upBrs(files[0], inp) : k === "msK" ? upMs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
+    (k === "kerDb" ? upKer(files[0], inp) : k === "brsB" ? upBrs(files[0], inp) : k === "fotoRm" || k === "fotoKc" ? upFoto(files, k === "fotoKc" ? "kc" : "rm", inp) : k.startsWith("lw") ? upLW(files, k.slice(-1), inp) : upPart(files[0], k, inp));
   }));
 }
 function openData() { if (!isAdmin()) return; const b = $("#dataBody"); b.innerHTML = dataCards(); bindDataCards(b); $("#dlgData").showModal(); }
@@ -3141,9 +3143,9 @@ async function doSyncRmk(btn) {
 }
 
 // sync per menu (admin): tiap menu hanya membangun ulang datanya sendiri lewat action syncParts, tanpa menunggu sync penuh
-const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG" };
-const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"] };
-const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : [];
+const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG", ms: "marketshare" };
+const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"], ms: ["ms_K"] };
+const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : k === "marketshare" ? ["ms"] : [];
 function updateSyncPart(k) {
   const b = $("#btnSyncPart"); if (!b) return; const p = syncPartsOf(k); b.hidden = !(isAdmin() && p.length); b.dataset.p = p.join(",");
   const sp = b.querySelector("span"); if (sp) sp.textContent = "Sync " + (p.length ? SP_LBL[p[0]] : "menu ini"); b.title = "Sync hanya " + (p.length ? SP_LBL[p[0]] : "data menu ini") + " (admin)";
@@ -3158,6 +3160,17 @@ async function doSyncPart(btn) {
     toast(`✓ ${name} diperbarui${ms ? " · " + Math.round(ms / 1000) + " dtk" : ""}`); render();
   } catch (er) { toast("Sync " + name + " gagal: " + er.message); }
   btn.disabled = false; sp.textContent = old;
+}
+
+// sync marketshare dari sheet "marketshare" (format ke bawah)
+async function doSyncMs(btn) {
+  btn.disabled = true; const old = btn.textContent; btn.textContent = "Menyinkronkan…";
+  try {
+    const j = await Auth.call("syncParts", { parts: ["ms"] }); await loadParts(["meta", "ms_K"], null, true);
+    const st = j.stats || {}; if (typeof st.ms === "string") throw new Error(st.ms[0].toUpperCase() + st.ms.slice(1) + ". Buat sheet bernama marketshare lalu isi dengan format yang ditentukan.");
+    toast(`✓ Marketshare diperbarui · ${nf0.format(st.msRows || 0)} baris data${DB.ms ? " · posisi " + perL(DB.ms.asof) : ""}`); render(); refreshDataUI();
+  } catch (er) { toast("Sync marketshare gagal: " + er.message); }
+  btn.disabled = false; btn.textContent = old;
 }
 
 /* ---------- VIEW: Admin ---------- */
@@ -3276,41 +3289,12 @@ async function adFeedback(el) {
   draw(""); let qt; $("#fbQ").oninput = e => { clearTimeout(qt); qt = setTimeout(() => draw(e.target.value.trim().toLowerCase()), 200); };
 }
 /* ================= Marketshare Konsumer Region I - Medan: industri vs BRI per kantor cabang, klaster & posisi bank lain ================= */
-// Sumber: file "Marketshare_konsumer_per <bulan>.xlsx" sheet "tanpa RO Medan" (Rp juta). Diolah di browser (parseMarketshare), disimpan sebagai bagian data "ms_K".
+// Sumber: sheet "marketshare" di Google Sheets, format panjang (Kode KC, Kanca, Tanggal, Segmen Bisnis, Jenis, OS; Rp juta), dibaca Apps Script saat Sync marketshare
 // DB.ms = { asof, per[{k:"yyyy-mm", l}], biz:{ konsumer|briguna|ritel|mikro|kpr: { rows[{n, kduk, t, i[], b[]}] } } }
 //   i = posisi INDUSTRI per periode, b = posisi BRI per periode (pada baris peers, b = posisi kelompok bank itu); %marketshare = b / i.
 const MS_BIZ = [["konsumer", "Konsumer", "KONSUMER TOTAL"], ["briguna", "Briguna Total", "SBL (RITEL + MIKRO)"], ["ritel", "Briguna Ritel", "SBL RITEL"], ["mikro", "Briguna Mikro", "SBL MIKRO"], ["kpr", "KPR", "KPR"]];
-const MS_MON = ["jan", "feb", "mar", "apr", "mei|may", "jun", "jul", "agu|aug", "sep", "okt|oct", "nov", "des|dec"];
-function parseMarketshare(wb, fname) {
-  const nm = wb.SheetNames.find(n => /tanpa\s*ro/i.test(n)); if (!nm) return null;
-  const ws = wb.Sheets[nm], rg = XLSX.utils.decode_range(ws["!ref"] || "A1"); rg.e.c = Math.min(rg.e.c, 200); rg.e.r = Math.min(rg.e.r, 600);
-  const a = XLSX.utils.sheet_to_json(Object.assign({}, ws, { "!ref": XLSX.utils.encode_range(rg) }), { header: 1, raw: true, defval: null });
-  const starts = []; a.forEach((r, i) => { const t = String(r && r[2] || "").trim().toUpperCase(), b = MS_BIZ.find(x => x[2] === t); if (b && r[3] != null && /industri/i.test(String(r[3]))) starts.push([i, b[0]]); });
-  if (!starts.length) return null;
-  const t0 = starts[0][0], hdr = a[t0], i0 = hdr.findIndex(x => /industri/i.test(String(x))), i1 = hdr.findIndex((x, k) => k > i0 && /^bri$/i.test(String(x).trim()));
-  if (i0 < 0 || i1 < 0) return null;
-  const n = i1 - i0, yrs = a[t0 + 1] || [], lbl = a[t0 + 2] || [], per = [];
-  for (let k = 0; k < n; k++) {
-    const y = +yrs[i0 + k], l = lbl[i0 + k]; let m = -1;
-    if (typeof l === "number" && l > 20000) m = new Date(Math.round((l - 25569) * 864e5)).getUTCMonth();
-    else m = MS_MON.findIndex(p => new RegExp("^(" + p + ")", "i").test(String(l == null ? "" : l).trim()));
-    if (!y || m < 0) return null;
-    per.push({ k: y + "-" + String(m + 1).padStart(2, "0"), l: BULAN[m] + "'" + String(y).slice(2) });
-  }
-  const num = v => typeof v === "number" && isFinite(v) ? Math.round(v * 10) / 10 : null, biz = {};
-  starts.forEach(([t, key]) => {
-    const rows = [];
-    for (let r = t + 3; r < a.length; r++) {
-      const x = a[r]; if (!x || x[2] == null || !String(x[2]).trim()) break;
-      const name = String(x[2]).trim(), kduk = typeof x[1] === "number" ? x[1] : null;
-      const tp = kduk != null ? "kc" : /^(urban|rural)/i.test(name) ? "zona" : /^(kanca metro|klaster)/i.test(name) ? "klaster" : /^bank/i.test(name) ? "peer" : /^ro\b/i.test(name) ? "ro" : "lain";
-      rows.push({ n: name, kduk, t: tp, i: per.map((_, k) => num(x[i0 + k])), b: per.map((_, k) => num(x[i1 + k])) });
-    }
-    biz[key] = { rows };
-  });
-  const ro = (biz.konsumer || Object.values(biz)[0]).rows.find(r => r.t === "ro"), last = ro ? per.map((p, k) => ro.b[k] != null && ro.i[k] ? k : -1).filter(k => k >= 0).pop() : per.length - 1;
-  return { asof: per[last >= 0 ? last : per.length - 1].k, unit: "Rp juta", per, biz, file: fname || "", updated: new Date().toISOString() };
-}
+// data dari Apps Script (sheet "marketshare"): periode hanya berisi kunci yyyy-mm, label dibuat di sini
+function msPrep(o) { o.per.forEach(p => { if (!p.l) p.l = BULAN[+p.k.slice(5, 7) - 1] + "'" + p.k.slice(2, 4); }); return o; }
 
 /* ---------- tampilan ---------- */
 const MSX = Object.assign({ biz: "konsumer", per: null }, lsGet(STORE + "-ms") || {});
@@ -3383,22 +3367,6 @@ function viewMarketshare(v) {
   mkChart("cMsKc", { type: "bar", data: { labels: kb.map(r => r.n), datasets: [{ label: "% marketshare", data: kb.map(r => r.ms), backgroundColor: s1, borderRadius: 3, maxBarThickness: 16 }] },
     options: baseOpts({ indexAxis: "y", plugins: { ...baseOpts().plugins, legend: { display: false }, tooltip: { ...baseOpts().plugins.tooltip, callbacks: { label: c => ` ${pct(c.parsed.x, 2)} · BRI ${rpM(kb[c.dataIndex].bri)} dari industri ${rpM(kb[c.dataIndex].ind)}` } } },
       scales: { x: { ...baseOpts().scales.y, ticks: { ...baseOpts().scales.y.ticks, callback: x => nf0.format(x * 100) + "%" } }, y: { ...baseOpts().scales.x, ticks: { ...baseOpts().scales.x.ticks, color: ink2, font: { size: 11 } } } } }) });
-}
-
-// Admin: upload file marketshare
-async function upMs(f, inp) {
-  const pg = progOf("msK");
-  try {
-    pg.set("Membaca " + f.name + "…"); await new Promise(r => setTimeout(r, 40));
-    const wb = await readWB(f); pg.set("Mengolah…"); await new Promise(r => setTimeout(r, 20));
-    const data = parseMarketshare(wb, f.name);
-    if (!data) throw new Error("File ini bukan data Marketshare Konsumer (butuh sheet “tanpa RO Medan” dengan blok INDUSTRI dan BRI).");
-    pg.set("Mengirim ke server…");
-    await Auth.call("partUpload", { name: "ms_K", data });
-    await loadParts(["meta", "ms_K"], null, true);
-    okCard("msK"); toast(`Marketshare posisi ${perL(data.asof)}: ${Object.keys(data.biz).length} bisnis · tersimpan.`); render(); refreshDataUI();
-  } catch (er) { toast(er.message); }
-  pg.done(); if (inp) inp.value = "";
 }
 /* ================= unduh tabel / grafik: Excel, CSV, PDF, gambar (PNG) ================= */
 // Tiap section yang berisi tabel atau grafik mendapat tombol "Unduh". Excel/CSV = data tabel (semua baris, bukan hanya yang tampil);
@@ -3870,7 +3838,7 @@ function applyPart(p, o) {
   else if (p === "foto") DB.foto = o && o.rm ? o : { rm: {}, kc: {} };
   else if (p === "rate") DB.rate = o && o.rows ? o : null;
   else if (p === "brs_B") DB.brs = o && o.rm ? o : null;
-  else if (p === "ms_K") DB.ms = o && o.biz ? o : null;
+  else if (p === "ms_K") DB.ms = o && o.biz ? msPrep(o) : null;
 }
 // soft = true: satu bagian data yang gagal / lambat tidak menggagalkan bagian lain; yang gagal dikembalikan sebagai [[nama, pesan], ...]
 async function loadParts(parts, onEach, soft) {

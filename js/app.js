@@ -167,6 +167,7 @@ function mkChart(id, cfg) {
   const el = document.getElementById(id); if (!el) return;
   if (charts[id]) charts[id].destroy();
   if (typeof Chart === "undefined") { el.parentElement.innerHTML = '<div class="empty">Grafik butuh koneksi internet untuk memuat pustaka grafik.</div>'; return; }
+  if (cfg && cfg.options && !cfg.options.onClick) cfg.options.onClick = (ev, els, ch) => { if (!DB.deb || !els.length) return; const l = ch.data.labels && ch.data.labels[els[0].index]; if (typeof l === "string" && RMX.find(l) != null) openRmPf(l); };   // klik batang / titik berlabel nama RM → portofolio RM
   charts[id] = new Chart(el, chartTheme(cfg));
 }
 function baseOpts(extra = {}) {
@@ -2955,7 +2956,7 @@ function dataCards() {
         "Dibaca dari sheet <b>marketshare</b> di Google Sheets (format ke bawah: Kode KC, Kanca, Tanggal, Segmen Bisnis, Jenis, OS). Data baru: tambahkan baris di bawah, lalu klik <b>Sync marketshare</b>. Tampil di menu Marketshare untuk semua pengguna.",
         `<button class="btn primary" type="button" id="btnSyncMs">Sync marketshare</button>`)}
       ${card("insB", dIco('<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2M3 13h18"/>'), "Portofolio Eksisting (instansi)", iSt(),
-        "Dibaca dari sheet <b>database instansi</b> di Google Sheets (kolom: PERIODE, KODE CABANG, CABANG, KODE UNIT, UNIT, INSTANSI, DEB, OS, SML (Rp), SML (%), NPL (Rp), NPL (%), Jenis PKS, No PKS, Tanggal Jatuh Tempo PKS, Payroll/Non Payroll, Jumlah Pegawai, ID INSTANSI). Data baru: ganti isi sheet, lalu klik <b>Sync portofolio</b>.",
+        "Dibaca dari sheet <b>database instansi</b> di Google Sheets (kolom: PERIODE, KODE CABANG, CABANG, KODE UNIT, UNIT, INSTANSI, DEB, OS, SML (Rp), SML (%), NPL (Rp), NPL (%), Jenis PKS, No PKS, Tanggal Jatuh Tempo PKS, Payroll/Non Payroll, Jumlah Pegawai, ID INSTANSI). Portofolio per RM dibaca dari sheet <b>database debitur briguna</b> (satu baris per debitur: PN PENGELOLA1, KOL ADK, BAKI DEBET, KODE UNIT, ID INSTANSI, dst.; nama debitur tidak dikirim ke browser). Data baru: ganti isi sheet, lalu klik <b>Sync portofolio</b>.",
         `<button class="btn primary" type="button" id="btnSyncIns">Sync portofolio</button>`)}
       ${card("pipeK", dIco('<path d="M3 4h18l-7 8v6l-4 2v-8z"/>'), "Pipeline Brispot KPR", pSt("K"),
         "File Pipeline BRISPOT KPR (sheet Pipeline, OnHand, Ref_Batal, Rencana Realisasi RM). Menggantikan data sebelumnya.", file("pipeK"))}
@@ -3152,12 +3153,12 @@ async function doSyncRmk(btn) {
 }
 
 // sync per menu (admin): tiap menu hanya membangun ulang datanya sendiri lewat action syncParts, tanpa menunggu sync penuh
-const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG", ms: "marketshare", ins: "portofolio instansi" };
-const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"], ms: ["ms_K"], ins: ["ins_B"] };
-const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : k === "marketshare" ? ["ms"] : k === "portofolio" ? ["ins"] : [];
+const SP_LBL = { ker: "keragaan", rmk: "produktivitas Ritel & Mikro", kpr: "produktivitas KPR", lw: "LW321 & DG/UG", ms: "marketshare", ins: "portofolio instansi", deb: "portofolio per RM" };
+const SP_LOAD = { ker: ["ker"], rmk: ["rmk_R", "rmk_M"], kpr: ["rmk_K"], lw: ["gerak", "lw_B", "lw_K"], ms: ["ms_K"], ins: ["ins_B"], deb: ["deb_B"] };
+const syncPartsOf = k => k === "keragaan" ? ["ker"] : k === "produktivitas" ? [SEG.rm === "K" ? "kpr" : "rmk"] : k === "nominatif" || k === "kualitas" ? ["lw"] : k === "marketshare" ? ["ms"] : k === "portofolio" ? ["ins", "deb"] : [];
 function updateSyncPart(k) {
   const b = $("#btnSyncPart"); if (!b) return; const p = syncPartsOf(k); b.hidden = !(isAdmin() && p.length); b.dataset.p = p.join(",");
-  const sp = b.querySelector("span"); if (sp) sp.textContent = "Sync " + (p.length ? SP_LBL[p[0]] : "menu ini"); b.title = "Sync hanya " + (p.length ? SP_LBL[p[0]] : "data menu ini") + " (admin)";
+  const sp = b.querySelector("span"), lb = k === "portofolio" ? "portofolio" : p.length ? SP_LBL[p[0]] : ""; if (sp) sp.textContent = "Sync " + (lb || "menu ini"); b.title = "Sync hanya " + (lb || "data menu ini") + " (admin)";
 }
 async function doSyncPart(btn) {
   const parts = (btn.dataset.p || "").split(",").filter(Boolean); if (!parts.length) return;
@@ -3175,9 +3176,9 @@ async function doSyncPart(btn) {
 async function doSyncIns(btn) {
   btn.disabled = true; const old = btn.textContent; btn.textContent = "Menyinkronkan…";
   try {
-    const j = await Auth.call("syncParts", { parts: ["ins"] }); await loadParts(["meta", "ins_B"], null, true);
+    const j = await Auth.call("syncParts", { parts: ["ins", "deb"] }); await loadParts(["meta", "ins_B", "deb_B"], null, true);
     const st = j.stats || {}; if (typeof st.ins === "string") throw new Error(st.ins[0].toUpperCase() + st.ins.slice(1) + ". Buat sheet bernama database instansi lalu isi dengan format yang ditentukan.");
-    toast(`✓ Portofolio diperbarui · ${nf0.format(st.insRows || 0)} baris${DB.ins ? " · posisi " + perL(DB.ins.asof) : ""}`); render(); refreshDataUI();
+    toast(`✓ Portofolio diperbarui · ${nf0.format(st.insRows || 0)} baris instansi${st.debRm ? " · " + nf0.format(st.debRm) + " RM" : typeof st.deb === "string" ? " · per RM belum: " + st.deb : ""}${DB.ins ? " · posisi " + perL(DB.ins.asof) : ""}`); render(); refreshDataUI();
   } catch (er) { toast("Sync portofolio gagal: " + er.message); }
   btn.disabled = false; btn.textContent = old;
 }
@@ -3418,7 +3419,7 @@ function viewMarketshare(v) {
 // Sumber: sheet "database instansi" di Google Sheets (dibaca Apps Script saat Sync portofolio), nominal Rp juta.
 // DB.ins = { asof, cab[[kode, nama]], uker[[kode, nama, cabIdx, 0 = kantor cabang (Ritel) · 1 = unit (Mikro)]], ins[[id, nama]], rows[[ukerIdx, insIdx, deb, os, sml, npl]], pks{ rowIdx: [jenis, no, jatuhTempo, payroll, pegawai] } }
 // Batas warna % SML / NPL: hijau di bawah batas pertama, kuning sampai batas kedua, merah di atasnya; default 1% dan 2%, diubah admin (meta.cfg.insThr).
-const PFX = Object.assign({ kc: [], uk: [], jn: "ALL", q: "" }, lsGet(STORE + "-pf") || {});
+const PFX = Object.assign({ kc: [], uk: [], jn: "ALL", q: "", qr: "", mode: "ins" }, lsGet(STORE + "-pf") || {});
 ["kc", "uk"].forEach(k => { if (!Array.isArray(PFX[k])) PFX[k] = PFX[k] && PFX[k] !== "ALL" ? [String(PFX[k])] : []; });   // kosong = semua; nilai lama (satu pilihan) diubah jadi daftar
 delete PFX.qu;
 const savePFX = () => lsSet(STORE + "-pf", PFX);
@@ -3474,18 +3475,38 @@ function viewPortofolio(v) {
   const scopeL = ukS.size ? (ukS.size === 1 ? D.uker[+PFX.uk[0]][1] : `${nf0.format(ukS.size)} uker terpilih`) : kcS.size ? (kcS.size === 1 ? D.cab[+PFX.kc[0]][1] : `${nf0.format(kcS.size)} kantor cabang terpilih`) : "Seluruh RO Medan";
   const itKc = cabs.map(c => ({ v: String(c.i), l: c.nama, s: c.kode })), itUk = ukers.map(u => ({ v: String(u.i), l: (u.unit ? "" : "★ ") + u.nama, s: u.kode + (u.unit ? "" : " · kantor cabang (Ritel)") }));
   const rule = k => `hijau &lt; ${nfTh(th[k][0])}% · kuning ${nfTh(th[k][0])}–${nfTh(th[k][1])}% · merah &gt; ${nfTh(th[k][1])}%`;
+  const rmMode = PFX.mode === "rm";
+  let rmRows = [], RT = { deb: 0, os: 0, sml: 0, npl: 0 }, nRm = 0;
+  if (rmMode && DB.deb) {   // portofolio kelolaan per RM (sheet database debitur briguna) dalam cakupan kantor cabang / uker / jenis terpilih
+    const DD = DB.deb, okKode = new Set(D.uker.filter((u, i) => okU[i]).map(u => String(u[0]))), per = new Map(), qr = PFX.qr.trim().toLowerCase();
+    DD.rows.forEach(r => { if (!okKode.has(String(DD.uker[r[1]][0]))) return; let o = per.get(r[0]); if (!o) per.set(r[0], o = { k: r[0], deb: 0, os: 0, sml: 0, npl: 0, uk: new Map(), ins: new Set() });
+      o.deb += r[3]; o.os += r[4]; o.sml += r[5]; o.npl += r[6]; o.uk.set(r[1], (o.uk.get(r[1]) || 0) + r[4]); o.ins.add(r[2]); });
+    per.forEach(o => { RT.deb += o.deb; RT.os += o.os; RT.sml += o.sml; RT.npl += o.npl; }); nRm = per.size;
+    rmRows = [...per.values()].filter(o => !qr || DD.rm[o.k].toLowerCase().includes(qr)).map(o => { const main = [...o.uk.entries()].sort((a, b) => b[1] - a[1])[0][0];
+      return { ...o, nama: DD.rm[o.k], psml: o.os ? o.sml / o.os : null, pnpl: o.os ? o.npl / o.os : null, nIns: o.ins.size, ukN: o.uk.size, ukMain: DD.uker[main][1], kc: DD.cab[DD.uker[main][2]][1] }; });
+  }
+  const rtp = { sml: RT.os ? RT.sml / RT.os : null, npl: RT.os ? RT.npl / RT.os : null };
   v.innerHTML = `
     <section class="panel" style="padding:12px 16px">
+      <div class="seg" role="tablist" aria-label="Tampilan"><button type="button" role="tab" data-pfm="ins" aria-selected="${!rmMode}">Per uker &amp; instansi</button><button type="button" role="tab" data-pfm="rm" aria-selected="${rmMode}">Per RM</button></div>
       <div class="toolbar">
         ${mselHtml("pfKc", "Kantor cabang", itKc, kcS, "Semua kantor cabang")}
         ${mselHtml("pfUk", "Uker", itUk, ukS, "Semua uker" + (kcS.size ? " di cabang terpilih" : ""))}
         <label class="field" style="flex:1 1 190px"><span class="note" style="font-weight:700">Jenis</span><select class="ctl" id="pfJn"><option value="ALL">Briguna Ritel + Mikro</option><option value="ritel" ${PFX.jn === "ritel" ? "selected" : ""}>Briguna Ritel (kantor cabang)</option><option value="mikro" ${PFX.jn === "mikro" ? "selected" : ""}>Briguna Mikro (unit)</option></select></label>
-        <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">Cari instansi</span><input class="ctl" type="search" id="pfQ" value="${esc(PFX.q)}" placeholder="nama instansi"></label>
+        <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">${rmMode ? "Cari RM" : "Cari instansi"}</span><input class="ctl" type="search" id="pfQ" value="${esc(rmMode ? PFX.qr : PFX.q)}" placeholder="${rmMode ? "nama RM / mantri" : "nama instansi"}"></label>
       </div>
       <p class="note" style="margin:0">${esc(scopeL)} · posisi ${D.asof ? perL(D.asof) : "–"} · nominal Rp juta · % kualitas = SML (atau NPL) ÷ OS instansi ·
         <b>%SML</b>: ${rule("sml")} · <b>%NPL</b>: ${rule("npl")}${isAdmin() ? ` · <button type="button" class="linkish" id="pfThr">Atur batas warna</button>` : ""}</p>
     </section>
-    <div class="grid tiles">
+    ${rmMode ? (DB.deb ? `<div class="grid tiles">
+      ${tile({ label: "RM / mantri", value: nf0.format(nRm), sub: PFX.qr.trim() ? nf0.format(rmRows.length) + " hasil pencarian" : "dengan portofolio kelolaan" })}
+      ${tile({ label: "Debitur", value: nf0.format(RT.deb), sub: "Briguna " + (PFX.jn === "ritel" ? "Ritel" : PFX.jn === "mikro" ? "Mikro" : "Ritel + Mikro") })}
+      ${tile({ label: "OS", value: rpM(RT.os), sub: "baki debet" })}
+      ${tile({ label: "SML", value: `${rpM(RT.sml)} · ${insChip(rtp.sml, th.sml)}`, sub: "Rp dan % dari OS" })}
+      ${tile({ label: "NPL", value: `${rpM(RT.npl)} · ${insChip(rtp.npl, th.npl)}`, sub: "Rp dan % dari OS" })}
+    </div>
+    <section class="panel"><div class="panel-h"><h2>Portofolio kelolaan per RM · ${esc(scopeL)}</h2><span class="sub">klik nama RM untuk melihat instansi dan debitur kelolaannya · di menu mana pun, klik nama RM membuka portofolionya</span></div><div id="pfRmT"></div></section>`
+      : `<section class="panel"><div class="empty"><p style="font-weight:700;margin:0 0 6px">Belum ada data portofolio per RM</p>${isAdmin() ? "Buat sheet <code>database debitur briguna</code> di Google Sheets (dari file Database_instansi.xlsx), lalu klik <b>Sync portofolio</b>." : "Hubungi admin untuk memuat data portofolio per RM."}</div></section>`) : `<div class="grid tiles">
       ${tile({ label: "Instansi", value: nf0.format(insRows.length), sub: q ? "hasil pencarian" : "dalam cakupan terpilih" })}
       ${tile({ label: "Debitur", value: nf0.format(T.deb), sub: "Briguna " + (PFX.jn === "ritel" ? "Ritel" : PFX.jn === "mikro" ? "Mikro" : "Ritel + Mikro") })}
       ${tile({ label: "OS", value: rpM(T.os), sub: "baki debet" })}
@@ -3493,13 +3514,23 @@ function viewPortofolio(v) {
       ${tile({ label: "% NPL", value: insChip(tp.npl, th.npl), sub: `${rpM(T.npl)} dari OS` })}
     </div>
     <section class="panel"><div class="panel-h"><h2>Kualitas per uker</h2><span class="sub">klik nama uker untuk melihat instansinya</span></div><div id="pfUkT"></div></section>
-    <section class="panel"><div class="panel-h"><h2>Instansi di ${esc(scopeL)}</h2><span class="sub">warna mengikuti batas % SML / NPL · tombol PKS menampilkan data kerja sama</span></div><div id="pfInT"></div></section>`;
+    <section class="panel"><div class="panel-h"><h2>Instansi di ${esc(scopeL)}</h2><span class="sub">warna mengikuti batas % SML / NPL · tombol PKS menampilkan data kerja sama</span></div><div id="pfInT"></div></section>`}`;
+  v.querySelectorAll("[data-pfm]").forEach(b => b.onclick = () => { PFX.mode = b.dataset.pfm; savePFX(); render(); });
   const go = () => { savePFX(); render(); };
   mselBind("pfKc", a => { PFX.kc = a; go(); });
   mselBind("pfUk", a => { PFX.uk = a; go(); });
   $("#pfJn").onchange = e => { PFX.jn = e.target.value; go(); };
-  let qt; $("#pfQ").oninput = e => { clearTimeout(qt); qt = setTimeout(() => { PFX.q = e.target.value; savePFX(); render(); const el = $("#pfQ"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 350); };
+  let qt; $("#pfQ").oninput = e => { clearTimeout(qt); qt = setTimeout(() => { PFX[rmMode ? "qr" : "q"] = e.target.value; savePFX(); render(); const el = $("#pfQ"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 350); };
   if ($("#pfThr")) $("#pfThr").onclick = openInsThr;
+  if (rmMode) {
+    if ($("#pfRmT")) { const sum = k => rmRows.reduce((a, r) => a + r[k], 0), so = sum("os");
+      table($("#pfRmT"), [{ key: "nama", label: "RM / mantri", fmt: (x, r) => `<button class="linkish" type="button" data-rmpf="${esc(x)}">${esc(x)}</button><br><small class="note">${esc(r.ukMain)}${r.ukN > 1 ? " +" + (r.ukN - 1) + " uker" : ""} · ${esc(r.kc)}</small>` },
+        { key: "nIns", label: "Instansi", r: 1, fmt: x => nf0.format(x) }, { key: "deb", label: "Debitur", r: 1, fmt: x => nf0.format(x) }, { key: "os", label: "OS (Rp juta)", r: 1, fmt: x => nf0.format(x) },
+        { key: "sml", label: "SML (Rp juta)", r: 1, fmt: x => nf0.format(x) }, { key: "psml", label: "% SML", r: 1, sortVal: r => r.psml ?? -1, fmt: x => insChip(x, th.sml) },
+        { key: "npl", label: "NPL (Rp juta)", r: 1, fmt: x => nf0.format(x) }, { key: "pnpl", label: "% NPL", r: 1, sortVal: r => r.pnpl ?? -1, fmt: x => insChip(x, th.npl) }], rmRows,
+        { sortKey: "os", page: 25, foot: rmRows.length > 1 ? { nama: "Total", nIns: "", deb: nf0.format(sum("deb")), os: nf0.format(so), sml: nf0.format(sum("sml")), npl: nf0.format(sum("npl")), psml: insChip(so ? sum("sml") / so : null, th.sml), pnpl: insChip(so ? sum("npl") / so : null, th.npl) } : null }); }
+    return;
+  }
   // per uker (semua uker dalam cakupan kantor cabang / jenis terpilih, tanpa menyaring uker)
   const scopedU = D.rows.map((r, ri) => [ri, r]).filter(([, r]) => { const u = D.uker[r[0]]; return inKc(u) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])); });
   const ukRows = pfAgg(scopedU, r => r[0]).map(o => ({ ...o, nama: D.uker[o.k][1], kode: D.uker[o.k][0], unit: D.uker[o.k][3], kc: D.cab[D.uker[o.k][2]][1], nIns: new Set(o.ri.map(ri => D.rows[ri][1])).size }));
@@ -3548,6 +3579,55 @@ function openInsThr() {
     catch (er) { err.hidden = false; err.textContent = /tidak dikenal/i.test(er.message) ? "Server belum mendukung pengaturan ini. Pasang Apps Script versi terbaru." : er.message; }
   };
   $("#dlg").showModal();
+}
+
+/* ================= Portofolio kelolaan per RM: klik nama RM di menu mana pun ================= */
+// DB.deb = { asof, cab, uker[[kode, nama, cabIdx, 0|1]], ins[[id, nama]], rm[nama], rows[[rmIdx, ukerIdx, insIdx, deb, os, sml, npl]] } (Rp juta), dari sheet "database debitur briguna"
+const RMX = (() => {
+  let idx = null;
+  const nk = s => String(s || "").toUpperCase().replace(/[^A-Z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+  return { nk, reset: () => { idx = null; },
+    find: name => { if (!DB.deb) return undefined; if (!idx) { idx = new Map(); DB.deb.rm.forEach((n, i) => idx.set(nk(n), i)); } return idx.get(nk(name)); } };
+})();
+function openRmPf(name, orig) {
+  const Dd = DB.deb, ri = RMX.find(name); if (ri == null) return false;
+  const th = insThr(), mine = Dd.rows.filter(r => r[0] === ri), sum = (a, k) => a.reduce((s, r) => s + r[k], 0);
+  const T = { deb: sum(mine, 3), os: sum(mine, 4), sml: sum(mine, 5), npl: sum(mine, 6) }, p = (x, o) => o ? x / o : null;
+  const grp = keyI => { const m = new Map(); mine.forEach(r => { const o = m.get(r[keyI]) || { k: r[keyI], deb: 0, os: 0, sml: 0, npl: 0 }; o.deb += r[3]; o.os += r[4]; o.sml += r[5]; o.npl += r[6]; m.set(r[keyI], o); });
+    return [...m.values()].map(o => ({ ...o, psml: p(o.sml, o.os), pnpl: p(o.npl, o.os) })); };
+  const rIns = grp(2).map(o => ({ ...o, nama: Dd.ins[o.k][1], sh: p(o.os, T.os) })), rUk = grp(1).map(o => ({ ...o, nama: Dd.uker[o.k][1], kc: Dd.cab[Dd.uker[o.k][2]][1], jn: Dd.uker[o.k][3] ? "Mikro (unit)" : "Ritel (kantor cabang)" }));
+  const num = (key, label) => ({ key, label, r: 1, fmt: x => nf0.format(x) });
+  const qc = [num("deb", "Debitur"), num("os", "OS (Rp juta)"), num("sml", "SML (Rp juta)"), { key: "psml", label: "% SML", r: 1, sortVal: r => r.psml ?? -1, fmt: x => insChip(x, th.sml) },
+    num("npl", "NPL (Rp juta)"), { key: "pnpl", label: "% NPL", r: 1, sortVal: r => r.pnpl ?? -1, fmt: x => insChip(x, th.npl) }];
+  const ft = { nama: "Total", deb: nf0.format(T.deb), os: nf0.format(T.os), sml: nf0.format(T.sml), psml: insChip(p(T.sml, T.os), th.sml), npl: nf0.format(T.npl), pnpl: insChip(p(T.npl, T.os), th.npl) };
+  $("#dlgTitle").textContent = "Portofolio kelolaan · " + Dd.rm[ri];
+  $("#dlgBody").innerHTML = `<p class="note" style="margin:0 0 8px">${rUk.map(u => esc(u.nama)).join(", ")} · posisi ${Dd.asof ? perL(Dd.asof) : "–"} · nominal Rp juta · % kualitas = SML (atau NPL) ÷ OS · SML = kolektibilitas 2, NPL = kolektibilitas 3–5</p>
+    <div class="grid tiles">${tile({ label: "Debitur", value: nf0.format(T.deb), sub: nf0.format(rIns.length) + " instansi" })}${tile({ label: "OS", value: rpM(T.os), sub: "baki debet" })}
+      ${tile({ label: "SML", value: `${rpM(T.sml)} · ${insChip(p(T.sml, T.os), th.sml)}`, sub: "Rp dan % dari OS" })}${tile({ label: "NPL", value: `${rpM(T.npl)} · ${insChip(p(T.npl, T.os), th.npl)}`, sub: "Rp dan % dari OS" })}</div>
+    ${rUk.length > 1 ? `<h3 style="margin:14px 0 6px;font-size:14px">Per uker</h3><div id="rpUk"></div>` : ""}
+    <h3 style="margin:14px 0 6px;font-size:14px">Instansi kelolaan</h3><div id="rpIn"></div>
+    <div class="toolbar">${orig ? `<button class="btn" type="button" id="rpProd">Lihat produktivitas RM</button>` : ""}<button class="btn" type="button" data-close>Tutup</button></div>`;
+  if (rUk.length > 1) table($("#rpUk"), [{ key: "nama", label: "Uker", fmt: (x, r) => `${esc(x)}<br><small class="note">${esc(r.jn)} · ${esc(r.kc)}</small>` }, ...qc], rUk, { sortKey: "os", foot: ft });
+  table($("#rpIn"), [{ key: "nama", label: "Instansi", fmt: x => `<b>${esc(x)}</b>` }, ...qc.slice(0, 2), { key: "sh", label: "% dari OS", r: 1, sortVal: r => r.os, fmt: x => pct(x ?? 0, 1) }, ...qc.slice(2)], rIns, { sortKey: "os", page: 15, foot: { ...ft, sh: "100%" } });
+  const pb = $("#rpProd"); if (pb) pb.onclick = () => { $("#dlg").close(); window.__rmBypass = true; try { orig.click(); } finally { window.__rmBypass = false; } };
+  if (!$("#dlg").open) $("#dlg").showModal();
+  return true;
+}
+// klik nama RM (tombol data-rm yang sudah ada, tombol data-rmpf, atau nama RM di sel tabel / grafik) → portofolio kelolaan RM tersebut
+document.addEventListener("click", e => {
+  if (window.__rmBypass || !DB.deb) return;
+  const b = e.target.closest("[data-rmpf], button[data-rm]"); if (!b) return;
+  const name = b.dataset.rmpf || b.dataset.rm; if (RMX.find(name) == null) return;
+  e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); openRmPf(name, b.dataset.rmpf ? null : b);
+}, true);
+// nama RM di sel tabel (tanpa tombol) dijadikan tautan
+function rmLinkify(root) {
+  if (!root || !DB.deb) return;
+  root.querySelectorAll("td, small").forEach(el => {
+    if (el.childElementCount || el.closest("button, a, thead") || el.querySelector("button")) return;
+    const t = el.textContent.trim(); if (t.length < 4 || t.length > 60 || RMX.find(t) == null) return;
+    el.innerHTML = `<button class="linkish" type="button" data-rmpf="${esc(t)}">${esc(t)}</button>`;
+  });
 }
 /* ================= unduh tabel / grafik: Excel, CSV, PDF, gambar (PNG) ================= */
 // Tiap section yang berisi tabel atau grafik mendapat tombol "Unduh". Excel/CSV = data tabel (semua baris, bukan hanya yang tampil);
@@ -3861,10 +3941,10 @@ function render() {
   { const tt = document.querySelector(".topbar .ttl"); if (tt && tt.dataset.v !== title) { tt.dataset.v = title; tt.classList.remove("tb-in"); void tt.offsetWidth; tt.classList.add("tb-in"); } }
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; });
   try { fn(v); } catch (er) { console.error(er); v.innerHTML = `<section class="panel"><div class="empty"><p style="font-weight:700;margin:0 0 6px">Bagian ini belum bisa ditampilkan</p>${esc(er.message || er)}</div></section>`; }
-  setupSections(v, k); Exp.decorate(v); Anim.run(v, k); NavInd.sync();
+  setupSections(v, k); rmLinkify(v); Exp.decorate(v); Anim.run(v, k); NavInd.sync();
 }
 // tombol Unduh tetap ada saat isi section digambar ulang (sub-tab, filter di dalam section)
-{ let t = 0; const deco = () => { clearTimeout(t); t = setTimeout(() => { Exp.decorate($("#view")); Exp.decorate($("#landing")); }, 60); };
+{ let t = 0; const deco = () => { clearTimeout(t); t = setTimeout(() => { rmLinkify($("#view")); Exp.decorate($("#view")); Exp.decorate($("#landing")); }, 60); };
   new MutationObserver(deco).observe(document.body, { childList: true, subtree: true }); }
 // impor (dipakai parser file upload)
 const normKey = k => String(k).trim().toLowerCase().replace(/[\s\-\/]+/g, "_").replace(/[^a-z0-9_]/g, "");
@@ -4022,6 +4102,7 @@ function applyPart(p, o) {
   else if (p === "brs_B") DB.brs = o && o.rm ? o : null;
   else if (p === "ms_K") DB.ms = o && o.biz ? msPrep(o) : null;
   else if (p === "ins_B") DB.ins = o && o.rows ? o : null;
+  else if (p === "deb_B") { DB.deb = o && o.rows ? o : null; RMX.reset(); }
 }
 // soft = true: satu bagian data yang gagal / lambat tidak menggagalkan bagian lain; yang gagal dikembalikan sebagai [[nama, pesan], ...]
 async function loadParts(parts, onEach, soft) {
@@ -4057,7 +4138,7 @@ async function loadAll(silent) {
   LOADING.core = false; KER_LOADING = RM_LOADING = PIPE_LOADING = RATE_LOADING = false; bootMsg("");
   KS.date = KS.date || null; render();
   // laporan Brispot Warm/Hot dimuat terpisah: tidak menahan data inti dan boleh gagal tanpa mengganggu
-  loadParts(["brs_B", "ms_K", "ins_B"], null, true).then(() => { if (seq === LOAD_SEQ && ["pipeline", "marketshare", "portofolio", "beranda"].includes(curView())) render(); }).catch(() => {});
+  loadParts(["brs_B", "ms_K", "ins_B", "deb_B"], null, true).then(() => { if (seq === LOAD_SEQ && ["pipeline", "marketshare", "portofolio", "beranda", "produktivitas", "nominatif", "kualitas", "keragaan"].includes(curView())) render(); }).catch(() => {});
   if (Auth.can("detail")) { try { await loadParts(["lw_B", "lw_K"]); } catch (er) { toast("LW321: " + er.message); } }
   if (seq !== LOAD_SEQ) return;
   LOADING.lw = false;
@@ -4087,7 +4168,7 @@ $("#loginForm").addEventListener("submit", async e => {
 });
 $("#lgEye").onclick = () => { const i = $("#lgPass"); i.type = i.type === "password" ? "text" : "password"; $("#lgEye").setAttribute("aria-label", i.type === "password" ? "Tampilkan password" : "Sembunyikan password"); };
 function resetData() {
-  ++LOAD_SEQ; Object.assign(DB, { meta: null, ker: null, rmk: null, pipe: null, lw: null, rate: null, brs: null, ms: null, ins: null, rmkSets: {}, pipeSets: {}, lwSets: {}, gerak: {}, foto: { rm: {}, kc: {} } });
+  ++LOAD_SEQ; Object.assign(DB, { meta: null, ker: null, rmk: null, pipe: null, lw: null, rate: null, brs: null, ms: null, ins: null, deb: null, rmkSets: {}, pipeSets: {}, lwSets: {}, gerak: {}, foto: { rm: {}, kc: {} } });
   LWR = []; LWK = new Map(); LWCIF = new Map(); LWPK = new Map(); LWPCIF = new Map(); KV = null;
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; }); $("#view").innerHTML = ""; $("#landing").innerHTML = "";
   document.querySelectorAll("dialog[open]").forEach(d => d.close());

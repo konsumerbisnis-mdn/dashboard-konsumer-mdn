@@ -115,6 +115,7 @@ function mkChart(id, cfg) {
   const el = document.getElementById(id); if (!el) return;
   if (charts[id]) charts[id].destroy();
   if (typeof Chart === "undefined") { el.parentElement.innerHTML = '<div class="empty">Grafik butuh koneksi internet untuk memuat pustaka grafik.</div>'; return; }
+  if (cfg && cfg.options && !cfg.options.onClick) cfg.options.onClick = (ev, els, ch) => { if (!DB.deb || !els.length) return; const l = ch.data.labels && ch.data.labels[els[0].index]; if (typeof l === "string" && RMX.find(l) != null) openRmPf(l); };   // klik batang / titik berlabel nama RM → portofolio RM
   charts[id] = new Chart(el, cfg);
 }
 function baseOpts(extra = {}) {

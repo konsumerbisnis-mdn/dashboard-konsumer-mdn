@@ -9,6 +9,7 @@ function applyPart(p, o) {
   else if (p === "foto") DB.foto = o && o.rm ? o : { rm: {}, kc: {} };
   else if (p === "rate") DB.rate = o && o.rows ? o : null;
   else if (p === "brs_B") DB.brs = o && o.rm ? o : null;
+  else if (p === "ms_K") DB.ms = o && o.biz ? o : null;
 }
 // soft = true: satu bagian data yang gagal / lambat tidak menggagalkan bagian lain; yang gagal dikembalikan sebagai [[nama, pesan], ...]
 async function loadParts(parts, onEach, soft) {
@@ -44,7 +45,7 @@ async function loadAll(silent) {
   LOADING.core = false; KER_LOADING = RM_LOADING = PIPE_LOADING = RATE_LOADING = false; bootMsg("");
   KS.date = KS.date || null; render();
   // laporan Brispot Warm/Hot dimuat terpisah: tidak menahan data inti dan boleh gagal tanpa mengganggu
-  loadParts(["brs_B"], null, true).then(() => { if (seq === LOAD_SEQ && curView() === "pipeline") render(); }).catch(() => {});
+  loadParts(["brs_B", "ms_K"], null, true).then(() => { if (seq === LOAD_SEQ && ["pipeline", "marketshare", "beranda"].includes(curView())) render(); }).catch(() => {});
   if (Auth.can("detail")) { try { await loadParts(["lw_B", "lw_K"]); } catch (er) { toast("LW321: " + er.message); } }
   if (seq !== LOAD_SEQ) return;
   LOADING.lw = false;
@@ -74,7 +75,7 @@ $("#loginForm").addEventListener("submit", async e => {
 });
 $("#lgEye").onclick = () => { const i = $("#lgPass"); i.type = i.type === "password" ? "text" : "password"; $("#lgEye").setAttribute("aria-label", i.type === "password" ? "Tampilkan password" : "Sembunyikan password"); };
 function resetData() {
-  ++LOAD_SEQ; Object.assign(DB, { meta: null, ker: null, rmk: null, pipe: null, lw: null, rate: null, brs: null, rmkSets: {}, pipeSets: {}, lwSets: {}, gerak: {}, foto: { rm: {}, kc: {} } });
+  ++LOAD_SEQ; Object.assign(DB, { meta: null, ker: null, rmk: null, pipe: null, lw: null, rate: null, brs: null, ms: null, rmkSets: {}, pipeSets: {}, lwSets: {}, gerak: {}, foto: { rm: {}, kc: {} } });
   LWR = []; LWK = new Map(); LWCIF = new Map(); LWPK = new Map(); LWPCIF = new Map(); KV = null;
   Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; }); $("#view").innerHTML = ""; $("#landing").innerHTML = "";
   document.querySelectorAll("dialog[open]").forEach(d => d.close());

@@ -432,7 +432,7 @@ start = '''
 })();
 '''
 js = '\n(() => {\n"use strict";\n' + util + P('master.js') + P('state.js') + P('cal.js') + chart + P('charts.js') + tbl + comp + land + P('beranda.js') + P('kerprep.js') + ker + kimp + rm + P('rm_rep.js') + P('rm_nett.js') + pipe + P('brispot_brs.js') + P('pipe_rep.js') + pimp + sim \
-     + P('sim_brg.js') + P('nominatif.js') + P('ker_up.js') + P('admin.js') + P('feedback.js') + P('export.js') + P('anim.js') + P('router.js') + P('foto_zoom.js') + P('land_fit.js') + zoom + P('boot.js') + start + intro
+     + P('sim_brg.js') + P('nominatif.js') + P('ker_up.js') + P('admin.js') + P('feedback.js') + P('marketshare.js') + P('export.js') + P('anim.js') + P('router.js') + P('foto_zoom.js') + P('land_fit.js') + zoom + P('boot.js') + start + intro
 # bagian bertanda data-nosec (mis. Lampiran, yang sudah punya buka-tutup per lampiran) tidak diberi tombol minimize
 js = rep(js, '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h"));''', '''const secs = [...v.querySelectorAll("section.panel")].filter(x => x.querySelector(":scope > .panel-h") && !x.hasAttribute("data-nosec"));''')
 open(os.path.join(ROOT, 'js', 'app.js'), 'w', encoding='utf8').write(js)
@@ -443,5 +443,8 @@ import hashlib, re
 ix = os.path.join(ROOT, 'index.html'); h = open(ix, encoding='utf8').read()
 vj = hashlib.md5(js.encode('utf8')).hexdigest()[:8]; vc = hashlib.md5(css.encode('utf8')).hexdigest()[:8]
 h = re.sub(r'js/app\.js(\?v=\w+)?"', 'js/app.js?v=' + vj + '"', h); h = re.sub(r'css/app\.css(\?v=\w+)?"', 'css/app.css?v=' + vc + '"', h)
+# auth.js (daftar hak akses menu) juga diberi versi: menu baru tidak boleh tertahan oleh auth.js lama di cache browser
+va = hashlib.md5(open(os.path.join(ROOT, 'js', 'auth.js'), 'rb').read()).hexdigest()[:8]
+h = re.sub(r'js/auth\.js(\?v=\w+)?"', 'js/auth.js?v=' + va + '"', h)
 open(ix, 'w', encoding='utf8').write(h)
 print('app.js', len(js), 'app.css', len(css))

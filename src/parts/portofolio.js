@@ -2,7 +2,7 @@
 // Sumber: sheet "database instansi" di Google Sheets (dibaca Apps Script saat Sync portofolio), nominal Rp juta.
 // DB.ins = { asof, cab[[kode, nama]], uker[[kode, nama, cabIdx, 0 = kantor cabang (Ritel) · 1 = unit (Mikro)]], ins[[id, nama]], rows[[ukerIdx, insIdx, deb, os, sml, npl]], pks{ rowIdx: [jenis, no, jatuhTempo, payroll, pegawai] } }
 // Batas warna % SML / NPL: hijau di bawah batas pertama, kuning sampai batas kedua, merah di atasnya; default 1% dan 2%, diubah admin (meta.cfg.insThr).
-const PFX = Object.assign({ kc: "ALL", uk: "ALL", jn: "ALL", q: "" }, lsGet(STORE + "-pf") || {});
+const PFX = Object.assign({ kc: "ALL", uk: "ALL", jn: "ALL", q: "", qu: "" }, lsGet(STORE + "-pf") || {});
 const savePFX = () => lsSet(STORE + "-pf", PFX);
 const insThr = () => { const c = (DB.meta && DB.meta.cfg && DB.meta.cfg.insThr) || {}; return { sml: Array.isArray(c.sml) ? c.sml : [1, 2], npl: Array.isArray(c.npl) ? c.npl : [1, 2] }; };
 const insCls = (v, th) => v == null ? "neutral" : v * 100 < th[0] ? "good" : v * 100 <= th[1] ? "warn" : "crit";
@@ -22,13 +22,15 @@ function viewPortofolio(v) {
   if (PFX.kc !== "ALL" && !D.cab[+PFX.kc]) PFX.kc = "ALL";
   const ukers = D.uker.map((u, i) => ({ i, kode: u[0], nama: u[1], cab: u[2], unit: u[3] })).filter(u => PFX.kc === "ALL" || u.cab === +PFX.kc).sort((a, b) => a.unit - b.unit || a.nama.localeCompare(b.nama));
   if (PFX.uk !== "ALL" && !ukers.some(u => String(u.i) === PFX.uk)) PFX.uk = "ALL";
-  const okU = D.uker.map((u, i) => (PFX.kc === "ALL" || u[2] === +PFX.kc) && (PFX.uk === "ALL" || String(i) === PFX.uk) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])));
+  const qu = PFX.qu.trim().toLowerCase(), ukHit = u => !qu || (u[1] + " " + u[0] + " " + D.cab[u[2]][1]).toLowerCase().includes(qu);   // cari uker: nama uker, kode uker, atau nama cabangnya
+  const okU = D.uker.map((u, i) => (PFX.kc === "ALL" || u[2] === +PFX.kc) && (PFX.uk === "ALL" || String(i) === PFX.uk) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])) && ukHit(u));
   const scoped = D.rows.map((r, ri) => [ri, r]).filter(([, r]) => okU[r[0]]);
   const q = PFX.q.trim().toLowerCase();
   const insRows = pfAgg(scoped, r => r[1]).map(o => ({ ...o, id: D.ins[o.k][0], nama: D.ins[o.k][1], npks: o.ri.filter(ri => D.pks[ri]).length })).filter(o => !q || (o.nama + " " + o.id).toLowerCase().includes(q));
   const T = { deb: 0, os: 0, sml: 0, npl: 0 }; scoped.forEach(([, r]) => { T.deb += r[2]; T.os += r[3]; T.sml += r[4]; T.npl += r[5]; });
   const tp = { sml: T.os ? T.sml / T.os : null, npl: T.os ? T.npl / T.os : null };
-  const scopeL = PFX.uk !== "ALL" ? D.uker[+PFX.uk][1] : PFX.kc !== "ALL" ? D.cab[+PFX.kc][1] : "Seluruh RO Medan";
+  const nUkHit = okU.filter(Boolean).length;
+  const scopeL = PFX.uk !== "ALL" ? D.uker[+PFX.uk][1] : qu ? `${nf0.format(nUkHit)} uker cocok “${PFX.qu.trim()}”` : PFX.kc !== "ALL" ? D.cab[+PFX.kc][1] : "Seluruh RO Medan";
   const optKc = `<option value="ALL">Semua kantor cabang</option>` + cabs.map(c => `<option value="${c.i}" ${String(c.i) === PFX.kc ? "selected" : ""}>${esc(c.nama)}</option>`).join("");
   const optUk = `<option value="ALL">Semua uker${PFX.kc !== "ALL" ? " di cabang ini" : ""}</option>` + ukers.map(u => `<option value="${u.i}" ${String(u.i) === PFX.uk ? "selected" : ""}>${u.unit ? "" : "★ "}${esc(u.nama)}${u.unit ? "" : " (kantor cabang · Ritel)"}</option>`).join("");
   const rule = k => `hijau &lt; ${nfTh(th[k][0])}% · kuning ${nfTh(th[k][0])}–${nfTh(th[k][1])}% · merah &gt; ${nfTh(th[k][1])}%`;
@@ -37,6 +39,7 @@ function viewPortofolio(v) {
       <div class="toolbar">
         <label class="field" style="flex:1 1 220px"><span class="note" style="font-weight:700">Kantor cabang</span><select class="ctl" id="pfKc">${optKc}</select></label>
         <label class="field" style="flex:1 1 260px"><span class="note" style="font-weight:700">Uker</span><select class="ctl" id="pfUk">${optUk}</select></label>
+        <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">Cari uker</span><input class="ctl" type="search" id="pfQu" value="${esc(PFX.qu)}" placeholder="nama atau kode uker"></label>
         <label class="field" style="flex:1 1 190px"><span class="note" style="font-weight:700">Jenis</span><select class="ctl" id="pfJn"><option value="ALL">Briguna Ritel + Mikro</option><option value="ritel" ${PFX.jn === "ritel" ? "selected" : ""}>Briguna Ritel (kantor cabang)</option><option value="mikro" ${PFX.jn === "mikro" ? "selected" : ""}>Briguna Mikro (unit)</option></select></label>
         <label class="field" style="flex:1 1 200px"><span class="note" style="font-weight:700">Cari instansi</span><input class="ctl" type="search" id="pfQ" value="${esc(PFX.q)}" placeholder="nama atau ID instansi"></label>
       </div>
@@ -54,18 +57,19 @@ function viewPortofolio(v) {
     <section class="panel"><div class="panel-h"><h2>Instansi di ${esc(scopeL)}</h2><span class="sub">warna mengikuti batas % SML / NPL · tombol PKS menampilkan data kerja sama</span></div><div id="pfInT"></div></section>`;
   const go = () => { savePFX(); render(); };
   $("#pfKc").onchange = e => { PFX.kc = e.target.value; PFX.uk = "ALL"; go(); };
-  $("#pfUk").onchange = e => { PFX.uk = e.target.value; go(); };
+  $("#pfUk").onchange = e => { PFX.uk = e.target.value; if (PFX.uk !== "ALL") PFX.qu = ""; go(); };
   $("#pfJn").onchange = e => { PFX.jn = e.target.value; go(); };
   let qt; $("#pfQ").oninput = e => { clearTimeout(qt); qt = setTimeout(() => { PFX.q = e.target.value; savePFX(); render(); const el = $("#pfQ"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 350); };
+  let qut; $("#pfQu").oninput = e => { clearTimeout(qut); qut = setTimeout(() => { PFX.qu = e.target.value; PFX.uk = "ALL"; if (PFX.qu.trim()) PFX.kc = "ALL"; savePFX(); render(); const el = $("#pfQu"); if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 350); };
   if ($("#pfThr")) $("#pfThr").onclick = openInsThr;
   // per uker (semua uker dalam cakupan kantor cabang / jenis terpilih, tanpa menyaring uker)
-  const scopedU = D.rows.map((r, ri) => [ri, r]).filter(([, r]) => { const u = D.uker[r[0]]; return (PFX.kc === "ALL" || u[2] === +PFX.kc) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])); });
+  const scopedU = D.rows.map((r, ri) => [ri, r]).filter(([, r]) => { const u = D.uker[r[0]]; return (PFX.kc === "ALL" || u[2] === +PFX.kc) && (PFX.jn === "ALL" || (PFX.jn === "ritel" ? !u[3] : !!u[3])) && ukHit(u); });
   const ukRows = pfAgg(scopedU, r => r[0]).map(o => ({ ...o, nama: D.uker[o.k][1], kode: D.uker[o.k][0], unit: D.uker[o.k][3], kc: D.cab[D.uker[o.k][2]][1], nIns: new Set(o.ri.map(ri => D.rows[ri][1])).size }));
   table($("#pfUkT"), [{ key: "nama", label: "Uker", fmt: (x, r) => `<button class="linkish" data-uk="${r.k}">${esc(x)}</button><br><small class="note">${r.kode} · ${esc(jenisUker(D.uker[r.k]))}${PFX.kc === "ALL" ? " · " + esc(r.kc) : ""}</small>` },
     { key: "nIns", label: "Instansi", r: 1, fmt: x => nf0.format(x) }, { key: "deb", label: "Debitur", r: 1, fmt: x => nf0.format(x) }, { key: "os", label: "OS (Rp juta)", r: 1, fmt: x => nf0.format(x) },
     { key: "psml", label: "% SML", r: 1, sortVal: r => r.psml ?? -1, fmt: x => insChip(x, th.sml) }, { key: "pnpl", label: "% NPL", r: 1, sortVal: r => r.pnpl ?? -1, fmt: x => insChip(x, th.npl) },
     { key: "sml", label: "SML (Rp juta)", r: 1, fmt: x => nf0.format(x) }, { key: "npl", label: "NPL (Rp juta)", r: 1, fmt: x => nf0.format(x) }], ukRows,
-    { sortKey: "os", page: 15, after: el => el.querySelectorAll("[data-uk]").forEach(b => b.onclick = () => { PFX.uk = b.dataset.uk; PFX.kc = String(D.uker[+b.dataset.uk][2]); go(); window.scrollTo(0, 0); }) });
+    { sortKey: "os", page: 15, after: el => el.querySelectorAll("[data-uk]").forEach(b => b.onclick = () => { PFX.uk = b.dataset.uk; PFX.qu = ""; PFX.kc = String(D.uker[+b.dataset.uk][2]); go(); window.scrollTo(0, 0); }) });
   // instansi
   table($("#pfInT"), [{ key: "nama", label: "Instansi", fmt: (x, r) => `<b>${esc(x)}</b>${r.id ? `<br><small class="note">${esc(r.id)}</small>` : ""}` },
     { key: "deb", label: "Debitur", r: 1, fmt: x => nf0.format(x) }, { key: "os", label: "OS (Rp juta)", r: 1, fmt: x => nf0.format(x) }, { key: "sh", label: "% dari OS", r: 1, sortVal: r => r.os, fmt: (x, r) => pct(T.os ? r.os / T.os : 0, 1) },
